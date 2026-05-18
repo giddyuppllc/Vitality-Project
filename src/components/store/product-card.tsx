@@ -41,11 +41,9 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
 
-          {product.slug === 'retatrutide' && (
-            <div className="absolute top-3 right-3 bg-amber-400/95 text-amber-950 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg shadow-sm">
-              Pre-order
-            </div>
-          )}
+          {/* Reta now has partial stock (10mg + 20mg). The detail page banner
+              and per-variant "In stock" / "Pre-order" badges cover the nuance —
+              the listing card no longer flags pre-order globally. */}
 
         </div>
 

@@ -174,17 +174,14 @@ export default async function ProductPage({ params }: Props) {
             </span>
           </div>
 
-          {/* Backorder notice — Reta supply is short, pre-orders only. */}
+          {/* Partial-stock notice — 10mg + 20mg in stock; larger sizes on pre-order. */}
           {product.slug === 'retatrutide' && (
             <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200/90">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-400/40">
-                  Pre-order
-                </span>
-                <span className="font-semibold text-amber-200">Backorder — ships in 3–4 weeks</span>
-              </div>
+              <p className="font-semibold text-amber-200 mb-1">
+                10 mg + 20 mg in stock now.
+              </p>
               <p className="text-amber-200/80 leading-relaxed">
-                Retatrutide is on a short backorder. We're accepting pre-orders now and will email you the moment yours ships. Thanks for your patience.
+                30 mg and larger sizes ship in 3–4 weeks. Select your size below — in-stock options ship within 2 business days.
               </p>
             </div>
           )}
