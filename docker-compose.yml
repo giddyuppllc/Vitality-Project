@@ -32,6 +32,10 @@ services:
         condition: service_healthy
     volumes:
       - ./public/uploads:/app/public/uploads
+      # CoA PDFs uploaded via /admin/coa/new must survive container rebuilds.
+      # Without this mount, /app/public/coa lives inside the image and every
+      # `docker compose up -d --build` wipes the uploads silently.
+      - ./public/coa:/app/public/coa
 
   # ─── Nginx ────────────────────────────────────────────────────
   nginx:
