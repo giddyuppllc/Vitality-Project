@@ -25,6 +25,53 @@ export default function CheckoutPage() {
   const { data: session, status: sessionStatus } = useSession()
   const items = useCart((s) => s.items)
   const clearCart = useCart((s) => s.clearCart)
+  const setItemPrice = useCart((s) => s.setItemPrice)
+  const removeItem = useCart((s) => s.removeItem)
+
+  // Same silent price sync as /cart — if a customer skips /cart and deep-links
+  // to /checkout, we still refresh every line item against the live DB price
+  // before they see a total. Archived items get silently dropped (the
+  // checkout server endpoint would reject them anyway).
+  useEffect(() => {
+    if (items.length === 0) return
+    let cancelled = false
+    void fetch('/api/cart/refresh-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId ?? null,
+        })),
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.items) return
+        for (const r of data.items as Array<{
+          productId: string
+          variantId: string | null
+          currentPrice: number | null
+          available: boolean
+        }>) {
+          if (!r.available || r.currentPrice == null) {
+            removeItem(r.productId, r.variantId ?? undefined)
+            continue
+          }
+          const stored = items.find(
+            (i) => i.productId === r.productId && (i.variantId ?? null) === r.variantId,
+          )
+          if (stored && stored.price !== r.currentPrice) {
+            setItemPrice(r.productId, r.currentPrice, r.variantId ?? undefined)
+          }
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, items.map((i) => `${i.productId}|${i.variantId}`).join(',')])
 
   const [name, setName] = useState('')
   const [line1, setLine1] = useState('')
