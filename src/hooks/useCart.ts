@@ -73,6 +73,9 @@ export const useCart = create<CartState>()(
       // Defensive migration: cart entries from before the 2026-05-19 refactor
       // had a `price` field. We strip it on rehydrate so no stale price
       // can ever sneak into the UI. Re-read /api/cart for live prices.
+      // Zustand's persist middleware only restores the data fields; methods
+      // come from the store factory. So we only need to return the data
+      // shape — the cast through `unknown` satisfies TS without runtime cost.
       migrate: (persistedState) => {
         const state = persistedState as { items?: Array<Record<string, unknown>> }
         if (state?.items && Array.isArray(state.items)) {
@@ -81,7 +84,7 @@ export const useCart = create<CartState>()(
             return rest
           })
         }
-        return state as CartState
+        return state as unknown as CartState
       },
       version: 2,
     }
