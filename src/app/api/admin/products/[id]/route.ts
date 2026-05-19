@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { setProductStatus } from '@/lib/products'
+import { purgeProductCache } from '@/lib/cloudflare-purge'
 import { z } from 'zod'
 
 const updateSchema = z.object({
@@ -80,6 +81,14 @@ export async function PATCH(
       entityId: id,
       metadata: { changes: Object.keys(data) },
     })
+
+    // Purge Cloudflare edge cache so the new product data is visible to
+    // every visitor immediately, not whenever the edge TTL expires.
+    // Fire-and-forget; admin save is not blocked on the purge call.
+    void purgeProductCache({ slug: product.slug }).catch((err) =>
+      console.error('[admin/products PATCH] cloudflare purge failed:', err),
+    )
+
     return NextResponse.json(product)
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues }, { status: 400 })

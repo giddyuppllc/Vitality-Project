@@ -40,11 +40,16 @@ export function AddToCartButton({ product }: Props) {
   const unitPrice = selectedVariant?.price ?? product.price
 
   const handleAdd = () => {
+    // Cart only stores REFS — productId, variantId, quantity + display
+    // fields. Price is intentionally NOT passed; the cart and checkout
+    // pages always derive prices from /api/cart on the server. The
+    // `unitPrice` shown on this button is still server-rendered HTML
+    // from the product detail page (force-dynamic), so the customer
+    // adds at the price they see.
     addItem({
       productId: product.id,
       variantId: selectedVariant?.id,
       name: product.name + (selectedVariant ? ` — ${selectedVariant.name}` : ''),
-      price: unitPrice,
       image: product.image,
       slug: product.slug,
       quantity: qty,

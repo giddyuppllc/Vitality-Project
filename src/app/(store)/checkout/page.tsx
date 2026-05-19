@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -20,58 +20,61 @@ function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
+interface PricedCart {
+  lines: Array<{
+    productId: string
+    variantId: string | null
+    name: string
+    slug: string
+    unitPrice: number
+    quantity: number
+    lineTotal: number
+    available: boolean
+  }>
+  subtotal: number
+  bundle: { discountCents: number; tierLabel: string | null; discountPct: number; nextTier: { remaining: number; pct: number } | null }
+  member: { tier: string; discountCents: number }
+  totalDiscount: number
+  total: number
+  unavailableCount: number
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { data: session, status: sessionStatus } = useSession()
   const items = useCart((s) => s.items)
   const clearCart = useCart((s) => s.clearCart)
-  const setItemPrice = useCart((s) => s.setItemPrice)
-  const removeItem = useCart((s) => s.removeItem)
 
-  // Same silent price sync as /cart — if a customer skips /cart and deep-links
-  // to /checkout, we still refresh every line item against the live DB price
-  // before they see a total. Archived items get silently dropped (the
-  // checkout server endpoint would reject them anyway).
+  // Authoritative cart numbers come from /api/cart — never from the client.
+  // Cart items in localStorage carry only refs (productId/variantId/quantity).
+  const [cart, setCart] = useState<PricedCart | null>(null)
   useEffect(() => {
-    if (items.length === 0) return
+    if (items.length === 0) {
+      setCart(null)
+      return
+    }
     let cancelled = false
-    void fetch('/api/cart/refresh-prices', {
+    void fetch('/api/cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         items: items.map((i) => ({
           productId: i.productId,
           variantId: i.variantId ?? null,
+          quantity: i.quantity,
         })),
       }),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.items) return
-        for (const r of data.items as Array<{
-          productId: string
-          variantId: string | null
-          currentPrice: number | null
-          available: boolean
-        }>) {
-          if (!r.available || r.currentPrice == null) {
-            removeItem(r.productId, r.variantId ?? undefined)
-            continue
-          }
-          const stored = items.find(
-            (i) => i.productId === r.productId && (i.variantId ?? null) === r.variantId,
-          )
-          if (stored && stored.price !== r.currentPrice) {
-            setItemPrice(r.productId, r.currentPrice, r.variantId ?? undefined)
-          }
-        }
+      .then((data: PricedCart | null) => {
+        if (cancelled) return
+        setCart(data)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, items.map((i) => `${i.productId}|${i.variantId}`).join(',')])
+  }, [items.length, items.map((i) => `${i.productId}|${i.variantId}|${i.quantity}`).join(',')])
 
   const [name, setName] = useState('')
   const [line1, setLine1] = useState('')
@@ -106,44 +109,23 @@ export default function CheckoutPage() {
     if (session?.user?.name && !name) setName(session.user.name)
   }, [session?.user?.name, name])
 
-  const subtotal = useMemo(
-    () => items.reduce((sum, i) => sum + i.price * i.quantity, 0),
-    [items],
-  )
-
-  // Auto-apply bundle + membership discounts. Recompute whenever the
-  // cart changes; debounced via the items dependency list. Server-side
-  // call so categorySlug + membership are looked up authoritatively.
-  const [discount, setDiscount] = useState<{
-    qualifyingCount: number;
-    discountPct: number;
-    discountCents: number;
-    tierLabel: string | null;
-    nextTier: { remaining: number; pct: number } | null;
-    memberDiscountCents: number;
-    memberTier: string;
-    totalDiscountCents: number;
-    finalTotalCents: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (items.length === 0) { setDiscount(null); return; }
-    const ctrl = new AbortController();
-    fetch("/api/cart/discount", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: items.map((i) => ({ productId: i.productId, price: i.price, quantity: i.quantity })),
-      }),
-      signal: ctrl.signal,
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data) setDiscount(data); })
-      .catch(() => {});
-    return () => ctrl.abort();
-  }, [items]);
-
-  const finalTotal = discount?.finalTotalCents ?? subtotal;
+  // All numbers below are pulled straight from /api/cart (server-authoritative).
+  // No client-side fallback math — if `cart` is null the UI shows a loader.
+  const subtotal = cart?.subtotal ?? 0
+  const discount = cart
+    ? {
+        qualifyingCount: cart.bundle.qualifyingCount ?? 0,
+        discountPct: cart.bundle.discountPct,
+        discountCents: cart.bundle.discountCents,
+        tierLabel: cart.bundle.tierLabel,
+        nextTier: cart.bundle.nextTier,
+        memberDiscountCents: cart.member.discountCents,
+        memberTier: cart.member.tier,
+        totalDiscountCents: cart.totalDiscount,
+        finalTotalCents: cart.total,
+      }
+    : null
+  const finalTotal = cart?.total ?? 0
 
   // Sign-in gate
   if (sessionStatus === 'loading') {
@@ -452,19 +434,25 @@ export default function CheckoutPage() {
             <h2 className="text-lg font-semibold">Order summary</h2>
 
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 text-sm">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.name}</p>
-                    <p className="text-white/40 text-xs">
-                      Qty {item.quantity} · {formatPrice(item.price)} ea
+              {!cart ? (
+                <div className="flex items-center justify-center py-6 text-white/40 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Pricing your cart…
+                </div>
+              ) : (
+                cart.lines.map((line) => (
+                  <div key={`${line.productId}|${line.variantId}`} className="flex items-start gap-3 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{line.name}</p>
+                      <p className="text-white/40 text-xs">
+                        Qty {line.quantity} · {formatPrice(line.unitPrice)} ea
+                      </p>
+                    </div>
+                    <p className="font-medium tabular-nums">
+                      {formatPrice(line.lineTotal)}
                     </p>
                   </div>
-                  <p className="font-medium tabular-nums">
-                    {formatPrice(item.price * item.quantity)}
-                  </p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="h-px bg-white/10" />

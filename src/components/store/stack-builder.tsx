@@ -79,11 +79,12 @@ export function StackBuilder({ stackName, stackSlug, components }: Props) {
   const handleAddStackToCart = () => {
     for (const { component, variant } of selected) {
       if (!variant) continue;
+      // Price intentionally omitted — cart stores refs only; /api/cart
+      // is the single source of truth for line totals.
       addItem({
         productId: component.productId,
         variantId: variant.id,
         name: `${component.productName} — ${variant.name}`,
-        price: variant.price,
         slug: component.productSlug,
         quantity: 1,
       });

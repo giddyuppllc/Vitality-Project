@@ -6,11 +6,17 @@ export interface CartItem {
   id: string
   productId: string
   variantId?: string
+  /** Display name with variant suffix (e.g., "Retatrutide — 20 mg"). Cached
+   *  locally so the cart icon can render an item name without a network
+   *  call. Authoritative name comes from the server on /api/cart. */
   name: string
-  price: number
   image?: string
   quantity: number
   slug: string
+  // NOTE: there is no `price` field. Prices live ONLY on the server, in the
+  // Product/ProductVariant tables, and are computed at /api/cart and at
+  // checkout time. Storing a price client-side was the root cause of the
+  // 2026-05-18 "stale price" incident. See plan: eventual-floating-beaver.
 }
 
 export interface CartState {
@@ -18,11 +24,7 @@ export interface CartState {
   addItem: (item: Omit<CartItem, 'id'>) => void
   removeItem: (productId: string, variantId?: string) => void
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void
-  /** Replace the cached price on a line item. Used by /cart when the
-   *  server price has drifted from the localStorage-stored one. */
-  setItemPrice: (productId: string, newPrice: number, variantId?: string) => void
   clearCart: () => void
-  total: number
   itemCount: number
 }
 

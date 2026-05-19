@@ -14,10 +14,10 @@ export default function WishlistPage() {
 
   const moveAllToCart = () => {
     items.forEach((it) => {
+      // Cart stores refs only — price comes from /api/cart on render.
       addItem({
         productId: it.id,
         name: it.name,
-        price: it.price,
         quantity: 1,
         slug: it.slug,
         image: it.image,

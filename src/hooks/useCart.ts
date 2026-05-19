@@ -3,8 +3,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useEffect, useRef } from 'react'
-import type { CartState, CartItem } from '@/types'
+import type { CartState } from '@/types'
 
+/**
+ * Client-side cart state.
+ *
+ * Important: this store deliberately does NOT track prices. Cart items
+ * are { productId, variantId, quantity, name, slug, image }. The price
+ * for any line — and the cart total — is always derived from the server
+ * by POSTing the refs to /api/cart and rendering the response.
+ *
+ * `itemCount` is a sum of quantities (for the navbar badge) — no price
+ * info needed for that.
+ */
 export const useCart = create<CartState>()(
   persist(
     (set, get) => ({
@@ -51,21 +62,7 @@ export const useCart = create<CartState>()(
         }))
       },
 
-      setItemPrice: (productId, newPrice, variantId) => {
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.productId === productId && i.variantId === variantId
-              ? { ...i, price: newPrice }
-              : i
-          ),
-        }))
-      },
-
       clearCart: () => set({ items: [] }),
-
-      get total() {
-        return get().items.reduce((sum, i) => sum + i.price * i.quantity, 0)
-      },
 
       get itemCount() {
         return get().items.reduce((sum, i) => sum + i.quantity, 0)
@@ -73,14 +70,28 @@ export const useCart = create<CartState>()(
     }),
     {
       name: 'vitality-cart',
+      // Defensive migration: cart entries from before the 2026-05-19 refactor
+      // had a `price` field. We strip it on rehydrate so no stale price
+      // can ever sneak into the UI. Re-read /api/cart for live prices.
+      migrate: (persistedState) => {
+        const state = persistedState as { items?: Array<Record<string, unknown>> }
+        if (state?.items && Array.isArray(state.items)) {
+          state.items = state.items.map((i) => {
+            const { price: _price, ...rest } = i
+            return rest
+          })
+        }
+        return state as CartState
+      },
+      version: 2,
     }
   )
 )
 
 /**
- * Subscribe-style hook that saves cart state to the API when cart changes.
- * Debounced 30s. Skips empty carts. If user has no session email it will still
- * post; the API will silently skip when it can't attribute the cart.
+ * Mirror cart state to the server (`/api/cart/save`) on change.
+ * Debounced 30s. Used for abandoned-cart recovery emails — NOT the source
+ * of truth for pricing.
  */
 export function useCartAutoSave(email?: string | null) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -94,7 +105,6 @@ export function useCartAutoSave(email?: string | null) {
           productId: i.productId,
           variantId: i.variantId ?? null,
           name: i.name,
-          price: i.price,
           quantity: i.quantity,
           slug: i.slug,
         }))

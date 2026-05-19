@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { createAdminNotification } from '@/lib/notifications'
+import { purgeProductCache } from '@/lib/cloudflare-purge'
 import type { ProductStatus } from '@prisma/client'
 
 interface ChangedBy {
@@ -65,6 +66,13 @@ export async function setProductStatus(
       source: by.source ?? 'admin',
     },
   })
+
+  // Cloudflare cache purge — fire-and-forget. Any status change to a
+  // product means its detail page + the storefront listing should be
+  // refreshed at the edge so visitors see the new state immediately.
+  void purgeProductCache({ slug: existing.slug }).catch((err) =>
+    console.error('[setProductStatus] cloudflare purge failed:', err),
+  )
 
   // Surface ACTIVE → non-ACTIVE changes as an admin notification — those
   // are the silent ones that hide products from the storefront. Anything
