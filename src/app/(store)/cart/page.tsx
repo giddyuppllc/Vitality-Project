@@ -1,16 +1,89 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trash2, ShoppingBag, ArrowRight, LogIn } from 'lucide-react'
+import { Trash2, ShoppingBag, ArrowRight, LogIn, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { useSession } from 'next-auth/react'
 import { formatPrice } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
+type PriceDrift = {
+  productId: string
+  variantId: string | null
+  storedPrice: number
+  currentPrice: number | null
+  available: boolean
+  reason?: string
+}
+
 export default function CartPage() {
   const { data: session, status } = useSession()
-  const { items, removeItem, updateQuantity, total, itemCount } = useCart()
+  const { items, removeItem, updateQuantity, setItemPrice, total, itemCount } = useCart()
+
+  // Stale-price detection: cart stores price at add-to-cart time in
+  // localStorage. If admin changed the price since (or archived the
+  // product), the customer would see a stale total here AND a different
+  // total at checkout. We fetch current server prices and surface drift.
+  const [drift, setDrift] = useState<PriceDrift[]>([])
+  useEffect(() => {
+    if (items.length === 0) {
+      setDrift([])
+      return
+    }
+    let cancelled = false
+    void fetch('/api/cart/refresh-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId ?? null,
+        })),
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.items) return
+        const drifts: PriceDrift[] = []
+        for (const r of data.items as Array<{
+          productId: string
+          variantId: string | null
+          currentPrice: number | null
+          available: boolean
+          reason?: string
+        }>) {
+          const stored = items.find(
+            (i) => i.productId === r.productId && (i.variantId ?? null) === r.variantId,
+          )
+          if (!stored) continue
+          if (!r.available || r.currentPrice == null) {
+            drifts.push({ ...r, storedPrice: stored.price })
+          } else if (r.currentPrice !== stored.price) {
+            drifts.push({ ...r, storedPrice: stored.price })
+          }
+        }
+        setDrift(drifts)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, items.map((i) => `${i.productId}|${i.variantId}|${i.quantity}`).join(',')])
+
+  const acceptUpdatedPrices = () => {
+    for (const d of drift) {
+      if (d.available && d.currentPrice != null) {
+        setItemPrice(d.productId, d.currentPrice, d.variantId ?? undefined)
+      } else {
+        // Product is unavailable — drop it from the cart so checkout doesn't fail.
+        removeItem(d.productId, d.variantId ?? undefined)
+      }
+    }
+    setDrift([])
+  }
 
   // Show sign-in prompt if not authenticated
   if (status !== 'loading' && !session) {
@@ -42,6 +115,49 @@ export default function CartPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="text-3xl font-bold mb-8">Cart ({itemCount} items)</h1>
+
+      {/* Price-drift banner: shows when stored cart prices no longer match
+          the current server price (admin edit while items sat in cart, or
+          a product got archived). One click syncs the cart to current
+          prices and drops unavailable items. */}
+      {drift.length > 0 && (
+        <div className="glass rounded-2xl border border-amber-400/40 bg-amber-400/10 p-4 mb-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-300 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-amber-200">
+              {drift.length} item{drift.length === 1 ? '' : 's'} in your cart {drift.length === 1 ? 'has' : 'have'} updated pricing or availability since you added {drift.length === 1 ? 'it' : 'them'}.
+            </p>
+            <ul className="text-sm text-amber-200/80 mt-2 space-y-0.5">
+              {drift.map((d) => {
+                const stored = items.find(
+                  (i) => i.productId === d.productId && (i.variantId ?? null) === d.variantId,
+                )
+                if (!stored) return null
+                return (
+                  <li key={`${d.productId}|${d.variantId}`} className="leading-relaxed">
+                    <span className="font-medium text-amber-100">{stored.name}</span>
+                    {' — '}
+                    {d.available && d.currentPrice != null ? (
+                      <>
+                        was {formatPrice(d.storedPrice)} → now <span className="text-amber-100 font-medium">{formatPrice(d.currentPrice)}</span>
+                      </>
+                    ) : (
+                      <span className="text-red-300">no longer available — will be removed</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+          <button
+            onClick={acceptUpdatedPrices}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400 text-amber-950 text-sm font-semibold hover:bg-amber-300 transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Update cart
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items */}

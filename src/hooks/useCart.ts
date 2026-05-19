@@ -51,6 +51,16 @@ export const useCart = create<CartState>()(
         }))
       },
 
+      setItemPrice: (productId, newPrice, variantId) => {
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.productId === productId && i.variantId === variantId
+              ? { ...i, price: newPrice }
+              : i
+          ),
+        }))
+      },
+
       clearCart: () => set({ items: [] }),
 
       get total() {

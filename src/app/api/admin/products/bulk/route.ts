@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
+import { setProductStatus } from '@/lib/products'
+import type { ProductStatus } from '@prisma/client'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -29,29 +31,40 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case 'status': {
-        const status = payload?.status as
-          | 'DRAFT'
-          | 'ACTIVE'
-          | 'ARCHIVED'
-          | undefined
+        const status = payload?.status as ProductStatus | undefined
         if (!status || !['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(status)) {
           return NextResponse.json(
             { error: 'Invalid status' },
             { status: 400 },
           )
         }
-        result = await prisma.product.updateMany({
-          where: { id: { in: ids } },
-          data: { status },
-        })
+        // One status change per id, each writing its own AuditLog row +
+        // AdminNotification (when ACTIVE → hidden). Sequential rather than
+        // updateMany so each change is individually auditable.
+        let changed = 0
+        for (const id of ids) {
+          const r = await setProductStatus(id, status, {
+            userId: session.user.id,
+            userEmail: session.user.email,
+            source: `admin/products bulk.status`,
+          })
+          if (r.changed) changed++
+        }
+        result = { count: changed }
         break
       }
       case 'delete': {
-        // Soft-delete: archive
-        result = await prisma.product.updateMany({
-          where: { id: { in: ids } },
-          data: { status: 'ARCHIVED' },
-        })
+        // Soft-delete = bulk archive, same path as status change above.
+        let changed = 0
+        for (const id of ids) {
+          const r = await setProductStatus(id, 'ARCHIVED', {
+            userId: session.user.id,
+            userEmail: session.user.email,
+            source: `admin/products bulk.delete (soft-delete)`,
+          })
+          if (r.changed) changed++
+        }
+        result = { count: changed }
         break
       }
       case 'feature':

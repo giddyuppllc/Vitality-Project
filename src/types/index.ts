@@ -18,6 +18,9 @@ export interface CartState {
   addItem: (item: Omit<CartItem, 'id'>) => void
   removeItem: (productId: string, variantId?: string) => void
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void
+  /** Replace the cached price on a line item. Used by /cart when the
+   *  server price has drifted from the localStorage-stored one. */
+  setItemPrice: (productId: string, newPrice: number, variantId?: string) => void
   clearCart: () => void
   total: number
   itemCount: number

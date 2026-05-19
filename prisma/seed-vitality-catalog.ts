@@ -667,18 +667,31 @@ async function main() {
     const minPrice = Math.min(...p.variants.map((v) => v.price));
     const minCost  = Math.min(...p.variants.map((v) => v.cost));
 
+    // IMPORTANT: this seed is idempotent BY DEFAULT — no admin changes
+    // (price tweaks, status archives, new variants added in /admin/products)
+    // are clobbered by a re-run. Set SEED_FORCE=1 to do a full reset back
+    // to the values in this file. See plan: "Kill the 'old products
+    // reappear' problem at every layer", 2026-05-18.
+    const force = process.env.SEED_FORCE === '1';
+
     const product = await prisma.product.upsert({
       where: { slug: p.slug },
-      update: {
-        name: p.name,
-        shortDesc: p.shortDesc,
-        description: p.description,
-        categoryId,
-        price: minPrice,
-        cost: minCost,
-        status: ProductStatus.ACTIVE,
-        tags: p.tags,
-      },
+      // Default mode: empty update — preserve every admin-set field.
+      // Force mode: full overwrite to match this seed file.
+      update: force
+        ? {
+            name: p.name,
+            shortDesc: p.shortDesc,
+            description: p.description,
+            categoryId,
+            price: minPrice,
+            cost: minCost,
+            status: ProductStatus.ACTIVE,
+            tags: p.tags,
+          }
+        : {},
+      // First-time creation: status DRAFT so an admin must explicitly
+      // activate. Stops new seed entries from auto-publishing without review.
       create: {
         slug: p.slug,
         name: p.name,
@@ -687,25 +700,46 @@ async function main() {
         categoryId,
         price: minPrice,
         cost: minCost,
-        status: ProductStatus.ACTIVE,
+        status: force ? ProductStatus.ACTIVE : ProductStatus.DRAFT,
         tags: p.tags,
         sku: p.variants[0].sku,
       },
     });
     prodCount++;
 
-    // Variants — drop existing and re-create so re-seeding stays idempotent
-    await prisma.productVariant.deleteMany({ where: { productId: product.id } });
+    // Variants: NEVER delete existing ones (an admin may have added the
+    // 20 mg variant or tuned a price). Upsert by SKU instead — create
+    // missing rows; preserve existing rows' prices/inventory unless
+    // SEED_FORCE=1, in which case we overwrite the price back to the
+    // seed file value (inventory left alone always — that's a live
+    // operational flag).
     for (const v of p.variants) {
-      await prisma.productVariant.create({
-        data: {
-          productId: product.id,
-          name: v.name,
-          sku: v.sku,
-          price: v.price,
-          inventory: 0,
-        },
-      });
+      const existing = v.sku
+        ? await prisma.productVariant.findFirst({
+            where: { sku: v.sku },
+          })
+        : await prisma.productVariant.findFirst({
+            where: { productId: product.id, name: v.name },
+          });
+      if (existing) {
+        if (force) {
+          await prisma.productVariant.update({
+            where: { id: existing.id },
+            data: { price: v.price, name: v.name },
+          });
+        }
+        // Default mode: leave existing variant entirely alone.
+      } else {
+        await prisma.productVariant.create({
+          data: {
+            productId: product.id,
+            name: v.name,
+            sku: v.sku,
+            price: v.price,
+            inventory: 0,
+          },
+        });
+      }
       varCount++;
     }
   }

@@ -6,6 +6,7 @@ import { TIER_BENEFITS } from '@/lib/membership'
 import { sendEmail } from '@/lib/email'
 import { membershipInvoice } from '@/lib/email-templates'
 import { generateOrderNumber } from '@/lib/utils'
+import { setProductStatus } from '@/lib/products'
 import { z } from 'zod'
 import type { MembershipTier } from '@prisma/client'
 
@@ -51,6 +52,13 @@ async function getZelleConfig() {
 
 // Ensure the hidden Membership product + the tier's variant exist.
 // Idempotent — safe to call on every subscribe.
+//
+// Defense in depth: on 2026-05-18 this product was found at status=ACTIVE,
+// leaking onto the public /products listing as a $25 card. Root cause was
+// never identified (AuditLog had zero rows). To guarantee it can never
+// reappear on the storefront, every subscribe call now re-archives the
+// product if it's somehow ACTIVE — via setProductStatus so the correction
+// is itself audit-logged.
 async function ensureMembershipVariant(tier: 'CLUB' | 'PLUS' | 'PREMIUM') {
   const benefits = TIER_BENEFITS[tier]
   const product = await prisma.product.upsert({
@@ -68,6 +76,12 @@ async function ensureMembershipVariant(tier: 'CLUB' | 'PLUS' | 'PREMIUM') {
       sku: 'VP-MEM',
     },
   })
+  // Re-archive if it ever drifts to ACTIVE.
+  if (product.status === 'ACTIVE') {
+    await setProductStatus(product.id, 'ARCHIVED', {
+      source: 'membership/subscribe (auto-correct)',
+    })
+  }
   const existingVariant = await prisma.productVariant.findFirst({
     where: { productId: product.id, name: TIER_LABELS[tier] },
   })

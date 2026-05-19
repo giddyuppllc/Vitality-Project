@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
+import { setProductStatus } from '@/lib/products'
 import { z } from 'zod'
 
 const updateSchema = z.object({
@@ -49,11 +50,28 @@ export async function PATCH(
   const { id } = await params
   try {
     const data = updateSchema.parse(await req.json())
+
+    // Status changes go through the central helper so they get an
+    // AuditLog row with before/after + an AdminNotification when an
+    // ACTIVE product is being hidden from the storefront.
+    if (data.status !== undefined) {
+      await setProductStatus(id, data.status, {
+        userId: session.user.id,
+        userEmail: session.user.email,
+        source: 'admin/products PATCH',
+      })
+    }
+
+    // All other fields update normally; we omit `status` from the
+    // update payload because the helper handled it (writing it twice
+    // would be a no-op but the second write would not be audit-logged).
+    const { status: _status, ...rest } = data
     const product = await prisma.product.update({
       where: { id },
-      data,
+      data: rest,
       include: { images: true, category: true },
     })
+
     await logAudit({
       userId: session.user.id,
       userEmail: session.user.email,
@@ -76,7 +94,14 @@ export async function DELETE(
   const session = await guard()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
-  await prisma.product.update({ where: { id }, data: { status: 'ARCHIVED' } })
+  // Soft-delete = archive. The helper writes the AuditLog row + the
+  // AdminNotification (if the product was ACTIVE and isn't an internal
+  // placeholder) so a stray DELETE click is visible in the inbox.
+  await setProductStatus(id, 'ARCHIVED', {
+    userId: session.user.id,
+    userEmail: session.user.email,
+    source: 'admin/products DELETE (soft-delete)',
+  })
   await logAudit({
     userId: session.user.id,
     userEmail: session.user.email,
