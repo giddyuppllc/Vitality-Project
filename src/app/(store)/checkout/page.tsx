@@ -32,7 +32,7 @@ interface PricedCart {
     available: boolean
   }>
   subtotal: number
-  bundle: { discountCents: number; tierLabel: string | null; discountPct: number; nextTier: { remaining: number; pct: number } | null }
+  bundle: { qualifyingCount: number; discountCents: number; tierLabel: string | null; discountPct: number; nextTier: { remaining: number; pct: number } | null }
   member: { tier: string; discountCents: number }
   totalDiscount: number
   total: number
