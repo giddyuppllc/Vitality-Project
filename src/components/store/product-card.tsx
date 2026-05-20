@@ -12,14 +12,23 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const discountPct = product.comparePrice
-    ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+  // Card displays the lowest variant price as the "from" price so removing
+  // a variant in admin automatically corrects the card without a separate
+  // Product.price recompute. Falls back to Product.price if no variants.
+  const variantPrices = product.variants?.map((v) => v.price).filter((n) => n > 0) ?? []
+  const fromPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : product.price
+
+  const discountPct = product.comparePrice && product.comparePrice > fromPrice
+    ? Math.round(((product.comparePrice - fromPrice) / product.comparePrice) * 100)
     : null
 
-  // Edward's call (2026-05): every product card uses the same branded
-  // peptide-vial image for visual consistency until per-product photography
-  // is shot. Overrides any DB ProductImage rows. Reverse by switching back
-  // to product.images?.[0] on this line.
+  // Variant labels (e.g. "5 mg, 10 mg, 30 mg") so customers can see sizes
+  // on the listing page without clicking through. Sorted by price ascending.
+  const variantLabels = (product.variants ?? [])
+    .slice()
+    .sort((a, b) => a.price - b.price)
+    .map((v) => v.name)
+
   const cardImage = "/products/vial-default-600.png"
 
   return (
@@ -55,11 +64,26 @@ export function ProductCard({ product }: ProductCardProps) {
             )}
             <span className="text-[10px] text-white/25 font-medium tracking-wide">RUO</span>
           </div>
-          <h3 className="font-semibold text-white mb-2 line-clamp-2">{product.name}</h3>
+          <h3 className="font-semibold text-white mb-1.5 line-clamp-2">{product.name}</h3>
+          {variantLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {variantLabels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-block text-[10px] font-medium text-white/55 bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-baseline gap-2">
-              <span className="font-bold text-white">{formatPrice(product.price)}</span>
-              {product.comparePrice && (
+            <div className="flex items-baseline gap-1.5">
+              {variantLabels.length > 1 && (
+                <span className="text-[11px] text-white/40 uppercase tracking-wider">from</span>
+              )}
+              <span className="font-bold text-white">{formatPrice(fromPrice)}</span>
+              {product.comparePrice && product.comparePrice > fromPrice && (
                 <span className="text-sm text-white/40 line-through">{formatPrice(product.comparePrice)}</span>
               )}
             </div>
