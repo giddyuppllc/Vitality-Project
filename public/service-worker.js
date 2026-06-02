@@ -11,7 +11,7 @@
  * the new SW activates. No customer action required.
  */
 
-const VERSION = 'vp-sw-v2'
+const VERSION = 'vp-sw-v3'
 const STATIC_CACHE = `${VERSION}-static`
 const IMAGE_CACHE = `${VERSION}-images`
 const RUNTIME_CACHE = `${VERSION}-runtime`
