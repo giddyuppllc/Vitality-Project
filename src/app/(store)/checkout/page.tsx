@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Sparkles, Lock, Loader2, ShoppingBag } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { NoRefundsNotice } from '@/components/store/no-refunds-notice'
+import { UsOnlyNotice } from '@/components/store/us-only-notice'
 
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS',
@@ -234,6 +235,8 @@ export default function CheckoutPage() {
           Pay via Zelle — your order is reserved as soon as you place it.
         </p>
       </div>
+
+      <UsOnlyNotice />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form column */}

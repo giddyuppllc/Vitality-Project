@@ -962,6 +962,21 @@ model NewsletterSubscriber {
   @@map("newsletter_subscribers")
 }
 
+model ShippingRegionInterest {
+  id        String   @id @default(cuid())
+  email     String
+  country   String
+  state     String?
+  source    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([country])
+  @@index([email])
+  @@map("shipping_region_interest")
+}
+
 model CartAbandonment {
   id         String   @id @default(cuid())
   userId     String?
