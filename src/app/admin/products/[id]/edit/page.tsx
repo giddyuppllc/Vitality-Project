@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import { ProductVariantsEditor } from '@/components/admin/product-variants-editor'
+import { ProductImagesEditor } from '@/components/admin/product-images-editor'
 
 type Status = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 
@@ -133,6 +134,18 @@ export default function EditProductPage() {
               className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
             />
           </div>
+        </div>
+
+        {/* Images */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold text-white/80">Product Images</h2>
+            <p className="text-xs text-white/40 mt-1">
+              The <strong className="text-white/60">Card</strong> image (first one) is what shows on the shop &amp; homepage cards.
+              Add a photo, then hover any image to make it the card image or remove it. Changes go live right away.
+            </p>
+          </div>
+          <ProductImagesEditor productId={id as string} />
         </div>
 
         {/* Pricing */}

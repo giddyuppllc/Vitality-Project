@@ -29,7 +29,12 @@ export function ProductCard({ product }: ProductCardProps) {
     .sort((a, b) => a.price - b.price)
     .map((v) => v.name)
 
-  const cardImage = "/products/vial-default-600.png"
+  // Use the product's own primary image (first by position) when one has been
+  // uploaded in admin; otherwise fall back to the shared default vial so
+  // image-less products look exactly as before. Real photos fill the tile
+  // (cover); the transparent default vial stays padded/contained.
+  const uploadedImage = product.images?.[0]?.url
+  const cardImage = uploadedImage || "/products/vial-default-600.png"
 
   return (
     <Link href={`/products/${product.slug}`}>
@@ -41,7 +46,7 @@ export function ProductCard({ product }: ProductCardProps) {
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+            className={`${uploadedImage ? 'object-cover' : 'object-contain p-4'} group-hover:scale-105 transition-transform duration-500`}
           />
 
           {discountPct && (
