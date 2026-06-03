@@ -136,6 +136,11 @@ const HIDDEN_PREFIXES = [
   '/k/',
   '/account',
   '/_next',
+  // The membership signup page IS the paywall's primary call-to-action
+  // ("Become A Vital Member" → /membership). Logged-out visitors must be
+  // able to reach it to pick a tier and start the Zelle signup flow, so it
+  // must never be re-covered by the paywall overlay.
+  '/membership',
 ]
 
 export function Paywall() {
