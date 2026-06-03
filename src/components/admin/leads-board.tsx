@@ -276,6 +276,7 @@ function LeadCard({
   const priorityMeta = LEAD_PRIORITIES.find((p) => p.key === lead.priority)
   const overdue =
     lead.nextActionDue && new Date(lead.nextActionDue).getTime() < Date.now()
+  const isAffiliateApp = lead.source === 'affiliate_application'
 
   return (
     <div className="bg-dark-700/60 border border-white/5 rounded-xl p-3 hover:border-white/15 transition-colors">
@@ -290,6 +291,11 @@ function LeadCard({
             </Badge>
           )}
         </div>
+        {isAffiliateApp && (
+          <span className="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-500/15 text-brand-300">
+            Affiliate application
+          </span>
+        )}
         <p className="text-[11px] text-white/50 truncate">
           {lead.contactName} · {lead.contactEmail}
         </p>
@@ -321,6 +327,14 @@ function LeadCard({
           </div>
         )}
       </Link>
+      {isAffiliateApp && (
+        <Link
+          href="/admin/affiliates"
+          className="mt-2 inline-block text-[11px] text-brand-400 hover:text-brand-300"
+        >
+          Review &amp; approve in Affiliates →
+        </Link>
+      )}
       <div className="mt-2">
         <LeadStageSelect leadId={lead.id} currentStage={lead.stage} />
       </div>
@@ -385,6 +399,11 @@ function LeadsTable({
                   >
                     {lead.businessName}
                   </Link>
+                  {lead.source === 'affiliate_application' && (
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-500/15 text-brand-300 align-middle">
+                      Affiliate
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-white/60">
                   <div>{lead.contactName}</div>

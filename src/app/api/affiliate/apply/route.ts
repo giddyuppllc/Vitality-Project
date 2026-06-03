@@ -41,6 +41,34 @@ export async function POST(req: NextRequest) {
     },
   })
 
+  // Surface the application in the admin lead board so it's managed/approved
+  // alongside other inbound leads. Best-effort — never block the application.
+  void (async () => {
+    try {
+      const existingLead = await prisma.salesLead.findFirst({
+        where: {
+          source: 'affiliate_application',
+          contactEmail: user.email.toLowerCase(),
+        },
+        select: { id: true },
+      })
+      if (!existingLead) {
+        await prisma.salesLead.create({
+          data: {
+            businessName: user.name ?? user.email,
+            contactName: user.name ?? user.email,
+            contactEmail: user.email.toLowerCase(),
+            source: 'affiliate_application',
+            stage: 'NEW',
+            notes: `Affiliate application — code ${code}${paypalEmail ? ` · PayPal: ${paypalEmail}` : ''}. Approve in Admin → Affiliates.`,
+          },
+        })
+      }
+    } catch (err) {
+      console.error('Affiliate application lead creation failed:', err)
+    }
+  })()
+
   // Fire-and-forget: confirmation to applicant + alert to admin
   void (async () => {
     try {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Pause, Clock } from 'lucide-react'
+import { Check, Pause, Clock, Trash2 } from 'lucide-react'
 
 type Status = 'PENDING' | 'ACTIVE' | 'SUSPENDED'
 
@@ -33,6 +33,20 @@ export function AffiliateStatusActions({
       alert(d.error ?? 'Update failed')
     }
     setBusy(false)
+  }
+
+  const remove = async () => {
+    if (!confirm('Delete this affiliate permanently? This cannot be undone.')) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/affiliates/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.push('/admin/affiliates')
+      router.refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error ?? 'Delete failed')
+      setBusy(false)
+    }
   }
 
   const statusBadge =
@@ -99,6 +113,14 @@ export function AffiliateStatusActions({
             Save
           </button>
         )}
+        <button
+          onClick={remove}
+          disabled={busy}
+          className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold disabled:opacity-50 transition-colors"
+          title="Delete affiliate"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Delete
+        </button>
       </div>
     </div>
   )

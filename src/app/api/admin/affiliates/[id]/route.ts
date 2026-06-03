@@ -41,6 +41,18 @@ export async function PATCH(
     data.status === 'ACTIVE' && before.status !== 'ACTIVE'
 
   if (becameActive) {
+    // Close out the matching affiliate-application lead on the board.
+    await prisma.salesLead
+      .updateMany({
+        where: {
+          source: 'affiliate_application',
+          contactEmail: before.user.email.toLowerCase(),
+          stage: { notIn: ['CLOSED_WON', 'CLOSED_LOST'] },
+        },
+        data: { stage: 'CLOSED_WON', closedAt: new Date() },
+      })
+      .catch(() => {})
+
     void (async () => {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://vitalityproject.global'
@@ -74,4 +86,52 @@ export async function PATCH(
   }).catch(() => {})
 
   return NextResponse.json({ affiliate: updated })
+}
+
+// DELETE /api/admin/affiliates/[id] — permanently remove an affiliate
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { id } = await params
+
+  const existing = await prisma.affiliate.findUnique({
+    where: { id },
+    include: { user: { select: { email: true } } },
+  })
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  try {
+    // Related links/clicks/commissions/payouts cascade via onDelete: Cascade.
+    await prisma.affiliate.delete({ where: { id } })
+
+    // Best-effort: clear any matching affiliate-application lead from the board.
+    await prisma.salesLead
+      .deleteMany({
+        where: {
+          source: 'affiliate_application',
+          contactEmail: existing.user.email.toLowerCase(),
+        },
+      })
+      .catch(() => {})
+
+    await logAudit({
+      userId: session.user.id ?? undefined,
+      userEmail: session.user.email ?? undefined,
+      action: 'affiliate.delete',
+      entityType: 'Affiliate',
+      entityId: id,
+      metadata: JSON.stringify({ code: existing.code, email: existing.user.email }),
+    }).catch(() => {})
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete affiliate error:', error)
+    return NextResponse.json({ error: 'Failed to delete affiliate' }, { status: 500 })
+  }
 }

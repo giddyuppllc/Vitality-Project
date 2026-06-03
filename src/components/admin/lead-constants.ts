@@ -24,6 +24,7 @@ export const LEAD_PRIORITIES: {
 export const LEAD_SOURCES = [
   { key: 'website', label: 'Website' },
   { key: 'website_application', label: 'Website application' },
+  { key: 'affiliate_application', label: 'Affiliate application' },
   { key: 'tradeshow', label: 'Tradeshow' },
   { key: 'referral', label: 'Referral' },
   { key: 'cold_outreach', label: 'Cold outreach' },

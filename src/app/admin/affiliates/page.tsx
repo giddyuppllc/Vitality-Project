@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { formatPrice, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, XCircle, Download, Clock } from 'lucide-react'
+import { Download, Clock } from 'lucide-react'
 import { MarkPaidButton } from './mark-paid-button'
+import { AffiliateRowActions } from './affiliate-row-actions'
 
 export default async function AdminAffiliatesPage() {
   const affiliates = await prisma.affiliate.findMany({
@@ -84,11 +85,7 @@ export default async function AdminAffiliatesPage() {
                     <td className="px-5 py-3 text-sm text-white/50">{formatDate(aff.createdAt)}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="inline-flex items-center gap-2">
-                        <form action={`/api/admin/affiliates/${aff.id}/approve`} method="POST">
-                          <button type="submit" className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors">
-                            <CheckCircle className="w-3.5 h-3.5" /> Approve
-                          </button>
-                        </form>
+                        <AffiliateRowActions id={aff.id} status={aff.status} />
                         <a href={`/admin/affiliates/${aff.id}`} className="text-xs text-white/40 hover:text-white/70">
                           Review →
                         </a>
@@ -155,25 +152,10 @@ export default async function AdminAffiliatesPage() {
                   <td className="px-5 py-4 text-sm text-white/60">{formatPrice(aff.totalPaid)}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      {aff.status === 'PENDING' && (
-                        <form action={`/api/admin/affiliates/${aff.id}/approve`} method="POST">
-                          <button type="submit" className="p-1.5 text-emerald-400 hover:text-emerald-300 transition-colors" title="Approve">
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        </form>
+                      {aff.status === 'ACTIVE' && owed > 0 && (
+                        <MarkPaidButton affiliateId={aff.id} owedCents={owed} />
                       )}
-                      {aff.status === 'ACTIVE' && (
-                        <>
-                          {owed > 0 && (
-                            <MarkPaidButton affiliateId={aff.id} owedCents={owed} />
-                          )}
-                          <form action={`/api/admin/affiliates/${aff.id}/suspend`} method="POST">
-                            <button type="submit" className="p-1.5 text-red-400 hover:text-red-300 transition-colors" title="Suspend">
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </form>
-                        </>
-                      )}
+                      <AffiliateRowActions id={aff.id} status={aff.status} />
                     </div>
                   </td>
                 </tr>
