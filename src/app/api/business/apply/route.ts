@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/utils'
 import { sendEmail } from '@/lib/email'
+import { sendOwnerSms } from '@/lib/sms'
 import { newBusinessApplication } from '@/lib/email-templates'
 import { createAdminNotification } from '@/lib/notifications'
 import { generateUniqueTrainerCode } from '@/lib/trainer'
@@ -162,6 +163,12 @@ export async function POST(req: NextRequest) {
           entityType: 'Organization',
           entityId: organization.id,
         })
+
+        // Text the business owner — before the email early-return so SMS is
+        // independent of email config.
+        void sendOwnerSms(
+          `Vitality: new business application — ${businessName} (${type.toLowerCase()}) from ${contactName}. Review in admin.`,
+        )
 
         const adminEmail = process.env.ADMIN_EMAIL
         if (!adminEmail) return

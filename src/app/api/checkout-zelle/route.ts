@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { generateOrderNumber } from '@/lib/utils'
+import { generateOrderNumber, formatPrice } from '@/lib/utils'
 import { resolveTenantFromHost } from '@/lib/tenant'
+import { sendOwnerSms } from '@/lib/sms'
 import { sendEmail } from '@/lib/email'
 import {
   zelleOrderInstructions,
@@ -362,6 +363,11 @@ export async function POST(req: NextRequest) {
             text: alert.text,
           })
         }
+
+        // Text the business owner — Zelle orders need a manual "mark paid".
+        void sendOwnerSms(
+          `Vitality: new Zelle order ${order.orderNumber} — ${formatPrice(total)} from ${customerName}. Awaiting payment; mark paid in admin when funds land.`,
+        )
       } catch (err) {
         console.error('[checkout-zelle] email send failed:', err)
       }

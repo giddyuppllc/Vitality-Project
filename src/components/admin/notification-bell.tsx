@@ -43,9 +43,13 @@ export function NotificationBell() {
   // it to be clipped by the sidebar's stacking/containing block on Safari
   // ("cut in half" on Mac). Portalling to <body> with position:fixed escapes
   // every ancestor clip and works identically across browsers.
-  const [coords, setCoords] = useState<{ top: number; right: number }>({
+  //
+  // Anchor by LEFT (open rightward), not right: the bell sits at the far left
+  // of the screen, so a right-anchor pushed the panel off the left edge. Left
+  // is clamped so the panel always stays fully on screen wherever the bell is.
+  const [coords, setCoords] = useState<{ top: number; left: number }>({
     top: 0,
-    right: 0,
+    left: 0,
   })
 
   useEffect(() => {
@@ -56,10 +60,11 @@ export function NotificationBell() {
     const el = buttonRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    setCoords({
-      top: rect.bottom + 8,
-      right: Math.max(8, window.innerWidth - rect.right),
-    })
+    const DROPDOWN_W = 320 // matches w-80
+    // Open rightward from the bell, but never let the panel run off either
+    // edge: clamp left to [8, viewport - width - 8].
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - DROPDOWN_W - 8))
+    setCoords({ top: rect.bottom + 8, left })
   }
 
   // Keep the dropdown anchored while it's open if the window resizes/scrolls.
@@ -122,8 +127,8 @@ export function NotificationBell() {
         onClick={() => setOpen(false)}
       />
       <div
-        className="fixed w-80 max-h-[70vh] bg-dark-800 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[1001] flex flex-col"
-        style={{ top: coords.top, right: coords.right }}
+        className="fixed w-80 max-w-[calc(100vw-16px)] max-h-[70vh] bg-dark-800 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[1001] flex flex-col"
+        style={{ top: coords.top, left: coords.left }}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h3 className="font-semibold text-sm">Notifications</h3>

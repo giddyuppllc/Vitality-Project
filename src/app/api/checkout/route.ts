@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { generateOrderNumber } from '@/lib/utils'
+import { generateOrderNumber, formatPrice } from '@/lib/utils'
 import { processPayment, validateCard, type CardDetails } from '@/lib/payments'
+import { sendOwnerSms } from '@/lib/sms'
 import { resolveTenantFromHost } from '@/lib/tenant'
 import { sendEmail } from '@/lib/email'
 import {
@@ -354,6 +355,11 @@ export async function POST(req: NextRequest) {
             text: alert.text,
           })
         }
+
+        // Text the business owner — best-effort, never blocks the response.
+        void sendOwnerSms(
+          `Vitality: new order ${order.orderNumber} — ${formatPrice(total)} from ${data.email}`,
+        )
       } catch (err) {
         console.error('Order email send failed:', err)
       }

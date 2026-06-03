@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
+import { sendOwnerSms } from '@/lib/sms'
 import { affiliateApplicationReceived, newAffiliateApplicationAlert } from '@/lib/email-templates'
 
 function generateAffiliateCode(name: string): string {
@@ -99,6 +100,11 @@ export async function POST(req: NextRequest) {
           text: alert.text,
         })
       }
+
+      // Text the business owner — best-effort.
+      void sendOwnerSms(
+        `Vitality: new affiliate application from ${user.name ?? user.email}. Approve in Admin → Affiliates.`,
+      )
     } catch (err) {
       console.error('Affiliate apply email failed:', err)
     }

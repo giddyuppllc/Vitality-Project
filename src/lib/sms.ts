@@ -75,6 +75,30 @@ export async function sendSMS({ to, body }: SmsArgs): Promise<SmsResult> {
 }
 
 /**
+ * Notify the business owner's cell of a site event (new order, new
+ * application/lead, contact-form message). Destination is OWNER_SMS_NUMBER.
+ *
+ * Best-effort and SELF-DISABLING: no-ops when OWNER_SMS_NUMBER isn't set, and
+ * the underlying sendSMS() dev-logs (no real send) when the Twilio creds are
+ * absent — so the site runs fine before the number + creds are wired in.
+ * Never throws; call it `void sendOwnerSms(...)` from request handlers so an
+ * SMS hiccup can't break a checkout / application / contact submit.
+ */
+export async function sendOwnerSms(body: string): Promise<void> {
+  const owner = process.env.OWNER_SMS_NUMBER
+  if (!owner) {
+    console.info('[sms] owner alert skipped — OWNER_SMS_NUMBER not set')
+    return
+  }
+  try {
+    const r = await sendSMS({ to: owner, body })
+    if (!r.success) console.warn('[sms] owner alert not delivered:', r.error)
+  } catch (err) {
+    console.warn('[sms] owner alert failed', err)
+  }
+}
+
+/**
  * Tracked SMS — creates an OutboundMessage record (channel=SMS) before sending,
  * mirrors src/lib/email.ts sendTrackedEmail. Use for admin → customer messages
  * and marketing campaigns where delivery analytics matter.

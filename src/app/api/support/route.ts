@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { sendEmail } from '@/lib/email'
 import { supportTicketCreated } from '@/lib/email-templates'
 import { createAdminNotification } from '@/lib/notifications'
+import { sendOwnerSms } from '@/lib/sms'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const schema = z.object({
@@ -136,6 +137,11 @@ export async function POST(req: NextRequest) {
         entityType: 'SupportTicket',
         entityId: ticket.id,
       })
+
+      // Text the business owner about the new contact-form message.
+      void sendOwnerSms(
+        `Vitality: new contact ${ticket.number} — "${ticket.subject}" from ${email}`,
+      )
     })()
 
     return NextResponse.json(ticket, { status: 201 })
