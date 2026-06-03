@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatPrice, formatDate } from '@/lib/utils'
+import { TIER_BENEFITS, planIdToTier } from '@/lib/membership'
 import { Badge } from '@/components/ui/badge'
 import { CustomerHeader } from '@/components/admin/customer-profile/customer-header'
 import {
@@ -30,6 +31,7 @@ import {
   Mail,
   Building2,
   ArrowLeft,
+  CreditCard,
 } from 'lucide-react'
 
 interface Props {
@@ -75,6 +77,7 @@ export default async function AdminCustomerProfilePage({
         },
         loyalty: true,
         storeCredit: true,
+        membership: true,
         orgMemberships: {
           include: { organization: true, location: true },
         },
@@ -140,6 +143,13 @@ export default async function AdminCustomerProfilePage({
 
   if (!user) notFound()
 
+  // Lightweight "interest" signup (email lead) — distinct from a real
+  // Membership row. Lets the admin tell "requested a tier / left an email" from
+  // "is an actual (or pending) paying member". Keyed by email.
+  const interestSignup = await prisma.membershipSignup.findUnique({
+    where: { email: user.email },
+  })
+
   const paidOrders = orders.filter((o) => o.paymentStatus === 'PAID')
   const ltv = paidOrders.reduce((sum, o) => sum + o.total, 0)
 
@@ -199,6 +209,93 @@ export default async function AdminCustomerProfilePage({
                   value={reviews.length.toString()}
                 />
               </div>
+
+              {/* Membership — real (paying / pending) status + any email-interest
+                  signup, so admin can tell a paying member from a mere lead. */}
+              {(user.membership && user.membership.tier !== 'NONE') ||
+              interestSignup ? (
+                <div className="glass rounded-2xl p-6">
+                  <h3 className="font-semibold text-sm flex items-center gap-2 mb-4">
+                    <CreditCard className="w-4 h-4 text-brand-400" /> Membership
+                  </h3>
+                  {user.membership && user.membership.tier !== 'NONE' ? (
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50">Tier</span>
+                        <Badge variant="info">
+                          {membershipTierLabel(user.membership.tier)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50">Status</span>
+                        <Badge
+                          variant={
+                            membershipStatusBadge(user.membership.status).variant
+                          }
+                        >
+                          {membershipStatusBadge(user.membership.status).label}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50">Monthly</span>
+                        <span className="text-white/70">
+                          {formatPrice(user.membership.monthlyPriceCents)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50">Signed up</span>
+                        <span className="text-white/50 text-xs">
+                          {formatDate(user.membership.startedAt)}
+                        </span>
+                      </div>
+                      {user.membership.paymentConfirmedAt && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/50">First paid</span>
+                          <span className="text-white/50 text-xs">
+                            {formatDate(user.membership.paymentConfirmedAt)}
+                          </span>
+                        </div>
+                      )}
+                      {user.membership.status === 'PENDING_PAYMENT' &&
+                        user.membership.pendingInvoiceOrderId && (
+                          <div className="pt-1">
+                            <Link
+                              href={`/admin/orders/${user.membership.pendingInvoiceOrderId}`}
+                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors"
+                            >
+                              Review unpaid invoice →
+                            </Link>
+                          </div>
+                        )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/40">
+                      No active membership.
+                    </p>
+                  )}
+
+                  {interestSignup && (
+                    <div className="mt-4 pt-4 border-t border-white/5 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50 flex items-center gap-2">
+                          Requested tier
+                          <Badge variant="warning">Interest only</Badge>
+                        </span>
+                        <span className="text-white/70">
+                          {membershipTierLabel(
+                            planIdToTier(interestSignup.plan),
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/30 mt-1">
+                        Email lead via {interestSignup.source ?? 'site'} ·{' '}
+                        {formatDate(interestSignup.createdAt)} · not yet a paying
+                        member
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               <div className="glass rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -713,6 +810,30 @@ function SummaryTile({
       <div className="text-lg font-bold">{value}</div>
     </div>
   )
+}
+
+function membershipTierLabel(tier: string): string {
+  return (
+    (TIER_BENEFITS as Record<string, { label: string }>)[tier]?.label ?? tier
+  )
+}
+
+function membershipStatusBadge(status: string): {
+  variant: 'success' | 'warning' | 'danger' | 'default'
+  label: string
+} {
+  switch (status) {
+    case 'ACTIVE':
+      return { variant: 'success', label: 'Active' }
+    case 'PENDING_PAYMENT':
+      return { variant: 'warning', label: 'Awaiting payment' }
+    case 'CANCELLED':
+      return { variant: 'danger', label: 'Cancelled' }
+    case 'PAUSED':
+      return { variant: 'default', label: 'Paused' }
+    default:
+      return { variant: 'default', label: status }
+  }
 }
 
 function StatusBadge({ status }: { status: string }) {

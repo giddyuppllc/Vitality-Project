@@ -1,8 +1,47 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { formatPrice, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { TIER_BENEFITS } from '@/lib/membership'
 import { OrderActions } from '@/components/admin/order-actions'
+import type { MembershipTier } from '@prisma/client'
+
+const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
+
+// Membership invoices are tagged on Order.notes as "MEMBERSHIP:<membershipId>:<tier>"
+// (see /api/membership/subscribe + mark-paid). Parse that so the order page can
+// show admins which tier this invoice activates.
+function parseMembershipNote(
+  notes: string | null,
+): { membershipId: string; tier: string } | null {
+  if (!notes?.startsWith(MEMBERSHIP_NOTE_PREFIX)) return null
+  const [, membershipId, tier] = notes.split(':')
+  if (!membershipId) return null
+  return { membershipId, tier: tier ?? '' }
+}
+
+function tierLabel(tier: string): string {
+  return (TIER_BENEFITS as Record<string, { label: string }>)[tier]?.label ?? tier
+}
+
+function membershipStatusBadge(status: string): {
+  variant: 'success' | 'warning' | 'danger' | 'default'
+  label: string
+} {
+  switch (status) {
+    case 'ACTIVE':
+      return { variant: 'success', label: 'Active' }
+    case 'PENDING_PAYMENT':
+      return { variant: 'warning', label: 'Awaiting payment' }
+    case 'CANCELLED':
+      return { variant: 'danger', label: 'Cancelled' }
+    case 'PAUSED':
+      return { variant: 'default', label: 'Paused' }
+    default:
+      return { variant: 'default', label: status }
+  }
+}
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -10,12 +49,38 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     where: { id },
     include: {
       items: { include: { product: { select: { name: true, slug: true, images: { take: 1 } } } } },
-      user: { select: { name: true, email: true } },
+      user: { select: { id: true, name: true, email: true } },
       shippingAddress: true,
     },
   })
 
   if (!order) notFound()
+
+  // Is this order a membership signup/renewal invoice? Detect via the notes
+  // marker (primary) and fall back to a membership whose open invoice points
+  // at this order. Pull the live Membership so we can show the requested tier
+  // and where it stands (Awaiting payment vs Active).
+  const noteInfo = parseMembershipNote(order.notes)
+  const membership = await prisma.membership.findFirst({
+    where: {
+      OR: [
+        ...(noteInfo ? [{ id: noteInfo.membershipId }] : []),
+        { pendingInvoiceOrderId: order.id },
+      ],
+    },
+    select: {
+      id: true,
+      userId: true,
+      tier: true,
+      status: true,
+      monthlyPriceCents: true,
+      paymentConfirmedAt: true,
+    },
+  })
+  // Requested tier: prefer the note (snapshot at order time), else the live row.
+  const requestedTier: MembershipTier | null =
+    (noteInfo?.tier as MembershipTier) || membership?.tier || null
+  const isMembershipOrder = Boolean(noteInfo || membership)
 
   // Pull the event timeline: AuditLog rows for this order + lifecycle stamps
   // pulled straight off the Order itself.
@@ -97,6 +162,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <Badge variant={order.paymentStatus === 'PAID' ? 'success' : order.paymentStatus === 'FAILED' ? 'danger' : 'warning'}>
           {order.paymentStatus}
         </Badge>
+        {isMembershipOrder && requestedTier && (
+          <Badge variant="info">Membership · {tierLabel(requestedTier)}</Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -178,6 +246,56 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
 
         {/* Right: customer + shipping */}
         <div className="space-y-6">
+          {isMembershipOrder && (
+            <div className="glass rounded-2xl p-6 border border-brand-500/20">
+              <h2 className="font-semibold mb-1">Membership signup</h2>
+              <p className="text-xs text-white/40 mb-4">
+                This order is a membership invoice — marking it paid activates
+                the tier below.
+              </p>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/50">Requested tier</span>
+                  {requestedTier ? (
+                    <Badge variant="info">{tierLabel(requestedTier)}</Badge>
+                  ) : (
+                    <span className="text-white/40">—</span>
+                  )}
+                </div>
+                {membership && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Membership status</span>
+                      <Badge variant={membershipStatusBadge(membership.status).variant}>
+                        {membershipStatusBadge(membership.status).label}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50">Monthly</span>
+                      <span className="text-white/70">
+                        {formatPrice(membership.monthlyPriceCents)}
+                      </span>
+                    </div>
+                    {membership.paymentConfirmedAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/50">First paid</span>
+                        <span className="text-white/50 text-xs">
+                          {formatDate(membership.paymentConfirmedAt)}
+                        </span>
+                      </div>
+                    )}
+                    <Link
+                      href={`/admin/customers/${membership.userId}?tab=overview`}
+                      className="inline-flex text-xs text-brand-400 hover:text-brand-300"
+                    >
+                      View member profile →
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="glass rounded-2xl p-6">
             <h2 className="font-semibold mb-4">Customer</h2>
             <p className="font-medium">{order.user?.name ?? 'Guest'}</p>
