@@ -244,15 +244,9 @@ export default async function ProductPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Full description */}
-      {product.description && (
-        <div className="mt-16 glass rounded-2xl p-8">
-          <h2 className="text-2xl font-bold mb-6">Product Details</h2>
-          <div className="prose prose-invert max-w-none text-white/70 whitespace-pre-wrap">
-            {product.description}
-          </div>
-        </div>
-      )}
+      {/* Full description / "Product Details" section removed per owner request
+          2026-06-08. Data is preserved in Product.description (still used for SEO
+          meta + card fallbacks); restore by re-adding the block here. */}
 
       {/* Pair-with anti-inflammatory recommendation (BPC-157 + TB-500) */}
       <PairWithAntiInflammatory

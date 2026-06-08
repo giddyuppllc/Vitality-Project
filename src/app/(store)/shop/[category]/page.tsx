@@ -61,9 +61,9 @@ export default async function CategoryPage({ params }: Props) {
             Catalog
           </p>
           <h1 className="mt-1 text-3xl md:text-4xl font-semibold">{category.name}</h1>
-          {category.description && (
-            <p className="mt-3 text-white/55 leading-relaxed">{category.description}</p>
-          )}
+          {/* Category description blurb removed per owner request 2026-06-08.
+              Data is preserved in Category.description; restore by re-adding
+              {category.description && <p>…</p>} here. */}
           <p className="mt-3 text-xs text-white/35">
             {category.products.length} product{category.products.length === 1 ? "" : "s"} ·
             Third-party tested · COA available on request
