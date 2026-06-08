@@ -42,7 +42,25 @@ function LoginInner() {
       setError('Invalid email/username or password')
       setLoading(false)
     } else {
-      router.push(next ?? '/')
+      // An explicit ?next= wins; otherwise ask the server where this user
+      // should land. Affiliates can't be detected from the client session
+      // (their role often stays CUSTOMER), so the destination is resolved
+      // server-side against the Affiliate table. Fall back to '/' on error.
+      let dest = next
+      if (!dest) {
+        try {
+          const r = await fetch('/api/auth/post-login')
+          if (r.ok) {
+            const data = await r.json()
+            if (typeof data?.path === 'string' && data.path.startsWith('/')) {
+              dest = data.path
+            }
+          }
+        } catch {
+          // ignore — fall back to the storefront
+        }
+      }
+      router.push(dest ?? '/')
       router.refresh()
     }
   }
