@@ -26,7 +26,7 @@ interface PricedCart {
   lines: PricedLine[]
   subtotal: number
   bundle: { qualifyingCount: number; discountCents: number; tierLabel: string | null; discountPct: number; nextTier: { remaining: number; pct: number } | null }
-  member: { tier: string; discountCents: number }
+  member: { tier: string; discountCents: number; peptideCreditsApplied: number; creditDiscountCents: number }
   totalDiscount: number
   total: number
   unavailableCount: number
@@ -234,6 +234,15 @@ export default function CartPage() {
                   <div className="flex justify-between text-sm text-fuchsia-300/90">
                     <span>{cart.member.tier} member discount</span>
                     <span>−{formatPrice(cart.member.discountCents)}</span>
+                  </div>
+                )}
+
+                {cart.member.creditDiscountCents > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-300/90">
+                    <span>
+                      Free peptide{cart.member.peptideCreditsApplied === 1 ? '' : 's'} · member credit
+                    </span>
+                    <span>−{formatPrice(cart.member.creditDiscountCents)}</span>
                   </div>
                 )}
 
