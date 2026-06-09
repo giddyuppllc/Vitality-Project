@@ -733,7 +733,7 @@ export function membershipActivated(args: {
     lines.push(
       `· ${peptideCredits} free peptide${peptideCredits === 1 ? '' : 's'} every month — just add any peptide to your cart`,
     )
-  if (includesSupplies) lines.push('· Free BAC water + syringes each month')
+  if (includesSupplies) lines.push('· Free BAC water + syringes on every order')
   if (freeShipping) lines.push('· Free priority shipping in the US')
   lines.push('· Early access to new peptides and limited batches')
   const benefitsHtml = lines.map((l) => escapeHtml(l)).join('<br/>')

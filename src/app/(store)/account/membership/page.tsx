@@ -197,9 +197,7 @@ export default async function AccountMembershipPage() {
                 {benefits.freeBacAndSyringes && (
                   <div className="text-white/70">
                     Free BAC + syringes:{' '}
-                    <span className="font-semibold text-white">
-                      {membership.freeSuppliesClaimedThisPeriod ? 'claimed' : 'available'}
-                    </span>
+                    <span className="font-semibold text-white">every order</span>
                   </div>
                 )}
               </div>

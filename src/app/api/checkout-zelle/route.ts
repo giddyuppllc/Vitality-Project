@@ -247,15 +247,13 @@ export async function POST(req: NextRequest) {
       subtotal - discount - loyaltyDiscount + shippingCost + taxAmount,
     )
 
-    // Free BAC + syringes — one allotment per paid cycle for Plus/Premium,
-    // auto-added as $0 line items (use-it-or-lose-it; flag flipped below).
+    // Free BAC + syringes — auto-added as $0 line items on EVERY order for
+    // active Plus/Premium members (no per-cycle limit; members only).
     const suppliesEligible =
       !!membership &&
       membership.status === 'ACTIVE' &&
       (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
-      TIER_BENEFITS[membership.tier].freeBacAndSyringes &&
-      !membership.freeSuppliesClaimedThisPeriod
-    let suppliesAdded = false
+      TIER_BENEFITS[membership.tier].freeBacAndSyringes
     if (suppliesEligible) {
       const freebies = await prisma.product.findMany({
         where: {
@@ -274,7 +272,6 @@ export async function POST(req: NextRequest) {
           quantity: 1,
           total: 0,
         })
-        suppliesAdded = true
       }
     }
 
@@ -353,17 +350,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Consume this cycle's member credits now that the order row exists.
-    if (membership && (peptideCreditsApplied > 0 || suppliesAdded)) {
+    // Consume this cycle's peptide credits now that the order row exists.
+    // (BAC + syringes are free on every order, so there's nothing to decrement.)
+    if (membership && peptideCreditsApplied > 0) {
       await prisma.membership
         .update({
           where: { id: membership.id },
-          data: {
-            ...(peptideCreditsApplied > 0
-              ? { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } }
-              : {}),
-            ...(suppliesAdded ? { freeSuppliesClaimedThisPeriod: true } : {}),
-          },
+          data: { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } },
         })
         .catch((err) =>
           console.error('[checkout-zelle] credit decrement failed:', err),

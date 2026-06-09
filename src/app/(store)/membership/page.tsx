@@ -313,8 +313,8 @@ function MembershipPageInner() {
             they reset at each renewal, do not roll over, and have no cash value.
           </li>
           <li>
-            <strong className="text-white/70">Free supplies.</strong> Plus and Premium include free
-            bacteriostatic water + syringes once per paid cycle, auto-added to an order.
+            <strong className="text-white/70">Free supplies.</strong> Plus and Premium members get
+            free bacteriostatic water + syringes auto-added to every order.
           </li>
           <li>
             <strong className="text-white/70">Free shipping.</strong> Plus and Premium include free US
