@@ -171,6 +171,45 @@ export default async function AccountMembershipPage() {
           </div>
         </div>
 
+        {/* This cycle's member credits */}
+        {membership.status === 'ACTIVE' &&
+          (benefits.freePeptideCreditsPerPeriod > 0 || benefits.freeBacAndSyringes) && (
+            <div className="rounded-xl border border-brand-500/30 bg-brand-500/5 p-4 mb-4">
+              <p className="text-xs uppercase tracking-wider text-brand-300 font-semibold mb-2">
+                This cycle&rsquo;s credits
+              </p>
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+                {benefits.freePeptideCreditsPerPeriod > 0 && (
+                  <div>
+                    <span className="text-2xl font-bold text-emerald-400">
+                      {Math.max(
+                        0,
+                        membership.freePeptideCreditsThisPeriod - membership.freePeptidesUsedThisPeriod,
+                      )}
+                    </span>
+                    <span className="text-white/50">
+                      {' '}
+                      / {membership.freePeptideCreditsThisPeriod} free peptide
+                      {membership.freePeptideCreditsThisPeriod === 1 ? '' : 's'} left
+                    </span>
+                  </div>
+                )}
+                {benefits.freeBacAndSyringes && (
+                  <div className="text-white/70">
+                    Free BAC + syringes:{' '}
+                    <span className="font-semibold text-white">
+                      {membership.freeSuppliesClaimedThisPeriod ? 'claimed' : 'available'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-white/40 mt-2">
+                Add any peptide to your cart — your credit applies free at checkout. Credits
+                reset each renewal (use-it-or-lose-it).
+              </p>
+            </div>
+          )}
+
         {/* Pending invoice CTA */}
         {membership.pendingInvoiceOrderId && membership.status !== 'ACTIVE' && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4 flex items-start gap-3">

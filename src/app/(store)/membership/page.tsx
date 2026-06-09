@@ -290,6 +290,52 @@ function MembershipPageInner() {
           </Button>
         </button>
       </div>
+
+      {/* Membership terms & rules */}
+      <div className="mt-12 rounded-2xl border border-white/10 bg-dark-800/40 p-6 text-xs leading-relaxed text-white/45">
+        <h2 className="text-sm font-semibold text-white/70 mb-3">Membership terms &amp; rules</h2>
+        <ul className="space-y-2 list-disc pl-4">
+          <li>
+            <strong className="text-white/70">Billing.</strong> Memberships are billed monthly via
+            Zelle. Your membership activates once payment is confirmed (usually same day) and renews
+            every 30 days. We email an invoice each cycle with the Zelle send-to details and a memo
+            to include with your payment.
+          </li>
+          <li>
+            <strong className="text-white/70">Member discount.</strong> Your tier discount (Club 5%,
+            Plus 10%, Premium 15%) applies automatically to every order while your membership is
+            active.
+          </li>
+          <li>
+            <strong className="text-white/70">Free peptide credits.</strong> Plus includes 1 free
+            peptide credit per paid cycle; Premium includes 3. A credit makes any single peptide free
+            at checkout (excludes stacks, supplies, and sample packs). Credits are use-it-or-lose-it —
+            they reset at each renewal, do not roll over, and have no cash value.
+          </li>
+          <li>
+            <strong className="text-white/70">Free supplies.</strong> Plus and Premium include free
+            bacteriostatic water + syringes once per paid cycle, auto-added to an order.
+          </li>
+          <li>
+            <strong className="text-white/70">Free shipping.</strong> Plus and Premium include free US
+            priority shipping.
+          </li>
+          <li>
+            <strong className="text-white/70">Cancellation.</strong> Cancel anytime from your account.
+            Your benefits and any unused credits remain active through the end of the paid cycle;
+            payments already made are final and non-refundable.
+          </li>
+          <li>
+            <strong className="text-white/70">Shipping.</strong> Orders ship within the United States
+            only.
+          </li>
+        </ul>
+        <p className="mt-4 text-white/35">
+          Research use only. All products are sold strictly for laboratory and research purposes and
+          are not for human or veterinary use, consumption, or for the diagnosis, treatment, cure, or
+          prevention of any condition. Nothing on this page is medical advice.
+        </p>
+      </div>
     </div>
   )
 }
