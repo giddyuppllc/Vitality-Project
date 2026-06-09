@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { paymentReminder } from "@/lib/email-templates";
+import { getZelleIdentity } from "@/lib/zelle";
 import { trackCronRun } from "@/lib/cron-tracker";
 
 const REMINDER_AFTER_DAYS = 3;
@@ -84,6 +85,8 @@ async function doRun() {
   let failed = 0;
   const results: Array<{ orderNumber: string; status: "sent" | "already-sent" | "failed"; error?: string }> = [];
 
+  const zelle = await getZelleIdentity();
+
   for (const order of orders) {
     if ((order.notes ?? "").includes(MARKER)) {
       alreadySent++;
@@ -108,6 +111,7 @@ async function doRun() {
         orderNumber: order.orderNumber,
         amountCents: order.total,
         ageDays: Math.floor((now - order.createdAt.getTime()) / 86400e3),
+        zelle,
       });
 
       const result = await sendEmail({

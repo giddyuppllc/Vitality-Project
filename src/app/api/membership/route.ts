@@ -14,6 +14,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { membershipInvoice } from "@/lib/email-templates";
+import { getZelleIdentity } from "@/lib/zelle";
 
 // Plan-id (from /membership UI) → display label + price (cents)
 const PLAN_DETAILS: Record<string, { label: string; cents: number; tier: "CLUB" | "PLUS" | "PREMIUM" }> = {
@@ -60,11 +61,13 @@ export async function POST(req: NextRequest) {
     const invoiceNumber = `VP-MEM-${signup.id.slice(0, 8).toUpperCase()}`;
 
     // Send the invoice (best-effort; never blocks the API response)
+    const zelle = await getZelleIdentity();
     const html = membershipInvoice({
       name: name ?? null,
       planLabel: planDetails.label,
       amountCents: planDetails.cents,
       invoiceNumber,
+      zelle,
     });
 
     sendEmail({

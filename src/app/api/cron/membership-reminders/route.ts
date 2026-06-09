@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { membershipSignupReminder } from '@/lib/email-templates'
+import { getZelleIdentity } from '@/lib/zelle'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { trackCronRun } from '@/lib/cron-tracker'
 
@@ -74,6 +75,8 @@ async function doRun() {
     error?: string
   }> = []
 
+  const zelle = await getZelleIdentity()
+
   for (const m of pending) {
     if (!m.user.email) {
       skipped += 1
@@ -137,6 +140,7 @@ async function doRun() {
       invoiceNumber: invoice.orderNumber,
       signedUpAt: m.startedAt,
       daysWaiting,
+      zelle,
     })
 
     try {

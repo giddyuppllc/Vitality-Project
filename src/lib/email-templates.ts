@@ -4,6 +4,8 @@
 // Branding: dark navy background (#0c0e1a), white text, brand purple (#6270f2).
 // ──────────────────────────────────────────────────────────────────────────
 
+import type { ZelleIdentity } from '@/lib/zelle'
+
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global'
 const COMPANY_ADDRESS =
@@ -1580,12 +1582,11 @@ export function paymentReminder(args: {
   orderNumber: string
   amountCents: number
   ageDays: number
+  zelle: ZelleIdentity
 }): string {
-  const { name, orderNumber, amountCents, ageDays } = args
+  const { name, orderNumber, amountCents, ageDays, zelle } = args
   const greeting = name ? `Hi ${name.split(" ")[0]}` : "Hi"
   const amount = `$${(amountCents / 100).toFixed(2)}`
-  const zelleEmail = process.env.ZELLE_RECIPIENT_EMAIL ?? "billing@thevitalityproject.com"
-  const zellePhone = process.env.ZELLE_RECIPIENT_PHONE ?? ""
 
   const body = `
     <h1 style="font:600 20px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;margin:0 0 12px;">A quick reminder about your order</h1>
@@ -1598,8 +1599,9 @@ export function paymentReminder(args: {
     </p>
     <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:0 0 14px;">
       <p style="font:12px/1.4 -apple-system,sans-serif;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">Zelle to</p>
-      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${zelleEmail}</p>
-      ${zellePhone ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${zellePhone}</p>` : ""}
+      ${zelle.displayName ? `<p style="font:13px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 2px;">${escapeHtml(zelle.displayName)}</p>` : ""}
+      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelle.primary)}</p>
+      ${zelle.altHandle ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zelle.altHandle)}</p>` : ""}
       <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;">
         <strong>Memo / note:</strong> ${orderNumber}
       </p>
@@ -1626,12 +1628,11 @@ export function membershipInvoice(args: {
   planLabel: string
   amountCents: number
   invoiceNumber: string
+  zelle: ZelleIdentity
 }): string {
-  const { name, planLabel, amountCents, invoiceNumber } = args
+  const { name, planLabel, amountCents, invoiceNumber, zelle } = args
   const greeting = name ? `Hi ${name.split(" ")[0]}` : "Hi"
   const amount = `$${(amountCents / 100).toFixed(2)}`
-  const zelleEmail = process.env.ZELLE_RECIPIENT_EMAIL ?? "billing@thevitalityproject.com"
-  const zellePhone = process.env.ZELLE_RECIPIENT_PHONE ?? ""
 
   const body = `
     <h1 style="font:600 20px/1.3 -apple-system,sans-serif;color:#0f172a;margin:0 0 12px;">Welcome to ${planLabel}</h1>
@@ -1643,8 +1644,9 @@ export function membershipInvoice(args: {
     </p>
     <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:0 0 14px;">
       <p style="font:12px/1.4 -apple-system,sans-serif;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">Zelle to</p>
-      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${zelleEmail}</p>
-      ${zellePhone ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${zellePhone}</p>` : ""}
+      ${zelle.displayName ? `<p style="font:13px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 2px;">${escapeHtml(zelle.displayName)}</p>` : ""}
+      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelle.primary)}</p>
+      ${zelle.altHandle ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zelle.altHandle)}</p>` : ""}
       <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Memo / note:</strong> ${invoiceNumber}</p>
       <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Amount:</strong> ${amount}</p>
     </div>
@@ -1668,12 +1670,11 @@ export function membershipSignupReminder(args: {
   invoiceNumber: string
   signedUpAt: Date
   daysWaiting: number
+  zelle: ZelleIdentity
 }) {
-  const { name, planLabel, amountCents, invoiceNumber, signedUpAt, daysWaiting } = args
+  const { name, planLabel, amountCents, invoiceNumber, signedUpAt, daysWaiting, zelle } = args
   const greeting = name ? `Hi ${name.split(' ')[0]}` : 'Hi'
   const amount = `$${(amountCents / 100).toFixed(2)}`
-  const zelleEmail = process.env.ZELLE_RECIPIENT_EMAIL ?? 'billing@vitalityproject.global'
-  const zellePhone = process.env.ZELLE_RECIPIENT_PHONE ?? ''
   const signedUpStr = signedUpAt.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -1682,7 +1683,7 @@ export function membershipSignupReminder(args: {
   const subject = `Reminder: activate your ${planLabel} membership (${amount} via Zelle)`
   const text = `${greeting},
 
-Just a nudge — your ${planLabel} membership signup from ${signedUpStr} is still waiting on payment. Send ${amount} via Zelle to ${zelleEmail}${zellePhone ? ` (or ${zellePhone})` : ''} with memo ${invoiceNumber} and we'll activate the moment funds clear.
+Just a nudge — your ${planLabel} membership signup from ${signedUpStr} is still waiting on payment. Send ${amount} via Zelle to ${zelle.primary}${zelle.altHandle ? ` (or ${zelle.altHandle})` : ''} with memo ${invoiceNumber} and we'll activate the moment funds clear.
 
 It's been ${daysWaiting} day${daysWaiting === 1 ? '' : 's'} since you signed up. If you no longer want the membership, just ignore this — we'll auto-close pending signups after 14 days.
 
@@ -1697,8 +1698,9 @@ It's been ${daysWaiting} day${daysWaiting === 1 ? '' : 's'} since you signed up.
     </p>
     <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:0 0 14px;">
       <p style="font:12px/1.4 -apple-system,sans-serif;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">Zelle to</p>
-      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelleEmail)}</p>
-      ${zellePhone ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zellePhone)}</p>` : ''}
+      ${zelle.displayName ? `<p style="font:13px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 2px;">${escapeHtml(zelle.displayName)}</p>` : ''}
+      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelle.primary)}</p>
+      ${zelle.altHandle ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zelle.altHandle)}</p>` : ''}
       <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Memo / note:</strong> ${escapeHtml(invoiceNumber)}</p>
       <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Amount:</strong> ${amount}</p>
     </div>

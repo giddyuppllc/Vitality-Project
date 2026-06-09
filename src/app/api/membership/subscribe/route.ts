@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { sendEmail } from '@/lib/email'
 import { membershipInvoice } from '@/lib/email-templates'
+import { getZelleIdentity } from '@/lib/zelle'
 import { generateOrderNumber } from '@/lib/utils'
 import { setProductStatus } from '@/lib/products'
 import { z } from 'zod'
@@ -32,23 +33,6 @@ const TIER_SKUS: Record<'CLUB' | 'PLUS' | 'PREMIUM', string> = {
 }
 
 const MEMBERSHIP_PRODUCT_SLUG = 'vitality-membership'
-
-async function getZelleConfig() {
-  const rows = await prisma.siteSetting.findMany({
-    where: { key: { in: ['zelleEmail', 'zelleDisplayName', 'zellePhone'] } },
-  })
-  const map = Object.fromEntries(rows.map((r) => [r.key, r.value?.trim() || '']))
-  const primary =
-    map.zelleEmail ||
-    map.zellePhone ||
-    process.env.ADMIN_EMAIL ||
-    'edward@giddyupp.com'
-  return {
-    email: primary,
-    displayName: map.zelleDisplayName || undefined,
-    phone: map.zelleEmail && map.zellePhone ? map.zellePhone : undefined,
-  }
-}
 
 // Ensure the hidden Membership product + the tier's variant exist.
 // Idempotent — safe to call on every subscribe.
@@ -207,7 +191,7 @@ export async function POST(req: NextRequest) {
     // Email Zelle instructions via the dedicated membership template. The
     // Order.notes "MEMBERSHIP:..." marker is what mark-paid uses to flip
     // the Membership to ACTIVE once Edward confirms the Zelle deposit.
-    const zelleConfig = await getZelleConfig()
+    const zelle = await getZelleIdentity()
     void (async () => {
       try {
         const html = membershipInvoice({
@@ -215,11 +199,12 @@ export async function POST(req: NextRequest) {
           planLabel: TIER_LABELS[tier],
           amountCents: benefits.monthlyPriceCents,
           invoiceNumber: order.orderNumber,
+          zelle,
         })
         const amount = `$${(benefits.monthlyPriceCents / 100).toFixed(2)}`
         const text = `Hi ${session.user.name?.split(' ')[0] ?? 'there'},
 
-Thanks for joining The Vitality Project. To activate your ${TIER_LABELS[tier]} membership, send ${amount} via Zelle to ${zelleConfig.email}${zelleConfig.phone ? ` (or ${zelleConfig.phone})` : ''}.
+Thanks for joining The Vitality Project. To activate your ${TIER_LABELS[tier]} membership, send ${amount} via Zelle to ${zelle.primary}${zelle.altHandle ? ` (or ${zelle.altHandle})` : ''}.
 
 Memo: ${order.orderNumber}
 Amount: ${amount}

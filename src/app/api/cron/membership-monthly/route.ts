@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { membershipInvoice } from '@/lib/email-templates'
+import { getZelleIdentity } from '@/lib/zelle'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { generateOrderNumber } from '@/lib/utils'
 import { trackCronRun } from '@/lib/cron-tracker'
@@ -85,6 +86,8 @@ async function doRun() {
     status: 'invoiced' | 'skipped' | 'failed'
     error?: string
   }> = []
+
+  const zelle = await getZelleIdentity()
 
   for (const m of memberships) {
     if (!m.user.email) {
@@ -173,6 +176,7 @@ async function doRun() {
         planLabel,
         amountCents,
         invoiceNumber: orderNumber,
+        zelle,
       })
       const amountStr = `$${(amountCents / 100).toFixed(2)}`
       const text = `Hi ${m.user.name?.split(' ')[0] ?? 'there'},
