@@ -12,6 +12,8 @@ import {
 } from '@/lib/email-templates'
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
+import { computeCartTotal } from '@/lib/pricing'
+import { TIER_BENEFITS } from '@/lib/membership'
 import { z } from 'zod'
 
 // Customer-driven Zelle checkout. Creates an order in PENDING / UNPAID state
@@ -149,7 +151,28 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    let discount = 0
+    // Membership pricing — run the cart through the single pricing engine so
+    // the member discount, bundle discount, and peptide credits all reach the
+    // REAL order (the inline subtotal above doesn't know about them).
+    const membership = await prisma.membership.findUnique({
+      where: { userId: session.user.id },
+    })
+    const priced = await computeCartTotal(
+      data.items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId ?? null,
+        quantity: i.quantity,
+      })),
+      { userId: session.user.id },
+    ).catch(() => null)
+    const membershipDiscount = priced
+      ? priced.member.discountCents +
+        priced.bundle.discountCents +
+        priced.member.creditDiscountCents
+      : 0
+    const peptideCreditsApplied = priced?.member.peptideCreditsApplied ?? 0
+
+    let discount = membershipDiscount
     let appliedDiscountCodeId: string | null = null
     if (data.discountCode) {
       const code = await prisma.discountCode.findUnique({
@@ -160,10 +183,14 @@ export async function POST(req: NextRequest) {
         (!code.expiresAt || code.expiresAt > new Date()) &&
         (!code.maxUses || code.usedCount < code.maxUses)
       ) {
-        discount =
+        // Discount code stacks on top of the membership discount, applied to
+        // the post-membership amount so it never over-discounts.
+        const base = Math.max(0, subtotal - membershipDiscount)
+        const codeDiscount =
           code.type === 'PERCENTAGE'
-            ? Math.round(subtotal * (code.value / 100))
-            : Math.min(code.value, subtotal)
+            ? Math.round(base * (code.value / 100))
+            : Math.min(code.value, base)
+        discount += codeDiscount
         appliedDiscountCodeId = code.id
       }
     }
@@ -195,11 +222,20 @@ export async function POST(req: NextRequest) {
       loyaltyDiscount = loyaltyPointsToUse // 1pt = 1c
     }
 
-    const { rate: shippingCost } = await calculateShipping(
-      subtotal,
-      data.shippingAddress.country,
-      data.shippingAddress.state,
-    )
+    const memberFreeShipping =
+      !!membership &&
+      membership.status === 'ACTIVE' &&
+      (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
+      TIER_BENEFITS[membership.tier].freeShipping
+    const shippingCost = memberFreeShipping
+      ? 0
+      : (
+          await calculateShipping(
+            subtotal,
+            data.shippingAddress.country,
+            data.shippingAddress.state,
+          )
+        ).rate
     const taxableBase = Math.max(0, subtotal - discount - loyaltyDiscount)
     const taxAmount = await calculateTaxAsync(
       taxableBase,
@@ -210,6 +246,37 @@ export async function POST(req: NextRequest) {
       0,
       subtotal - discount - loyaltyDiscount + shippingCost + taxAmount,
     )
+
+    // Free BAC + syringes — one allotment per paid cycle for Plus/Premium,
+    // auto-added as $0 line items (use-it-or-lose-it; flag flipped below).
+    const suppliesEligible =
+      !!membership &&
+      membership.status === 'ACTIVE' &&
+      (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
+      TIER_BENEFITS[membership.tier].freeBacAndSyringes &&
+      !membership.freeSuppliesClaimedThisPeriod
+    let suppliesAdded = false
+    if (suppliesEligible) {
+      const freebies = await prisma.product.findMany({
+        where: {
+          slug: { in: ['bacteriostatic-water', 'insulin-syringes'] },
+          status: 'ACTIVE',
+        },
+        select: { id: true, name: true, sku: true },
+      })
+      for (const f of freebies) {
+        orderItems.push({
+          productId: f.id,
+          variantId: undefined,
+          name: `${f.name} — member freebie`,
+          sku: f.sku ?? undefined,
+          price: 0,
+          quantity: 1,
+          total: 0,
+        })
+        suppliesAdded = true
+      }
+    }
 
     const orderNumber = generateOrderNumber()
 
@@ -284,6 +351,23 @@ export async function POST(req: NextRequest) {
         where: { id: appliedDiscountCodeId },
         data: { usedCount: { increment: 1 } },
       })
+    }
+
+    // Consume this cycle's member credits now that the order row exists.
+    if (membership && (peptideCreditsApplied > 0 || suppliesAdded)) {
+      await prisma.membership
+        .update({
+          where: { id: membership.id },
+          data: {
+            ...(peptideCreditsApplied > 0
+              ? { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } }
+              : {}),
+            ...(suppliesAdded ? { freeSuppliesClaimedThisPeriod: true } : {}),
+          },
+        })
+        .catch((err) =>
+          console.error('[checkout-zelle] credit decrement failed:', err),
+        )
     }
 
     // Burn the loyalty points now that the order row exists — passes orderId
