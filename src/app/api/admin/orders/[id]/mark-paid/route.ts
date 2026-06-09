@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
-import { membershipActivated, membershipCycleCredits, zellePaymentConfirmed } from '@/lib/email-templates'
+import { commissionEarned, membershipActivated, membershipCycleCredits, zellePaymentConfirmed } from '@/lib/email-templates'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { awardPointsForOrder } from '@/lib/loyalty'
@@ -209,7 +209,11 @@ export async function POST(
       try {
         const aff = await prisma.affiliate.findUnique({
           where: { id: order.affiliateId },
-          select: { id: true, commissionRate: true },
+          select: {
+            id: true,
+            commissionRate: true,
+            user: { select: { name: true, email: true } },
+          },
         })
         if (aff) {
           const amount = Math.round(order.total * aff.commissionRate)
@@ -231,6 +235,22 @@ export async function POST(
               where: { id: aff.id },
               data: { totalEarned: { increment: amount } },
             })
+            // Tell the affiliate they earned — this relay was missing entirely.
+            if (aff.user?.email) {
+              const tpl = commissionEarned({
+                name: aff.user.name ?? 'there',
+                amount,
+                orderNumber: order.orderNumber,
+              })
+              void sendEmail({
+                to: aff.user.email,
+                subject: tpl.subject,
+                html: tpl.html,
+                text: tpl.text,
+              }).catch((err) =>
+                console.error('[mark-paid] commission email failed:', err),
+              )
+            }
           }
         }
       } catch (err) {
