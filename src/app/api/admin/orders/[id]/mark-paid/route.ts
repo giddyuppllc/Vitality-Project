@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
-import { membershipActivated, zellePaymentConfirmed } from '@/lib/email-templates'
+import { membershipActivated, membershipCycleCredits, zellePaymentConfirmed } from '@/lib/email-templates'
+import { TIER_BENEFITS } from '@/lib/membership'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { awardPointsForOrder } from '@/lib/loyalty'
 
@@ -39,6 +40,11 @@ async function activateMembershipFromOrder(order: {
     membership.renewsAt && membership.renewsAt > now ? membership.renewsAt : now
   const renewsAt = new Date(baseDate.getTime() + 30 * 86400e3)
 
+  const isFirstActivation = !membership.paymentConfirmedAt
+  const tierKey =
+    tier === 'CLUB' || tier === 'PLUS' || tier === 'PREMIUM' ? tier : null
+  const benefits = tierKey ? TIER_BENEFITS[tierKey] : TIER_BENEFITS.NONE
+
   await prisma.membership.update({
     where: { id: membershipId },
     data: {
@@ -49,6 +55,12 @@ async function activateMembershipFromOrder(order: {
         membership.pendingInvoiceOrderId === order.id
           ? null
           : membership.pendingInvoiceOrderId,
+      // Grant this cycle's allotment. Use-it-or-lose-it: each paid cycle
+      // overwrites the prior balance (peptides reuse the existing counters;
+      // supplies are a single per-cycle flag).
+      freePeptideCreditsThisPeriod: benefits.freePeptideCreditsPerPeriod,
+      freePeptidesUsedThisPeriod: 0,
+      freeSuppliesClaimedThisPeriod: false,
     },
   })
 
@@ -56,13 +68,34 @@ async function activateMembershipFromOrder(order: {
     try {
       const planLabel = TIER_LABELS[tier] ?? 'Membership'
       const name = order.user?.name ?? 'there'
-      const tpl = membershipActivated({ name, plan: planLabel })
-      await sendEmail({
-        to: order.email,
-        subject: tpl.subject,
-        html: tpl.html,
-        text: tpl.text,
-      })
+      // First payment → welcome (with this month's credits called out).
+      // Renewal with credits → "your credits refreshed". Renewal with no
+      // credits (Club) → nothing extra; the payment-confirmed email covers it.
+      const tpl = isFirstActivation
+        ? membershipActivated({
+            name,
+            plan: planLabel,
+            discountPct: benefits.permanentDiscountPct,
+            peptideCredits: benefits.freePeptideCreditsPerPeriod,
+            includesSupplies: benefits.freeBacAndSyringes,
+            freeShipping: benefits.freeShipping,
+          })
+        : benefits.freePeptideCreditsPerPeriod > 0
+          ? membershipCycleCredits({
+              name,
+              planLabel,
+              peptideCredits: benefits.freePeptideCreditsPerPeriod,
+              includesSupplies: benefits.freeBacAndSyringes,
+            })
+          : null
+      if (tpl) {
+        await sendEmail({
+          to: order.email,
+          subject: tpl.subject,
+          html: tpl.html,
+          text: tpl.text,
+        })
+      }
     } catch (err) {
       console.error('[mark-paid] membership activation email failed:', err)
     }

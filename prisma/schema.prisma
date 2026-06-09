@@ -1363,6 +1363,9 @@ model Membership {
   // Free peptide credits earned per billing period (Plus = 1, Premium = 3)
   freePeptideCreditsThisPeriod  Int            @default(0)
   freePeptidesUsedThisPeriod    Int            @default(0)
+  // Free BAC + syringes: a single per-cycle allotment (Plus/Premium). Reset to
+  // false on each paid cycle; flipped true once auto-added to an order.
+  freeSuppliesClaimedThisPeriod Boolean        @default(false)
   // Stripe-style subscription tracking — Chase will go here when ready
   externalSubscriptionId        String?
   paymentProvider               String?        // 'chase', 'stripe', etc.

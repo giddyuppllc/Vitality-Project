@@ -719,8 +719,25 @@ View earnings: ${APP_URL}/account/affiliate
 // Template: Membership Activated
 // ──────────────────────────────────────────────────────────────────────────
 
-export function membershipActivated(args: { name: string; plan: string }) {
-  const { name, plan } = args
+export function membershipActivated(args: {
+  name: string
+  plan: string
+  discountPct: number
+  peptideCredits: number
+  includesSupplies: boolean
+  freeShipping: boolean
+}) {
+  const { name, plan, discountPct, peptideCredits, includesSupplies, freeShipping } = args
+  const lines: string[] = [`· ${discountPct}% off every order, automatically applied`]
+  if (peptideCredits > 0)
+    lines.push(
+      `· ${peptideCredits} free peptide${peptideCredits === 1 ? '' : 's'} every month — just add any peptide to your cart`,
+    )
+  if (includesSupplies) lines.push('· Free BAC water + syringes each month')
+  if (freeShipping) lines.push('· Free priority shipping in the US')
+  lines.push('· Early access to new peptides and limited batches')
+  const benefitsHtml = lines.map((l) => escapeHtml(l)).join('<br/>')
+  const benefitsText = lines.join('\n')
 
   const body = `
     ${h1(`Membership activated, ${escapeHtml(name)}`)}
@@ -728,12 +745,10 @@ export function membershipActivated(args: { name: string; plan: string }) {
     ${box(`
       <div style="font-size:13px;color:#d1d5db;line-height:1.7;">
         <strong style="color:#ffffff;">Your member benefits:</strong><br/>
-        · 15% off every order, automatically applied<br/>
-        · Early access to new peptides and limited batches<br/>
-        · Free priority shipping in the US<br/>
-        · Member-only research digest
+        ${benefitsHtml}
       </div>
     `)}
+    ${peptideCredits > 0 ? p(`Your free peptide credit${peptideCredits === 1 ? '' : 's'} for this month ${peptideCredits === 1 ? 'is' : 'are'} ready now — add any peptide to your cart and the price drops to $0 at checkout. Credits reset every month, so use them while they're fresh.`) : ''}
     ${button('Start shopping', `${APP_URL}/products`)}
   `
 
@@ -741,11 +756,8 @@ export function membershipActivated(args: { name: string; plan: string }) {
 
 Your ${plan} membership is now live.
 
-· 15% off every order, automatically applied
-· Early access to new peptides and limited batches
-· Free priority shipping in the US
-· Member-only research digest
-
+${benefitsText}
+${peptideCredits > 0 ? `\nYour ${peptideCredits} free peptide credit${peptideCredits === 1 ? '' : 's'} for this month ${peptideCredits === 1 ? 'is' : 'are'} ready — add any peptide to your cart and it's free at checkout. Credits reset monthly.\n` : ''}
 Start: ${APP_URL}/products
 
 — The Vitality Project
@@ -754,6 +766,91 @@ Start: ${APP_URL}/products
   return {
     subject: 'Your Vitality Project membership is active',
     html: wrap(body, { preheader: `Your ${plan} membership is live.` }),
+    text,
+  }
+}
+
+// Sent on each PAID RENEWAL cycle (not first activation) so members are told
+// their fresh monthly credits are loaded and use-it-or-lose-it.
+export function membershipCycleCredits(args: {
+  name: string
+  planLabel: string
+  peptideCredits: number
+  includesSupplies: boolean
+}) {
+  const { name, planLabel, peptideCredits, includesSupplies } = args
+  const pep = `${peptideCredits} free peptide${peptideCredits === 1 ? '' : 's'}`
+
+  const body = `
+    ${h1(`Your ${escapeHtml(planLabel)} credits just refreshed`)}
+    ${p(`Hi ${escapeHtml(name)}, your payment cleared and this month's member credits are loaded.`)}
+    ${box(`
+      <div style="font-size:13px;color:#d1d5db;line-height:1.7;">
+        <strong style="color:#ffffff;">Ready to use this cycle:</strong><br/>
+        ${escapeHtml(`· ${pep} — add any peptide to your cart, it's $0 at checkout`)}<br/>
+        ${includesSupplies ? '· Free BAC water + syringes, auto-added to your order<br/>' : ''}
+      </div>
+    `)}
+    ${p(`Heads up: credits are use-it-or-lose-it — they reset at your next renewal, so grab them this month.`)}
+    ${button('Redeem your credits', `${APP_URL}/products`)}
+  `
+
+  const text = `Your ${planLabel} credits just refreshed, ${name}
+
+This month's member credits are loaded:
+· ${pep} — add any peptide to your cart, it's free at checkout${includesSupplies ? '\n· Free BAC water + syringes, auto-added to your order' : ''}
+
+Credits are use-it-or-lose-it and reset at your next renewal, so use them this month.
+
+Redeem: ${APP_URL}/products
+
+— The Vitality Project
+`
+
+  return {
+    subject: `Your ${planLabel} peptide credits are ready`,
+    html: wrap(body, { preheader: `${pep} waiting to use this month.` }),
+    text,
+  }
+}
+
+// Sent when a member cancels — confirms no further charges and that benefits
+// (and any unused credits) run to the end of the paid cycle.
+export function membershipCancelled(args: {
+  name: string
+  planLabel: string
+  coverageEndsAt: Date | null
+}) {
+  const { name, planLabel, coverageEndsAt } = args
+  const endStr = coverageEndsAt
+    ? coverageEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null
+
+  const body = `
+    ${h1(`Your ${escapeHtml(planLabel)} membership is cancelled`)}
+    ${p(`Hi ${escapeHtml(name)}, we've cancelled your membership — no further charges.`)}
+    ${box(`
+      <div style="font-size:13px;color:#d1d5db;line-height:1.7;">
+        ${endStr ? `Your member benefits and any unused credits stay active until <strong style="color:#ffffff;">${escapeHtml(endStr)}</strong>.` : 'Your membership has ended.'}<br/>
+        After that your account stays open at standard pricing.
+      </div>
+    `)}
+    ${p(`Changed your mind? You can rejoin anytime and pick up the same benefits.`)}
+    ${button('Rejoin', `${APP_URL}/membership`)}
+  `
+
+  const text = `Your ${planLabel} membership is cancelled, ${name}
+
+No further charges.${endStr ? ` Your benefits and any unused credits stay active until ${endStr}.` : ''}
+
+Rejoin anytime: ${APP_URL}/membership
+
+— The Vitality Project
+`
+
+  return {
+    subject: `Your ${planLabel} membership is cancelled`,
+    html: wrap(body, { preheader: endStr ? `Benefits active until ${endStr}.` : 'Membership ended.' }),
     text,
   }
 }
