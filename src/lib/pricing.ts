@@ -62,6 +62,12 @@ export interface PricedCart {
   member: {
     tier: MembershipTier
     discountCents: number
+    /** Free-peptide credits the member has left this cycle. */
+    peptideCreditsAvailable: number
+    /** How many credits this cart redeems (priciest eligible units first). */
+    peptideCreditsApplied: number
+    /** Value of the credited (now-free) peptide units, in cents. */
+    creditDiscountCents: number
   }
   totalDiscount: number
   /** Final cart total after both discounts (shipping/tax are applied later
@@ -189,8 +195,38 @@ export async function computeCartTotal(
   }))
   const bundle = calculateBundleDiscount(bundleItems, { subscriber: isSubscriber })
 
-  const memberDiscountCents = calculateMemberDiscount(subtotal, membership.tier)
-  const totalDiscount = bundle.discountCents + memberDiscountCents
+  // ── Membership peptide credits ──────────────────────────────────────
+  // Active Plus/Premium members get N free-peptide credits per cycle. Each
+  // credit zeroes ONE unit of an eligible peptide; we apply to the priciest
+  // units first to maximize member value. Supplies, stacks, the membership
+  // line, and sample packs are not credit-eligible. The actual decrement
+  // happens at order placement — here we only price the redemption for display.
+  const mRow = 'membership' in membership ? membership.membership : null
+  const peptideCreditsAvailable =
+    mRow && mRow.status === 'ACTIVE'
+      ? Math.max(0, mRow.freePeptideCreditsThisPeriod - mRow.freePeptidesUsedThisPeriod)
+      : 0
+  const CREDIT_INELIGIBLE = new Set(['supplies', 'stacks'])
+  const creditUnitPrices: number[] = []
+  for (const l of availableLines) {
+    const catSlug = productById.get(l.productId)?.category?.slug ?? ''
+    if (CREDIT_INELIGIBLE.has(catSlug) || l.slug.includes('membership') || l.slug.includes('sample')) {
+      continue
+    }
+    for (let i = 0; i < l.quantity; i++) creditUnitPrices.push(l.unitPrice)
+  }
+  creditUnitPrices.sort((a, b) => b - a)
+  const peptideCreditsApplied = Math.min(peptideCreditsAvailable, creditUnitPrices.length)
+  const creditDiscountCents = creditUnitPrices
+    .slice(0, peptideCreditsApplied)
+    .reduce((s, v) => s + v, 0)
+
+  // Member % applies to what they actually pay (the non-credited portion).
+  const memberDiscountCents = calculateMemberDiscount(
+    Math.max(0, subtotal - creditDiscountCents),
+    membership.tier,
+  )
+  const totalDiscount = bundle.discountCents + memberDiscountCents + creditDiscountCents
   const total = Math.max(0, subtotal - totalDiscount)
 
   const unavailableCount = lines.filter((l) => !l.available).length
@@ -208,6 +244,9 @@ export async function computeCartTotal(
     member: {
       tier: membership.tier,
       discountCents: memberDiscountCents,
+      peptideCreditsAvailable,
+      peptideCreditsApplied,
+      creditDiscountCents,
     },
     totalDiscount,
     total,
@@ -226,7 +265,13 @@ function emptyCart(): PricedCart {
       tierLabel: null,
       nextTier: null,
     },
-    member: { tier: 'NONE' as MembershipTier, discountCents: 0 },
+    member: {
+      tier: 'NONE' as MembershipTier,
+      discountCents: 0,
+      peptideCreditsAvailable: 0,
+      peptideCreditsApplied: 0,
+      creditDiscountCents: 0,
+    },
     totalDiscount: 0,
     total: 0,
     unavailableCount: 0,
