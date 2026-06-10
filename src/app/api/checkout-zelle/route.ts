@@ -9,6 +9,7 @@ import { sendEmail } from '@/lib/email'
 import {
   zelleOrderInstructions,
   zelleOrderAdminAlert,
+  orderConfirmation,
 } from '@/lib/email-templates'
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
@@ -391,30 +392,56 @@ export async function POST(req: NextRequest) {
     const customerName =
       data.shippingAddress.name || session.user.name || 'there'
 
+    // Credits/membership can take the total to $0 — there's nothing to Zelle,
+    // so send a plain order confirmation instead of payment instructions.
+    const isFree = total <= 0
+
     void (async () => {
       try {
-        const instructions = zelleOrderInstructions({
-          orderNumber: order.orderNumber,
-          customerName,
-          items: orderItems.map((it) => ({
-            name: it.name,
-            quantity: it.quantity,
-            price: it.price,
-            total: it.total,
-          })),
-          subtotal,
-          total,
-          shippingAddress: data.shippingAddress,
-          zelleEmail: zelleConfig.email,
-          zelleDisplayName: zelleConfig.displayName,
-          zellePhone: zelleConfig.phone,
-        })
-        await sendEmail({
-          to: data.email,
-          subject: instructions.subject,
-          html: instructions.html,
-          text: instructions.text,
-        })
+        if (isFree) {
+          const conf = orderConfirmation({
+            orderNumber: order.orderNumber,
+            customerName,
+            items: orderItems.map((it) => ({
+              name: it.name,
+              quantity: it.quantity,
+              price: it.price,
+              total: it.total,
+            })),
+            subtotal,
+            total,
+            shippingAddress: data.shippingAddress,
+          })
+          await sendEmail({
+            to: data.email,
+            subject: conf.subject,
+            html: conf.html,
+            text: conf.text,
+          })
+        } else {
+          const instructions = zelleOrderInstructions({
+            orderNumber: order.orderNumber,
+            customerName,
+            items: orderItems.map((it) => ({
+              name: it.name,
+              quantity: it.quantity,
+              price: it.price,
+              total: it.total,
+            })),
+            subtotal,
+            total,
+            shippingAddress: data.shippingAddress,
+            zelleEmail: zelleConfig.email,
+            zelleDisplayName: zelleConfig.displayName,
+            zellePhone: zelleConfig.phone,
+          })
+          await sendEmail({
+            to: data.email,
+            subject: instructions.subject,
+            html: instructions.html,
+            text: instructions.text,
+          })
+        }
 
         const adminEmail = process.env.ADMIN_EMAIL
         if (adminEmail) {
@@ -435,15 +462,20 @@ export async function POST(req: NextRequest) {
           })
           await sendEmail({
             to: adminEmail,
-            subject: alert.subject,
+            subject: isFree
+              ? `[Free member order] #${order.orderNumber} — ready to ship`
+              : alert.subject,
             html: alert.html,
             text: alert.text,
           })
         }
 
-        // Text the business owner — Zelle orders need a manual "mark paid".
+        // Text the business owner — Zelle orders need a manual "mark paid";
+        // free member orders just need shipping.
         void sendOwnerSms(
-          `Vitality: new Zelle order ${order.orderNumber} — ${formatPrice(total)} from ${customerName}. Awaiting payment; mark paid in admin when funds land.`,
+          isFree
+            ? `Vitality: free member order ${order.orderNumber} from ${customerName} ($0 — covered by credits). Mark paid in admin to release shipping.`
+            : `Vitality: new Zelle order ${order.orderNumber} — ${formatPrice(total)} from ${customerName}. Awaiting payment; mark paid in admin when funds land.`,
         )
       } catch (err) {
         console.error('[checkout-zelle] email send failed:', err)
