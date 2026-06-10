@@ -13,10 +13,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#0f0f12', color: '#fff' }}>
+    <div className="lg:flex min-h-screen" style={{ background: '#0f0f12', color: '#fff' }}>
       <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
+      {/* min-w-0 lets the content column shrink below its intrinsic width so
+          wide tables scroll within their own container instead of pushing the
+          whole page wider than the viewport on phones/tablets. */}
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="admin-scope p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
     </div>
   )

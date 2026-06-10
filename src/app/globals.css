@@ -177,3 +177,27 @@
       0 0 80px rgba(120, 160, 255, 0.06);
   }
 }
+
+/*
+ * ── Mobile / tablet: admin data tables ─────────────────────────────────
+ *
+ * The admin panel is full of wide data tables. On screens narrower than the
+ * desktop breakpoint (lg, 1024px) the sidebar becomes an off-canvas drawer and
+ * the content column is full width, but a 6–8 column table still can't fit. Let
+ * each table become its own horizontal scroll container so it scrolls *inside*
+ * its card instead of blowing the whole page out past the viewport (which is
+ * what made the dashboard "unviewable" on a phone).
+ *
+ * Scoped to .admin-scope and gated under lg so the desktop layout is byte-for
+ * byte identical — purely additive small-screen behavior.
+ */
+@media (max-width: 1023.98px) {
+  .admin-scope table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+}

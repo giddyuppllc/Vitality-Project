@@ -191,12 +191,12 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-6 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6 mb-8">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-white/40 mt-1">Overview of The Vitality Project</p>
         </div>
-        <div className="w-80 shrink-0">
+        <div className="w-full sm:w-80 sm:shrink-0">
           <InstallAppButton />
         </div>
       </div>

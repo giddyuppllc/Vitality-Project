@@ -24,10 +24,10 @@ export default async function BusinessLayout({ children }: { children: React.Rea
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#0f0f12', color: '#fff' }}>
+    <div className="lg:flex min-h-screen" style={{ background: '#0f0f12', color: '#fff' }}>
       <BusinessSidebar orgName={membership.organization.name} />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="admin-scope p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
     </div>
   )

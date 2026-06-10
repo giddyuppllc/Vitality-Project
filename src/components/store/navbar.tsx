@@ -35,7 +35,7 @@ export function Navbar() {
   return (
     <nav className="fixed top-0 w-full z-50 glass-elevated border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-44">
+        <div className="flex items-center justify-between h-20 md:h-44">
 
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0">
@@ -44,7 +44,7 @@ export function Navbar() {
               alt="The Vitality Project"
               width={900}
               height={900}
-              className="h-40 w-auto object-contain"
+              className="h-16 md:h-40 w-auto object-contain"
               style={{ filter: 'invert(1) hue-rotate(180deg) brightness(1.15)' }}
               priority
             />
