@@ -51,20 +51,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (order?.affiliateId) {
         const affiliate = await prisma.affiliate.findUnique({ where: { id: order.affiliateId } })
         if (affiliate) {
-          const commission = Math.round(order.total * affiliate.commissionRate)
-          await prisma.affiliateCommission.upsert({
-            where: { id: `${order.id}-${affiliate.id}` },
-            create: { affiliateId: affiliate.id, orderId: order.id, amount: commission, status: 'PENDING' },
-            update: {},
-          }).catch(() =>
-            prisma.affiliateCommission.create({
+          // Gross product value (subtotal), not post-discount total — see
+          // mark-paid route. Idempotent: exactly one commission per
+          // (affiliate, order) so re-saving a paid order can't double-pay
+          // (the old upsert keyed on a synthetic id that never matched the
+          // real cuid, so it created a new row + double-incremented every time).
+          const commission = Math.round(order.subtotal * affiliate.commissionRate)
+          const existing = await prisma.affiliateCommission.findFirst({
+            where: { affiliateId: affiliate.id, orderId: order.id },
+            select: { id: true },
+          })
+          if (!existing) {
+            await prisma.affiliateCommission.create({
               data: { affiliateId: affiliate.id, orderId: order.id, amount: commission, status: 'PENDING' },
             })
-          )
-          await prisma.affiliate.update({
-            where: { id: affiliate.id },
-            data: { totalEarned: { increment: commission } },
-          })
+            await prisma.affiliate.update({
+              where: { id: affiliate.id },
+              data: { totalEarned: { increment: commission } },
+            })
+          }
         }
       }
       // Decrement inventory on payment confirmation

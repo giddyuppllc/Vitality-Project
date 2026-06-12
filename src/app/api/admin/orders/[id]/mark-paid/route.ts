@@ -216,7 +216,11 @@ export async function POST(
           },
         })
         if (aff) {
-          const amount = Math.round(order.total * aff.commissionRate)
+          // Commission is paid on GROSS PRODUCT VALUE (subtotal), not the
+          // post-discount total — otherwise a member whose credits zero the
+          // payable total ($0) would earn the affiliate $0 despite driving a
+          // real product sale. (Edward, 2026-06-12.)
+          const amount = Math.round(order.subtotal * aff.commissionRate)
           // Idempotent: only create one commission per (affiliate, order).
           const existing = await prisma.affiliateCommission.findFirst({
             where: { affiliateId: aff.id, orderId: order.id },

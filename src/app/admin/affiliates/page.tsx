@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Download, Clock } from 'lucide-react'
 import { MarkPaidButton } from './mark-paid-button'
 import { AffiliateRowActions } from './affiliate-row-actions'
-import { addAffiliateManually } from './add-affiliate-action'
+import { AddAffiliateForm } from './add-affiliate-form'
 
 export default async function AdminAffiliatesPage() {
   const affiliates = await prisma.affiliate.findMany({
@@ -53,31 +53,7 @@ export default async function AdminAffiliatesPage() {
       </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
-        <form action={addAffiliateManually} className="rounded-xl bg-dark-700 border border-white/10 p-4">
-          <p className="text-sm font-medium mb-1">Add an affiliate</p>
-          <p className="text-xs text-white/40 mb-3">
-            Enter the email of an existing account — they&rsquo;re added as Active. No account yet?
-            Send the invite link →
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="their@email.com"
-              className="flex-1 min-w-[150px] px-3 py-2 rounded-lg bg-dark-800 border border-white/10 text-sm"
-            />
-            <input
-              name="paypalEmail"
-              type="email"
-              placeholder="PayPal email (optional)"
-              className="flex-1 min-w-[150px] px-3 py-2 rounded-lg bg-dark-800 border border-white/10 text-sm"
-            />
-            <button className="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:opacity-90">
-              Add
-            </button>
-          </div>
-        </form>
+        <AddAffiliateForm />
         <div className="rounded-xl bg-dark-700 border border-white/10 p-4">
           <p className="text-sm font-medium mb-1">Invite an affiliate</p>
           <p className="text-xs text-white/40 mb-3">
