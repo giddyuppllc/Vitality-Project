@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,10 +17,12 @@ export default function LoginPage() {
 }
 
 function LoginInner() {
-  const router = useRouter()
   const params = useSearchParams()
-  // Only follow internal redirects to avoid open-redirect risk.
-  const rawNext = params.get('next')
+  // Only follow internal redirects to avoid open-redirect risk. Accept either
+  // ?next= (our own links) or ?callbackUrl= (what the server auth-guards send,
+  // e.g. /auth/login?callbackUrl=/account/support) so users return to where
+  // they were instead of getting dumped on the storefront.
+  const rawNext = params.get('next') ?? params.get('callbackUrl')
   const next = rawNext && rawNext.startsWith('/') ? rawNext : null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,8 +62,12 @@ function LoginInner() {
           // ignore — fall back to the storefront
         }
       }
-      router.push(dest ?? '/')
-      router.refresh()
+      // Hard navigation (NOT router.push) so the navbar + every client
+      // component re-reads the freshly-set session cookie. A soft SPA push
+      // leaves the navbar's useSession() stale — it keeps showing "Sign In",
+      // so the user clicks it and loops back to the login screen even though
+      // they are actually authenticated.
+      window.location.assign(dest ?? '/')
     }
   }
 
