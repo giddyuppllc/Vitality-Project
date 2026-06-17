@@ -13,8 +13,12 @@ import { prisma } from '@/lib/prisma'
 // carry. Admins are routed by role; everyone else falls through to the store.
 export async function GET() {
   const session = await getServerSession(authOptions)
+  // Land everyone on the product catalog by default. The membership-first
+  // homepage reads as a paywall to warm inbound traffic, so discovery should
+  // open straight onto the products rather than the join page. Membership is
+  // still one click away via the banner on the storefront.
   if (!session?.user?.id) {
-    return NextResponse.json({ path: '/' })
+    return NextResponse.json({ path: '/products' })
   }
 
   if (session.user.role === 'ADMIN') {
@@ -32,5 +36,5 @@ export async function GET() {
     return NextResponse.json({ path: '/account/affiliate' })
   }
 
-  return NextResponse.json({ path: '/' })
+  return NextResponse.json({ path: '/products' })
 }

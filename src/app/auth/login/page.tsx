@@ -67,7 +67,7 @@ function LoginInner() {
       // leaves the navbar's useSession() stale — it keeps showing "Sign In",
       // so the user clicks it and loops back to the login screen even though
       // they are actually authenticated.
-      window.location.assign(dest ?? '/')
+      window.location.assign(dest ?? '/products')
     }
   }
 

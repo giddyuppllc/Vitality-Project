@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { Sparkles, ArrowRight } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { ProductCard } from '@/components/store/product-card'
 import { SortSelect } from '@/components/store/sort-select'
@@ -61,6 +63,32 @@ export default async function ProductsPage({ searchParams }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Membership entry banner — keeps the join page one obvious click away
+          without gating discovery behind it. */}
+      <Link
+        href="/membership"
+        className="group block mb-8 glass rounded-2xl px-5 py-4 sm:px-6 sm:py-5 card-hover border border-brand-500/20"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-brand-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-white text-sm sm:text-base">
+                Pay less on every order — become a member
+              </p>
+              <p className="text-xs sm:text-sm text-white/50">
+                Permanent member pricing, free compounds every month, and first access to new drops.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-sm text-brand-400 group-hover:text-brand-300 font-medium shrink-0">
+            See membership <ArrowRight className="w-4 h-4" />
+          </span>
+        </div>
+      </Link>
+
       <div className="mb-10">
         <h1 className="text-4xl font-bold mb-2">Products</h1>
         <p className="text-white/40">
