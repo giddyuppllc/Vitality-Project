@@ -23,6 +23,7 @@ import {
 } from '@/lib/loyalty'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { attributeOrderToCampaigns } from '@/lib/campaign-attribution'
+import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 const checkoutSchema = z.object({
@@ -55,6 +56,10 @@ const checkoutSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  // Throttle checkout attempts per IP — limits card-testing / order spam.
+  const limited = checkRateLimit(req, 'checkout', { limit: 10, windowMs: 60_000 })
+  if (!limited.allowed) return tooManyRequests(limited.retryAfter)
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -291,7 +296,11 @@ export async function POST(req: NextRequest) {
         select: { commissionRate: true },
       })
       const commissionRate = location?.commissionRate ?? 0
-      const commissionAmount = Math.round(order.total * commissionRate)
+      // Commission is paid on GROSS PRODUCT VALUE (subtotal), not the
+      // post-discount/credit total — matches checkout-zelle + mark-paid so a
+      // member whose credits zero the payable total still earns the location
+      // a real cut. (Edward, 2026-06-12.)
+      const commissionAmount = Math.round(subtotal * commissionRate)
       if (commissionAmount > 0) {
         await prisma.orderCommission.upsert({
           where: { orderId_locationId: { orderId: order.id, locationId } },
@@ -306,7 +315,9 @@ export async function POST(req: NextRequest) {
     if (affCode && !locationId) {
       const affiliate = await prisma.affiliate.findUnique({ where: { code: affCode, status: 'ACTIVE' } })
       if (affiliate) {
-        const commission = Math.round(total * affiliate.commissionRate)
+        // Gross subtotal, not post-discount/credit total — see comment above
+        // and mark-paid (Edward, 2026-06-12).
+        const commission = Math.round(subtotal * affiliate.commissionRate)
         await prisma.affiliateCommission.create({
           data: { affiliateId: affiliate.id, orderId: order.id, amount: commission, status: 'PENDING' },
         })
