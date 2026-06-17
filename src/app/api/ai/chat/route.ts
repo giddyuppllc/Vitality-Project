@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -24,6 +25,12 @@ Important guidelines:
 Payment info: We accept Zelle and Wire Transfer. Payment details are provided after order placement.`
 
 export async function POST(req: NextRequest) {
+  // Strict per-IP rate limit — this route is intentionally unauthenticated
+  // (anonymous storefront chat) and hits a paid LLM, so cap it tightly to
+  // contain cost/DoS abuse. ~20 messages/minute is plenty for a real user.
+  const limited = checkRateLimit(req, 'ai-chat', { limit: 20, windowMs: 60_000 })
+  if (!limited.allowed) return tooManyRequests(limited.retryAfter)
+
   try {
     const { messages, sessionId } = await req.json()
 
