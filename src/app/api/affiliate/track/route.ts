@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -8,6 +9,14 @@ export async function GET(req: NextRequest) {
   const redirect = searchParams.get('to') ?? '/'
 
   if (!code) {
+    return NextResponse.redirect(new URL(redirect, req.url))
+  }
+
+  // Cap per-IP click recording so a single source can't spray click rows /
+  // commission cookies. When over the limit we still redirect the visitor
+  // (never break the user-facing link) but skip the DB write + cookie set.
+  const limited = checkRateLimit(req, 'affiliate-track', { limit: 30, windowMs: 60_000 })
+  if (!limited.allowed) {
     return NextResponse.redirect(new URL(redirect, req.url))
   }
 

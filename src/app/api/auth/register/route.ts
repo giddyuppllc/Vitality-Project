@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { sendEmail } from '@/lib/email'
 import { welcomeEmail, emailVerification } from '@/lib/email-templates'
 import { TRAINER_ATTRIBUTION_COOKIE, attributeUserToTrainer } from '@/lib/trainer'
+import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 // Username: 3–24 chars, alphanumeric + underscore + dash + dot, must
 // start with a letter or digit. Case-insensitive uniqueness enforced
@@ -26,6 +27,11 @@ const schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  // Throttle account creation per IP — deters credential-stuffing / mass
+  // signup abuse.
+  const limited = checkRateLimit(req, 'register', { limit: 10, windowMs: 60_000 })
+  if (!limited.allowed) return tooManyRequests(limited.retryAfter)
+
   try {
     const body = await req.json()
     const { name, email, password, username } = schema.parse(body)

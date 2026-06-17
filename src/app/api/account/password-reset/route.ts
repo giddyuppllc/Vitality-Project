@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import { sendEmail } from '@/lib/email'
 import { passwordReset } from '@/lib/email-templates'
+import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const schema = z.object({
   email: z.string().email(),
@@ -18,6 +19,12 @@ const GENERIC_RESPONSE = NextResponse.json({
 })
 
 export async function POST(req: NextRequest) {
+  // Throttle reset requests per IP — deters reset-email spam / enumeration
+  // probing. Return the same generic body on limit so we still don't leak
+  // whether the email exists.
+  const limited = checkRateLimit(req, 'password-reset', { limit: 5, windowMs: 60_000 })
+  if (!limited.allowed) return GENERIC_RESPONSE
+
   try {
     const body = await req.json().catch(() => ({}))
     const parsed = schema.safeParse(body)

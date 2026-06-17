@@ -13,6 +13,7 @@ import {
 } from '@/lib/email-templates'
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
+import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { computeCartTotal } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { z } from 'zod'
@@ -76,6 +77,10 @@ async function getZelleConfig(): Promise<{
 }
 
 export async function POST(req: NextRequest) {
+  // Throttle order placement per IP — limits order spam.
+  const limited = checkRateLimit(req, 'checkout-zelle', { limit: 10, windowMs: 60_000 })
+  if (!limited.allowed) return tooManyRequests(limited.retryAfter)
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
