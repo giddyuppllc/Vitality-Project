@@ -42,8 +42,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    // If marking as PAID, also trigger affiliate commission
-    if (data.paymentStatus === 'PAID') {
+    // Payment confirmation now goes through the canonical /mark-paid pipeline
+    // (the order-detail button uses it). This branch only fires on a genuine
+    // UNPAID→PAID transition so re-saving an already-paid order can't double-
+    // decrement inventory or re-credit commission.
+    if (data.paymentStatus === 'PAID' && prev.paymentStatus !== 'PAID') {
       const order = await prisma.order.findUnique({
         where: { id: id },
         include: { items: true },
