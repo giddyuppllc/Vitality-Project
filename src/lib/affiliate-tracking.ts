@@ -39,43 +39,43 @@ export async function recordClickAndRedirect(
     where: { code: normalized },
   })
 
-  // Inactive/missing — still redirect so the visitor doesn't see a 404.
-  if (!affiliate || affiliate.status !== 'ACTIVE') {
+  // Truly unknown code — just redirect (nothing to attribute).
+  if (!affiliate) {
     return NextResponse.redirect(dest)
   }
 
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
-  const userAgent = req.headers.get('user-agent') ?? ''
-  const referrer = req.headers.get('referer') ?? ''
+  // Record the click only for ACTIVE affiliates — but the cookie below is set
+  // for ANY existing affiliate, so a PENDING affiliate approved before the
+  // visitor checks out still earns the attribution. Checkout only CREDITS
+  // active affiliates, so this can never over-attribute.
+  if (affiliate.status === 'ACTIVE') {
+    const ip =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      req.headers.get('x-real-ip') ??
+      'unknown'
+    const userAgent = req.headers.get('user-agent') ?? ''
+    const referrer = req.headers.get('referer') ?? ''
 
-  try {
-    await prisma.affiliateClick.create({
-      data: {
-        affiliateId: affiliate.id,
-        ip,
-        userAgent,
-        referrer,
-        sessionId,
-      },
-    })
+    try {
+      await prisma.affiliateClick.create({
+        data: { affiliateId: affiliate.id, ip, userAgent, referrer, sessionId },
+      })
 
-    if (opts.slug) {
-      await prisma.affiliateLink.updateMany({
-        where: { affiliateId: affiliate.id, slug: opts.slug },
-        data: { clicks: { increment: 1 } },
-      })
-    } else {
-      // No slug supplied — bump the base affiliate's first link if one exists.
-      await prisma.affiliateLink.updateMany({
-        where: { affiliateId: affiliate.id },
-        data: { clicks: { increment: 1 } },
-      })
+      if (opts.slug) {
+        await prisma.affiliateLink.updateMany({
+          where: { affiliateId: affiliate.id, slug: opts.slug },
+          data: { clicks: { increment: 1 } },
+        })
+      } else {
+        // No slug supplied — bump the base affiliate's first link if one exists.
+        await prisma.affiliateLink.updateMany({
+          where: { affiliateId: affiliate.id },
+          data: { clicks: { increment: 1 } },
+        })
+      }
+    } catch (err) {
+      console.error('[affiliate-tracking] click record failed:', err)
     }
-  } catch (err) {
-    console.error('[affiliate-tracking] click record failed:', err)
   }
 
   const days = parseInt(process.env.AFFILIATE_COOKIE_DAYS ?? '30')
