@@ -18,6 +18,18 @@ import { computeCartTotal } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { z } from 'zod'
 
+// Shared system user that owns guest shipping-address rows (Address.userId is a
+// required FK). Guest ORDERS themselves stay userId:null with the real customer
+// email on the order — this user only anchors the address snapshot.
+async function getOrCreateGuestUserId(): Promise<string> {
+  const guest = await prisma.user.upsert({
+    where: { email: 'guest-orders@vitalityproject.global' },
+    update: {},
+    create: { email: 'guest-orders@vitalityproject.global', name: 'Guest Orders' },
+  })
+  return guest.id
+}
+
 // Customer-driven Zelle checkout. Creates an order in PENDING / UNPAID state
 // with paymentMethod = 'zelle'. No money has changed hands at this point —
 // admin manually confirms via /api/admin/orders/:id/mark-paid once the Zelle
@@ -83,12 +95,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Sign in to place an order' },
-        { status: 401 },
-      )
-    }
+    // Guest checkout allowed: no session → the order is a true guest order
+    // (userId null, real email on the order). Only the shipping Address row needs
+    // an owner, so guest addresses are parented to a system "guest orders" user.
+    const userId = session?.user?.id ?? null
 
     const host =
       req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? ''
@@ -111,14 +121,13 @@ export async function POST(req: NextRequest) {
       }
       organizationId = org.id
       salesChannel = 'CLIENT_PORTAL'
-      const client = await prisma.orgClient.findUnique({
-        where: {
-          organizationId_userId: {
-            organizationId: org.id,
-            userId: session.user.id,
-          },
-        },
-      })
+      const client = userId
+        ? await prisma.orgClient.findUnique({
+            where: {
+              organizationId_userId: { organizationId: org.id, userId },
+            },
+          })
+        : null
       if (client) {
         clientId = client.id
         locationId = client.locationId ?? undefined
@@ -160,17 +169,19 @@ export async function POST(req: NextRequest) {
     // Membership pricing — run the cart through the single pricing engine so
     // the member discount, bundle discount, and peptide credits all reach the
     // REAL order (the inline subtotal above doesn't know about them).
-    const membership = await prisma.membership.findUnique({
-      where: { userId: session.user.id },
-    })
-    const priced = await computeCartTotal(
-      data.items.map((i) => ({
-        productId: i.productId,
-        variantId: i.variantId ?? null,
-        quantity: i.quantity,
-      })),
-      { userId: session.user.id },
-    ).catch(() => null)
+    const membership = userId
+      ? await prisma.membership.findUnique({ where: { userId } })
+      : null
+    const priced = userId
+      ? await computeCartTotal(
+          data.items.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId ?? null,
+            quantity: i.quantity,
+          })),
+          { userId },
+        ).catch(() => null)
+      : null
     const membershipDiscount = priced
       ? priced.member.discountCents +
         priced.bundle.discountCents +
@@ -209,12 +220,13 @@ export async function POST(req: NextRequest) {
     let loyaltyPointsToUse = 0
     let loyaltyDiscount = 0
     if (
+      userId && // guests have no loyalty account
       data.loyaltyPointsToRedeem &&
       data.loyaltyPointsToRedeem > 0 &&
       !locationId // never redeem on B2B tenant orders
     ) {
       const account = await prisma.loyaltyAccount.findUnique({
-        where: { userId: session.user.id },
+        where: { userId },
         select: { points: true },
       })
       const available = account?.points ?? 0
@@ -283,28 +295,28 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = generateOrderNumber()
 
-    const shippingAddress =
-      (await prisma.address.findFirst({
-        where: {
-          userId: session.user.id,
-          line1: data.shippingAddress.line1,
-          zip: data.shippingAddress.zip,
-        },
-      })) ??
-      (await prisma.address
-        .create({
-          data: {
-            userId: session.user.id,
-            name: data.shippingAddress.name,
-            line1: data.shippingAddress.line1,
-            line2: data.shippingAddress.line2,
-            city: data.shippingAddress.city,
-            state: data.shippingAddress.state,
-            zip: data.shippingAddress.zip,
-            country: data.shippingAddress.country,
-          },
-        })
-        .catch(() => null))
+    const addressData = {
+      name: data.shippingAddress.name,
+      line1: data.shippingAddress.line1,
+      line2: data.shippingAddress.line2,
+      city: data.shippingAddress.city,
+      state: data.shippingAddress.state,
+      zip: data.shippingAddress.zip,
+      country: data.shippingAddress.country,
+    }
+    const shippingAddress = userId
+      ? // Logged-in: reuse a matching saved address or create one they own.
+        ((await prisma.address.findFirst({
+          where: { userId, line1: addressData.line1, zip: addressData.zip },
+        })) ??
+          (await prisma.address
+            .create({ data: { userId, ...addressData } })
+            .catch(() => null)))
+      : // Guest: store the shipping snapshot under the system guest user (the
+        // order itself stays userId:null with the real email).
+        await prisma.address
+          .create({ data: { userId: await getOrCreateGuestUserId(), ...addressData } })
+          .catch(() => null)
 
     // Pull the affiliate cookie (set by /r/<code>, /ref/<code>, or /api/affiliate/track)
     // and resolve it to an active Affiliate. Skipped for tenant/B2B traffic where
@@ -326,7 +338,7 @@ export async function POST(req: NextRequest) {
     const order = await prisma.order.create({
       data: {
         orderNumber,
-        userId: session.user.id,
+        userId,
         email: data.email,
         subtotal,
         discount,
@@ -392,7 +404,7 @@ export async function POST(req: NextRequest) {
       try {
         const { redeemPointsForOrder } = await import('@/lib/loyalty')
         await redeemPointsForOrder({
-          userId: session.user.id,
+          userId: userId!, // loyaltyPointsToUse>0 only when userId is set (guarded above)
           pointsToRedeem: loyaltyPointsToUse,
           orderId: order.id,
         })
@@ -404,13 +416,15 @@ export async function POST(req: NextRequest) {
     // Clear server-side cart_items for this user so the abandoned-cart cron
     // doesn't pester them while they're still mid-Zelle-transfer. Best-effort
     // — failure here doesn't break the order.
-    await prisma.cartItem
-      .deleteMany({ where: { userId: session.user.id } })
-      .catch((err) => console.error('[checkout-zelle] cart clear failed:', err))
+    if (userId) {
+      await prisma.cartItem
+        .deleteMany({ where: { userId } })
+        .catch((err) => console.error('[checkout-zelle] cart clear failed:', err))
+    }
 
     const zelleConfig = await getZelleConfig()
     const customerName =
-      data.shippingAddress.name || session.user.name || 'there'
+      data.shippingAddress.name || session?.user?.name || 'there'
 
     // Credits/membership can take the total to $0 — there's nothing to Zelle,
     // so send a plain order confirmation instead of payment instructions.
