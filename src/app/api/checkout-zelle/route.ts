@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
     let appliedDiscountCodeId: string | null = null
     if (data.discountCode) {
       const code = await prisma.discountCode.findUnique({
-        where: { code: data.discountCode.toUpperCase(), active: true },
+        where: { code: data.discountCode.trim().toUpperCase(), active: true },
       })
       if (
         code &&
@@ -332,6 +332,24 @@ export async function POST(req: NextRequest) {
       if (aff && aff.status === 'ACTIVE') {
         resolvedAffiliateId = aff.id
         resolvedAffiliateCode = aff.code
+      }
+    }
+
+    // Fallback attribution: no referral-link cookie, but the customer TYPED an
+    // affiliate's code into the discount field (the common case — affiliates
+    // share their code, not a link). Trim + uppercase so a stray space doesn't
+    // silently drop the attribution. The code can double as a discount or not.
+    if (!resolvedAffiliateId && !locationId && data.discountCode) {
+      const typed = data.discountCode.trim().toUpperCase()
+      if (typed) {
+        const aff = await prisma.affiliate.findUnique({
+          where: { code: typed },
+          select: { id: true, code: true, status: true },
+        })
+        if (aff && aff.status === 'ACTIVE') {
+          resolvedAffiliateId = aff.id
+          resolvedAffiliateCode = aff.code
+        }
       }
     }
 
