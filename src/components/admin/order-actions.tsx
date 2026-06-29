@@ -79,6 +79,20 @@ export function OrderActions({ order }: Props) {
     }
   }
 
+  // Confirm payment via the canonical mark-paid pipeline (fulfillment routing,
+  // inventory, commission, loyalty, membership activation, emails) — the old
+  // PATCH path only did commission+inventory and never routed fulfillment, so
+  // orders confirmed here never shipped.
+  const confirmPayment = async () => {
+    setLoading(true)
+    try {
+      await fetch(`/api/admin/orders/${order.id}/mark-paid`, { method: 'POST' })
+      router.refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="glass rounded-2xl p-6 space-y-6">
       <h2 className="font-semibold">Order Actions</h2>
@@ -89,7 +103,7 @@ export function OrderActions({ order }: Props) {
           <p className="text-sm text-amber-400 font-medium mb-3">Awaiting Payment Confirmation</p>
           <Button
             size="sm"
-            onClick={() => update({ paymentStatus: 'PAID', status: 'PROCESSING' })}
+            onClick={confirmPayment}
             loading={loading}
             className="bg-emerald-600 hover:bg-emerald-700"
           >

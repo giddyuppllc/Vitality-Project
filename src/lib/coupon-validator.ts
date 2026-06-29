@@ -184,6 +184,7 @@ export async function validateCoupon(
         where: {
           userId: context.userId,
           discountCode: discountCode.code,
+          status: { not: 'CANCELLED' }, // a cancelled order shouldn't burn the per-customer use
         },
       })
       if (priorUses >= rule.usesPerCustomer)

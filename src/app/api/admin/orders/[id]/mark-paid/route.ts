@@ -7,8 +7,10 @@ import { commissionEarned, membershipActivated, membershipCycleCredits, zellePay
 import { TIER_BENEFITS } from '@/lib/membership'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { awardPointsForOrder } from '@/lib/loyalty'
+import { createAdminNotification } from '@/lib/notifications'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
+const LOW_STOCK_THRESHOLD = 5
 const TIER_LABELS: Record<string, string> = {
   CLUB: 'Vitality Club',
   PLUS: 'Vitality Plus',
@@ -132,7 +134,7 @@ export async function POST(
       notes: true,
       userId: true,
       affiliateId: true,
-      items: { select: { name: true, sku: true, quantity: true, price: true, total: true } },
+      items: { select: { name: true, sku: true, quantity: true, price: true, total: true, productId: true, variantId: true } },
       shippingAddress: {
         select: {
           name: true,
@@ -187,6 +189,49 @@ export async function POST(
       await routeOrderToFacilities(order.id)
     } catch (err) {
       console.error('[mark-paid] fulfillment routing failed:', err)
+    }
+
+    // Decrement inventory on payment confirmation. Idempotent overall: this
+    // whole branch only runs on the UNPAID→PAID transition (a repeat call hits
+    // the alreadyPaid early-return). Ported from the order-detail PATCH so both
+    // confirm paths now run the same full pipeline.
+    for (const item of order.items) {
+      try {
+        if (item.variantId) {
+          const v = await prisma.productVariant.update({
+            where: { id: item.variantId },
+            data: { inventory: { decrement: item.quantity } },
+            include: { product: { select: { name: true } } },
+          })
+          if (v.inventory <= LOW_STOCK_THRESHOLD) {
+            await createAdminNotification({
+              type: 'LOW_STOCK',
+              title: `Low stock: ${v.product.name} (${v.name})`,
+              body: `Variant inventory is at ${v.inventory}.`,
+              link: `/admin/products/${v.productId}/edit`,
+              entityType: 'ProductVariant',
+              entityId: v.id,
+            })
+          }
+        } else {
+          const p = await prisma.product.update({
+            where: { id: item.productId },
+            data: { inventory: { decrement: item.quantity } },
+          })
+          if (p.inventory <= LOW_STOCK_THRESHOLD) {
+            await createAdminNotification({
+              type: 'LOW_STOCK',
+              title: `Low stock: ${p.name}`,
+              body: `Product inventory is at ${p.inventory}.`,
+              link: `/admin/products/${p.id}/edit`,
+              entityType: 'Product',
+              entityId: p.id,
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[mark-paid] inventory decrement failed:', err)
+      }
     }
 
     // Loyalty points — award after payment confirmation (not at placement)
