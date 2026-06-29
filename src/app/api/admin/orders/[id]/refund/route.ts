@@ -51,6 +51,16 @@ export async function POST(
       )
     }
 
+    // Validate refund-method preconditions BEFORE creating the canonical Refund
+    // row, so a rejected request never leaves an orphan PENDING refund (which
+    // would inflate the /admin P&L and shrink the future refundable cap).
+    if (refundMethod === 'store_credit' && !order.userId) {
+      return NextResponse.json(
+        { error: 'Cannot issue store credit for a guest order' },
+        { status: 400 },
+      )
+    }
+
     // Create the canonical Refund row first, PENDING. This is the source
     // of truth for the /admin P&L card. We update it to PROCESSED/FAILED
     // once the downstream call returns.
