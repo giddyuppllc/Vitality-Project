@@ -349,6 +349,21 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Mark this visitor's referral click(s) as converted so the affiliate's
+    // dashboard "Converted" column reflects reality (was permanently "No",
+    // making affiliates think tracking was broken). Best-effort, session-scoped.
+    if (resolvedAffiliateId) {
+      const clickSessionId = req.cookies.get('session_id')?.value
+      if (clickSessionId) {
+        prisma.affiliateClick
+          .updateMany({
+            where: { affiliateId: resolvedAffiliateId, sessionId: clickSessionId, converted: false },
+            data: { converted: true },
+          })
+          .catch(() => {})
+      }
+    }
+
     if (appliedDiscountCodeId) {
       await prisma.discountCode.update({
         where: { id: appliedDiscountCodeId },

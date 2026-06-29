@@ -63,7 +63,7 @@ export default async function HomePage() {
               Research-grade peptides. Lab-verified purity. Private infrastructure. Built for people who take their biology seriously.
             </p>
             <p className="text-sm text-brand-300/80 mb-8">
-              Launching soon — members get first access + exclusive pricing.
+              Members get first access + exclusive pricing.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/membership">
@@ -225,7 +225,7 @@ export default async function HomePage() {
             <p className="text-white/50 mb-3 max-w-md mx-auto leading-relaxed">
               Pay less. Get more. Every month. Members get early access, exclusive pricing, and compounds you won't find anywhere else.
             </p>
-            <p className="text-sm text-brand-300/60 mb-8">No payment today — just reserve your spot.</p>
+            <p className="text-sm text-brand-300/60 mb-8">Pay by Zelle — your membership activates as soon as funds clear.</p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link href="/membership">
                 <Button size="lg">

@@ -13,9 +13,13 @@ interface Props {
 export default async function AdminSupportPage({ searchParams }: Props) {
   const { status, priority } = await searchParams
 
+  // Validate URL params against the enums before they hit Prisma — an invalid
+  // value (stale bookmark / typo) was throwing PrismaClientValidationError → 500.
+  const TICKET_STATUSES = ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'RESOLVED', 'CLOSED']
+  const TICKET_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT']
   const where: any = {}
-  if (status) where.status = status
-  if (priority) where.priority = priority
+  if (status && TICKET_STATUSES.includes(status)) where.status = status
+  if (priority && TICKET_PRIORITIES.includes(priority)) where.priority = priority
 
   const tickets = await prisma.supportTicket.findMany({
     where,
