@@ -77,6 +77,7 @@ export default function CheckoutPage() {
     }
   }, [items.length, items.map((i) => `${i.productId}|${i.variantId}|${i.quantity}`).join(',')])
 
+  const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [line1, setLine1] = useState('')
   const [line2, setLine2] = useState('')
@@ -110,6 +111,10 @@ export default function CheckoutPage() {
     if (session?.user?.name && !name) setName(session.user.name)
   }, [session?.user?.name, name])
 
+  useEffect(() => {
+    if (session?.user?.email && !email) setEmail(session.user.email)
+  }, [session?.user?.email, email])
+
   // All numbers below are pulled straight from /api/cart (server-authoritative).
   // No client-side fallback math — if `cart` is null the UI shows a loader.
   const subtotal = cart?.subtotal ?? 0
@@ -133,26 +138,6 @@ export default function CheckoutPage() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-24 text-center">
         <Loader2 className="w-10 h-10 text-white/30 mx-auto animate-spin" />
-      </div>
-    )
-  }
-
-  if (sessionStatus === 'unauthenticated') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-        <Lock className="w-16 h-16 text-white/10 mx-auto mb-6" />
-        <h1 className="text-3xl font-bold mb-3">Sign in to check out</h1>
-        <p className="text-white/50 mb-8 max-w-md mx-auto leading-relaxed">
-          You need an account to place an order. It takes 30 seconds.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link href={`/auth/signin?callbackUrl=${encodeURIComponent('/checkout')}`}>
-            <Button size="lg">Sign in</Button>
-          </Link>
-          <Link href={`/auth/register?callbackUrl=${encodeURIComponent('/checkout')}`}>
-            <Button size="lg" variant="outline">Create account</Button>
-          </Link>
-        </div>
       </div>
     )
   }
@@ -183,8 +168,8 @@ export default function CheckoutPage() {
       setError('Please fill in all required shipping fields.')
       return
     }
-    if (!session?.user?.email) {
-      setError('Missing account email. Please sign in again.')
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setError('Please enter a valid email for your order confirmation.')
       return
     }
 
@@ -199,7 +184,7 @@ export default function CheckoutPage() {
             variantId: i.variantId,
             quantity: i.quantity,
           })),
-          email: session.user.email,
+          email,
           shippingAddress: {
             name,
             line1,
@@ -244,6 +229,24 @@ export default function CheckoutPage() {
           onSubmit={handlePlaceOrder}
           className="lg:col-span-2 space-y-6"
         >
+          {/* Contact */}
+          <div className="glass rounded-2xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Contact</h2>
+            <Field
+              label="Email *"
+              value={email}
+              onChange={setEmail}
+              placeholder="you@email.com"
+              required
+            />
+            {!session?.user && (
+              <p className="text-xs text-white/40">
+                Your order confirmation and Zelle instructions are sent here — no
+                account needed to check out.
+              </p>
+            )}
+          </div>
+
           {/* Shipping */}
           <div className="glass rounded-2xl p-6 space-y-4">
             <h2 className="text-lg font-semibold">Shipping address</h2>

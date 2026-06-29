@@ -114,6 +114,13 @@ export async function POST(
     })
   }
 
+  // Reflect the payout in the affiliate's running total so the admin "Paid"
+  // column and /api/affiliate/stats stop showing $0.00 after real payouts.
+  await prisma.affiliate.update({
+    where: { id: affiliateId },
+    data: { totalPaid: { increment: payoutAmount } },
+  })
+
   await prisma.auditLog.create({
     data: {
       userId: session.user.id,

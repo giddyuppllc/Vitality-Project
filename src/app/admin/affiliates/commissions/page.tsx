@@ -18,7 +18,10 @@ interface PageProps {
 // affiliate detail page.
 export default async function AdminCommissionsPage({ searchParams }: PageProps) {
   const sp = await searchParams
-  const status = (sp.status?.toUpperCase() ?? '') as CommissionStatus | ''
+  // Only accept a valid CommissionStatus — an invalid ?status= was 500ing the page.
+  const COMMISSION_STATUSES = ['PENDING', 'APPROVED', 'PAID', 'CANCELLED']
+  const rawStatus = sp.status?.toUpperCase() ?? ''
+  const status = (COMMISSION_STATUSES.includes(rawStatus) ? rawStatus : '') as CommissionStatus | ''
   const code = sp.code?.toUpperCase() ?? ''
   const days = Math.max(0, Math.min(365, parseInt(sp.days ?? '90') || 90))
 

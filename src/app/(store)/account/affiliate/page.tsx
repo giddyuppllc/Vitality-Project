@@ -132,7 +132,7 @@ export default async function AffiliatePage() {
     commissionAgg.find((c) => c.status === 'PAID')?._sum.amount ?? 0
   const totalOrders = commissionAgg.reduce((sum, c) => sum + (c._count ?? 0), 0)
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yoursite.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global'
   const referralLink = `${appUrl}/ref/${affiliate.code}`
 
   return (
