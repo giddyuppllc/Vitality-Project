@@ -13,6 +13,8 @@ import { z } from 'zod'
 //                                     user's server-side wishlist (used at
 //                                     login to upgrade localStorage items
 //                                     into a persistent record).
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ items: [] })

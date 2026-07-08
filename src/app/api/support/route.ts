@@ -24,6 +24,8 @@ async function nextTicketNumber(): Promise<string> {
   return `VP-TKT-${String(count + 1).padStart(6, '0')}`
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id)

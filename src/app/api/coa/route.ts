@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 // No auth required. Returns sanitized records (no internal `notes`,
 // no `uploadedById`, no `uploadedByName`).
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const q = (url.searchParams.get('q') ?? '').trim()

@@ -37,6 +37,8 @@ async function guard() {
   return session
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   if (!(await guard())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

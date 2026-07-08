@@ -11,6 +11,8 @@ import { prisma } from '@/lib/prisma'
 // most affiliates as `CUSTOMER`. So affiliate status has to be resolved by
 // looking up the Affiliate table server-side, which the JWT/session does not
 // carry. Admins are routed by role; everyone else falls through to the store.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   // Land everyone on the product catalog by default. The membership-first

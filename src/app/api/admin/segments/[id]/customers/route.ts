@@ -10,6 +10,8 @@ async function guard() {
   return session
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

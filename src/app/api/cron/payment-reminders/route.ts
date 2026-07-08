@@ -46,6 +46,8 @@ function authorize(req: NextRequest): boolean {
   return fromQuery === secret || fromHeader === secret;
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   if (!authorize(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return trackCronRun(

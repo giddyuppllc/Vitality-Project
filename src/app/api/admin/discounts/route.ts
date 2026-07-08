@@ -39,6 +39,8 @@ const schema = z.object({
   rule: ruleSchema,
 })
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {

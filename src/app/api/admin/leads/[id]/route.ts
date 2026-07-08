@@ -16,6 +16,8 @@ const VALID_STAGES: LeadStage[] = [
 ]
 const VALID_PRIORITIES: LeadPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT']
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -147,6 +147,8 @@ async function runJob(): Promise<{ scanned: number; sent: number; skipped: numbe
   return { scanned: candidates.length, sent, skipped, errors }
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   // Auth: external cron must pass ?secret=<CRON_SECRET>.
   // Fail closed if CRON_SECRET is unset — otherwise the job is publicly

@@ -9,6 +9,8 @@ import { generateUniqueTrainerCode } from '@/lib/trainer'
  * Returns the calling user's first OrgMember row + a join link.
  * Lazy-generates a referralCode for legacy members who don't have one yet.
  */
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

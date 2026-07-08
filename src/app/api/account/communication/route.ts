@@ -10,6 +10,8 @@ const patchSchema = z.object({
   phoneContact: z.boolean().optional(),
 })
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {

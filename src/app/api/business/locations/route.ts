@@ -11,6 +11,8 @@ async function getOrgMembership(userId: string) {
   })
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) {

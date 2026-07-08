@@ -15,6 +15,8 @@ import type { OrgType } from '@prisma/client'
  * GET /api/admin/organizations
  * Quick list for the admin index page (paginated by status filter).
  */
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {
