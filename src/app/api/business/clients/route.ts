@@ -12,6 +12,8 @@ import { prisma } from '@/lib/prisma'
  * Optional ?trainerId= filter (owner/admin only) for the gym-owner's view
  * to scope down to one trainer.
  */
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

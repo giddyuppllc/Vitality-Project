@@ -10,6 +10,8 @@ import { pointsToDiscountCents, tierForLifetimeSpend } from '@/lib/loyalty'
 //
 // Returns: current balance, lifetime spend + tier, the cap on redeemable
 // points at this moment, and the dollar value those points are worth.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {

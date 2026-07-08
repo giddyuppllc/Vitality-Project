@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 
 const DAY = 24 * 60 * 60 * 1000
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (session?.user?.role !== 'ADMIN') {

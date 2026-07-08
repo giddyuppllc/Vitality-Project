@@ -11,6 +11,8 @@ const postSchema = z.object({ email: z.string().email() })
  * POST — generates a verify token for the given email and sends the email.
  * Returns a generic response to prevent user-enumeration.
  */
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   const generic = NextResponse.json({
     success: true,

@@ -24,6 +24,8 @@ const createSchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {

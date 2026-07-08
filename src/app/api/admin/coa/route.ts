@@ -15,6 +15,8 @@ async function ensureDir() {
 }
 
 // ── GET /api/admin/coa?q=... — list / search ─────────────────────────────────
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {

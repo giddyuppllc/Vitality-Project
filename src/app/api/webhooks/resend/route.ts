@@ -56,6 +56,8 @@ type ResendEvent = {
   }
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   const raw = await req.text()
   const sig =

@@ -24,6 +24,8 @@ const slugify = (s: string) =>
  * — otherwise lands at link.url with the affiliate cookie set).
  */
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

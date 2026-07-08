@@ -16,6 +16,8 @@ const createSchema = z.object({
   active: z.boolean().optional(),
 })
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
