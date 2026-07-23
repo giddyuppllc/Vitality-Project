@@ -4,13 +4,16 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Download, ChevronRight } from 'lucide-react'
 import type { Prisma } from '@prisma/client'
+import { CustomerSearchBar } from '@/components/admin/customer-search-bar'
+
+export const dynamic = 'force-dynamic'
 
 const DAY = 24 * 60 * 60 * 1000
 
 type Segment = 'all' | 'new' | 'vip' | 'at-risk' | 'affiliates'
 
 interface Props {
-  searchParams: Promise<{ segment?: string }>
+  searchParams: Promise<{ segment?: string; q?: string }>
 }
 
 function parseSegment(raw?: string): Segment {
@@ -28,6 +31,7 @@ function parseSegment(raw?: string): Segment {
 export default async function AdminCustomersPage({ searchParams }: Props) {
   const sp = await searchParams
   const segment = parseSegment(sp?.segment)
+  const q = (sp?.q ?? '').trim()
 
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY)
@@ -48,6 +52,19 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
         some: { paymentStatus: 'PAID' },
         none: { paymentStatus: 'PAID', createdAt: { gte: ninetyDaysAgo } },
       },
+    }
+  }
+
+  // Free-text search across name, email, and username — AND-ed onto the
+  // active segment so you can search within a tab.
+  if (q) {
+    where = {
+      ...where,
+      OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+      ],
     }
   }
 
@@ -141,11 +158,19 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
         </a>
       </div>
 
+      {/* Search */}
+      <div className="mb-4">
+        <CustomerSearchBar defaultValue={q} />
+      </div>
+
       {/* Segment tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
         {tabs.map((t) => {
           const active = segment === t.key
-          const href = t.key === 'all' ? '/admin/customers' : `/admin/customers?segment=${t.key}`
+          const usp = new URLSearchParams()
+          if (t.key !== 'all') usp.set('segment', t.key)
+          if (q) usp.set('q', q)
+          const href = `/admin/customers${usp.toString() ? `?${usp}` : ''}`
           return (
             <Link
               key={t.key}
@@ -251,7 +276,9 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
             {customers.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-5 py-12 text-center text-white/30 text-sm">
-                  No customers match this segment.
+                  {q
+                    ? `No customers match "${q}".`
+                    : 'No customers match this segment.'}
                 </td>
               </tr>
             )}
