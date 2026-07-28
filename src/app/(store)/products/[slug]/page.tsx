@@ -13,6 +13,7 @@ import type { Metadata } from 'next'
 import { getRelatedProducts } from '@/lib/recommendations'
 import { PairWithAntiInflammatory } from '@/components/store/pair-with-anti-inflammatory'
 import { NoRefundsNotice } from '@/components/store/no-refunds-notice'
+import { ProductCoaSection } from '@/components/store/product-coa-section'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global'
 
@@ -34,6 +35,30 @@ async function getProduct(slug: string) {
         take: 10,
       },
     },
+  })
+}
+
+/**
+ * Lab reports for this product. CoAs are keyed to a product by `productSlug`
+ * (the clean link) or, for records uploaded with just a free-text name, by a
+ * case-insensitive `productName` match. Newest test first.
+ */
+async function getProductCoas(slug: string, name: string) {
+  return prisma.certificateOfAnalysis.findMany({
+    where: {
+      OR: [{ productSlug: slug }, { productName: { equals: name, mode: 'insensitive' } }],
+    },
+    select: {
+      id: true,
+      variant: true,
+      lotNumber: true,
+      documentUrl: true,
+      purity: true,
+      testingLab: true,
+      testDate: true,
+    },
+    orderBy: [{ testDate: 'desc' }, { createdAt: 'desc' }],
+    take: 12,
   })
 }
 
@@ -59,6 +84,7 @@ export default async function ProductPage({ params }: Props) {
     : null
 
   const related = await getRelatedProducts(product.id, 4)
+  const coas = await getProductCoas(product.slug, product.name)
 
   // Determine if current user has purchased this product (to show review button)
   const session = await getServerSession(authOptions)
@@ -247,6 +273,9 @@ export default async function ProductPage({ params }: Props) {
       {/* Full description / "Product Details" section removed per owner request
           2026-06-08. Data is preserved in Product.description (still used for SEO
           meta + card fallbacks); restore by re-adding the block here. */}
+
+      {/* Third-party lab reports (CoA) — only renders when this product has one */}
+      <ProductCoaSection coas={coas} />
 
       {/* Pair-with anti-inflammatory recommendation (BPC-157 + TB-500) */}
       <PairWithAntiInflammatory
