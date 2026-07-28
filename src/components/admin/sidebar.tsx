@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Package, ShoppingBag, Users, BarChart2,
   Settings, Tag, Truck, Link2, LogOut, Building2, Sparkles, Factory,
-  MessageSquare, Star, FileSearch, Filter, Send, CheckSquare, Tags as TagsIcon,
+  MessageSquare, Star, FileSearch, Filter, Send, CheckSquare, Tags as TagsIcon, Newspaper,
   UserSquare, TrendingUp, FileText, Bell, Activity, Crown, ChevronDown,
   Menu, X,
 } from 'lucide-react'
@@ -37,6 +37,7 @@ const MORE: NavItem[] = [
   { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/fulfillments', label: 'Fulfillments', icon: Truck },
   { href: '/admin/coa', label: 'Certificates (CoA)', icon: FileText },
+  { href: '/admin/blog', label: 'Blog / Research', icon: Newspaper },
   { href: '/admin/facilities', label: 'Facilities', icon: Factory },
   { href: '/admin/leads', label: 'Leads', icon: UserSquare },
   { href: '/admin/organizations', label: 'Organizations', icon: Building2 },

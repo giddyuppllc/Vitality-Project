@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { blogPosts } from '@/lib/blog-data'
+import { getPublishedPosts } from '@/lib/posts'
 
 export const metadata: Metadata = {
   title: 'Blog — The Vitality Project',
@@ -8,7 +8,11 @@ export const metadata: Metadata = {
     'News, analysis, and perspectives on the peptide research landscape.',
 }
 
-export default function BlogPage() {
+// Revalidate hourly so newly published posts appear without a deploy.
+export const revalidate = 3600
+
+export default async function BlogPage() {
+  const blogPosts = await getPublishedPosts()
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="mb-12">
