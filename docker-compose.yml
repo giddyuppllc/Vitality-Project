@@ -37,6 +37,22 @@ services:
       # `docker compose up -d --build` wipes the uploads silently.
       - ./public/coa:/app/public/coa
 
+  # ─── One-off DB migration + first-time post seed ──────────────
+  # Syncs the schema (`prisma db push` — creates the posts table etc.) and runs
+  # the one-time post import. Targets the BUILDER stage because the standalone
+  # runner image ships no prisma CLI / ts-node. Never started by `up` (profile);
+  # the deploy workflow invokes it explicitly with `run --rm`.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: vitality_migrate
+    env_file: .env.production
+    restart: "no"
+    profiles: ["migrate"]
+    command: sh -c "npx prisma db push --skip-generate && npm run seed:posts"
+
   # ─── Nginx ────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine

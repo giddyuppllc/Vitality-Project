@@ -15,6 +15,15 @@ import { blogPosts } from '../src/lib/blog-data'
 const prisma = new PrismaClient()
 
 async function main() {
+  // Deploy-safe: only import when the table is empty (first run). On later
+  // deploys the table has posts — including admin edits to these same slugs — so
+  // we skip entirely rather than upsert over them.
+  const existing = await prisma.post.count()
+  if (existing > 0) {
+    console.log(`posts table already has ${existing} row(s) — skipping seed (preserves edits).`)
+    return
+  }
+
   let created = 0
   let updated = 0
   for (const p of blogPosts) {
