@@ -39,6 +39,7 @@ export function OrderActions({ order }: Props) {
   const [refundMethod, setRefundMethod] = useState<'original' | 'store_credit'>('original')
   const [refundMsg, setRefundMsg] = useState<string | null>(null)
   const [refundErr, setRefundErr] = useState<string | null>(null)
+  const [actionErr, setActionErr] = useState<string | null>(null)
 
   const issueRefund = async () => {
     setLoading(true)
@@ -67,13 +68,23 @@ export function OrderActions({ order }: Props) {
 
   const update = async (data: Record<string, unknown>) => {
     setLoading(true)
+    setActionErr(null)
     try {
-      await fetch(`/api/admin/orders/${order.id}`, {
+      // Check res.ok — this used to fire-and-refresh, so a 401 (expired admin
+      // session) / 500 was swallowed and the status change looked like a silent
+      // no-op with no feedback ("status won't save").
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? `Update failed (${res.status})`)
+      }
       router.refresh()
+    } catch (err) {
+      setActionErr(err instanceof Error ? err.message : 'Update failed')
     } finally {
       setLoading(false)
     }
@@ -130,6 +141,7 @@ export function OrderActions({ order }: Props) {
               </button>
             ))}
         </div>
+        {actionErr && <p className="text-xs text-red-400 mt-2">{actionErr}</p>}
       </div>
 
       {/* Tracking */}

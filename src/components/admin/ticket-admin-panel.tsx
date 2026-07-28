@@ -34,11 +34,13 @@ export function TicketAdminPanel({
   const [saving, setSaving] = useState(false)
   const [sending, setSending] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const savePanel = async () => {
     setSaving(true)
+    setSaveError(null)
     try {
-      await fetch(`/api/admin/support/${ticketId}`, {
+      const res = await fetch(`/api/admin/support/${ticketId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -47,9 +49,18 @@ export function TicketAdminPanel({
           assignedTo: assignedTo || null,
         }),
       })
+      // Previously this never checked res.ok and always showed "Saved." — so a
+      // 401 (expired admin session) / 500 silently failed while the dropdown
+      // claimed success. Only report saved when the server actually persisted it.
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? `Save failed (${res.status})`)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       router.refresh()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -134,6 +145,9 @@ export function TicketAdminPanel({
         >
           Save Changes
         </Button>
+        {saveError && (
+          <p className="text-red-400 text-xs text-center">{saveError}</p>
+        )}
         {saved && (
           <p className="text-emerald-400 text-xs text-center">Saved.</p>
         )}
