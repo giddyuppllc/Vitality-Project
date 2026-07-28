@@ -18,7 +18,7 @@ const NUDGE_MARKER_PREFIX = 'stale_zelle_nudge_'
 
 function authorize(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true // bypass when CRON_SECRET unset (dev)
+  if (!secret) return process.env.NODE_ENV !== 'production' // fail closed in prod; bypass only in dev
   const url = new URL(req.url)
   const querySecret = url.searchParams.get('secret')
   const headerSecret = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')

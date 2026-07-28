@@ -39,7 +39,7 @@ function isTestRecipient(email: string): boolean {
 
 function authorize(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // bypass when unset (dev)
+  if (!secret) return process.env.NODE_ENV !== 'production' // fail closed in prod; bypass only in dev
   const url = new URL(req.url);
   const fromQuery = url.searchParams.get("secret");
   const fromHeader = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");

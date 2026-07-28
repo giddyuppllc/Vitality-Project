@@ -176,16 +176,21 @@ export async function POST(req: NextRequest) {
     const membership = userId
       ? await prisma.membership.findUnique({ where: { userId } })
       : null
-    const priced = userId
-      ? await computeCartTotal(
-          data.items.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId ?? null,
-            quantity: i.quantity,
-          })),
-          { userId },
-        ).catch(() => null)
-      : null
+    // Price through the single engine for EVERYONE, including guests. The cart
+    // display (/api/cart) runs computeCartTotal with a null userId and shows the
+    // bundle discount to anonymous shoppers, so the order MUST too. Previously
+    // `priced` was gated on `userId`, so guest orders silently dropped the bundle
+    // discount and charged full price while the cart showed it discounted — a
+    // display != charge overcharge on every guest bundle order. Member and
+    // peptide-credit discounts stay zero for guests (they require a userId).
+    const priced = await computeCartTotal(
+      data.items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId ?? null,
+        quantity: i.quantity,
+      })),
+      { userId: userId ?? null },
+    ).catch(() => null)
     const membershipDiscount = priced
       ? priced.member.discountCents +
         priced.bundle.discountCents +
