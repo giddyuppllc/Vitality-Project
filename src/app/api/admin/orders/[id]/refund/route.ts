@@ -13,6 +13,14 @@ const refundSchema = z.object({
   refundMethod: z.enum(['original', 'store_credit']),
 })
 
+/** Thrown inside the refund transaction when the cumulative cap would be exceeded. */
+class RefundCapError extends Error {
+  constructor(public readonly refundable: number) {
+    super('refund cap exceeded')
+    this.name = 'RefundCapError'
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,24 +39,10 @@ export async function POST(
       where: { id },
       include: {
         user: { select: { name: true, email: true } },
-        refunds: { select: { amount: true, status: true } },
       },
     })
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    }
-
-    // Cap cumulative refunds at the order total so we can't refund more
-    // than the customer paid (e.g. across multiple partial refunds).
-    const alreadyRefunded = order.refunds
-      .filter((r) => r.status !== 'FAILED')
-      .reduce((sum, r) => sum + r.amount, 0)
-    const refundable = order.total - alreadyRefunded
-    if (amount > refundable) {
-      return NextResponse.json(
-        { error: `Refund amount exceeds remaining refundable balance ($${(refundable / 100).toFixed(2)})` },
-        { status: 400 },
-      )
     }
 
     // Validate refund-method preconditions BEFORE creating the canonical Refund
@@ -61,19 +55,56 @@ export async function POST(
       )
     }
 
-    // Create the canonical Refund row first, PENDING. This is the source
-    // of truth for the /admin P&L card. We update it to PROCESSED/FAILED
-    // once the downstream call returns.
-    const refundRow = await prisma.refund.create({
-      data: {
-        orderId: order.id,
-        amount,
-        method: refundMethod === 'store_credit' ? 'STORE_CREDIT' : 'CASH',
-        reason,
-        status: 'PENDING',
-        createdById: session.user.id,
-      },
-    })
+    // Re-check the cumulative-refund cap and create the canonical PENDING Refund
+    // row inside a SERIALIZABLE transaction. The old path summed existing
+    // refunds, checked the cap, then created the row as separate statements — so
+    // two simultaneous submits could both read the same total, both pass the cap,
+    // and both refund (double-refund). Serializable makes the second overlapping
+    // transaction fail (P2034) instead of over-refunding. The cap ensures we
+    // never refund more than the customer paid.
+    let refundRow: { id: string }
+    let alreadyRefunded = 0
+    try {
+      const result = await prisma.$transaction(
+        async (tx) => {
+          const prior = await tx.refund.findMany({
+            where: { orderId: order.id, status: { not: 'FAILED' } },
+            select: { amount: true },
+          })
+          const already = prior.reduce((sum, r) => sum + r.amount, 0)
+          const refundable = order.total - already
+          if (amount > refundable) throw new RefundCapError(refundable)
+          const row = await tx.refund.create({
+            data: {
+              orderId: order.id,
+              amount,
+              method: refundMethod === 'store_credit' ? 'STORE_CREDIT' : 'CASH',
+              reason,
+              status: 'PENDING',
+              createdById: session.user.id,
+            },
+          })
+          return { row, already }
+        },
+        { isolationLevel: 'Serializable' },
+      )
+      refundRow = result.row
+      alreadyRefunded = result.already
+    } catch (e) {
+      if (e instanceof RefundCapError) {
+        return NextResponse.json(
+          { error: `Refund amount exceeds remaining refundable balance ($${(e.refundable / 100).toFixed(2)})` },
+          { status: 400 },
+        )
+      }
+      if (e && typeof e === 'object' && 'code' in e && (e as { code?: string }).code === 'P2034') {
+        return NextResponse.json(
+          { error: 'Another refund for this order is being processed — try again in a moment.' },
+          { status: 409 },
+        )
+      }
+      throw e
+    }
 
     // Issue the refund
     let refundRef: string | null = null

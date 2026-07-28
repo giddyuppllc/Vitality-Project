@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
   const limited = checkRateLimit(req, 'checkout-zelle', { limit: 10, windowMs: 60_000 })
   if (!limited.allowed) return tooManyRequests(limited.retryAfter)
 
+  // Tracks a discount-code use we atomically claimed below, so we can release it
+  // if the order ultimately fails to be created (see the catch at the bottom).
+  let claimedDiscountCodeId: string | null = null
+
   try {
     const session = await getServerSession(authOptions)
     // Guest checkout allowed: no session → the order is a true guest order
@@ -190,25 +194,42 @@ export async function POST(req: NextRequest) {
     const peptideCreditsApplied = priced?.member.peptideCreditsApplied ?? 0
 
     let discount = membershipDiscount
-    let appliedDiscountCodeId: string | null = null
     if (data.discountCode) {
       const code = await prisma.discountCode.findUnique({
         where: { code: data.discountCode.trim().toUpperCase(), active: true },
       })
-      if (
-        code &&
-        (!code.expiresAt || code.expiresAt > new Date()) &&
-        (!code.maxUses || code.usedCount < code.maxUses)
-      ) {
-        // Discount code stacks on top of the membership discount, applied to
-        // the post-membership amount so it never over-discounts.
-        const base = Math.max(0, subtotal - membershipDiscount)
-        const codeDiscount =
-          code.type === 'PERCENTAGE'
-            ? Math.round(base * (code.value / 100))
-            : Math.min(code.value, base)
-        discount += codeDiscount
-        appliedDiscountCodeId = code.id
+      const notExpired = !!code && (!code.expiresAt || code.expiresAt > new Date())
+      if (code && notExpired) {
+        // Atomically CLAIM one use BEFORE applying the discount. The old path
+        // read `usedCount < maxUses` here and incremented separately after the
+        // order was created, so two concurrent checkouts could both pass the cap
+        // and both redeem past `maxUses`. A conditional updateMany
+        // (`usedCount < maxUses`) lets exactly maxUses checkouts win under any
+        // concurrency; a code with no cap increments unconditionally.
+        const claimed =
+          code.maxUses == null
+            ? (await prisma.discountCode.update({
+                where: { id: code.id },
+                data: { usedCount: { increment: 1 } },
+              }),
+              true)
+            : (
+                await prisma.discountCode.updateMany({
+                  where: { id: code.id, usedCount: { lt: code.maxUses } },
+                  data: { usedCount: { increment: 1 } },
+                })
+              ).count > 0
+        if (claimed) {
+          claimedDiscountCodeId = code.id
+          // Discount code stacks on top of the membership discount, applied to
+          // the post-membership amount so it never over-discounts.
+          const base = Math.max(0, subtotal - membershipDiscount)
+          const codeDiscount =
+            code.type === 'PERCENTAGE'
+              ? Math.round(base * (code.value / 100))
+              : Math.min(code.value, base)
+          discount += codeDiscount
+        }
       }
     }
 
@@ -394,12 +415,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (appliedDiscountCodeId) {
-      await prisma.discountCode.update({
-        where: { id: appliedDiscountCodeId },
-        data: { usedCount: { increment: 1 } },
-      })
-    }
+    // The discount-code use was already claimed atomically up-front (before the
+    // discount was applied), so there's nothing to increment here. Clearing the
+    // release tracker means the catch below won't roll it back now the order
+    // exists.
+    claimedDiscountCodeId = null
 
     // Consume this cycle's peptide credits now that the order row exists.
     // (BAC + syringes are free on every order, so there's nothing to decrement.)
@@ -546,6 +566,16 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('[checkout-zelle] error:', error)
+    // We claimed a discount-code use before the order was created; since the
+    // order failed, release it so an errored checkout doesn't burn a use.
+    if (claimedDiscountCodeId) {
+      await prisma.discountCode
+        .updateMany({
+          where: { id: claimedDiscountCodeId, usedCount: { gt: 0 } },
+          data: { usedCount: { decrement: 1 } },
+        })
+        .catch((e) => console.error('[checkout-zelle] discount release failed:', e))
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.issues[0].message },
