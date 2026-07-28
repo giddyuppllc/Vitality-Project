@@ -16,7 +16,12 @@ const LOW_STOCK_THRESHOLD = 5
 
 const updateSchema = z.object({
   status: z.enum(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']).optional(),
-  paymentStatus: z.enum(['UNPAID', 'PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'FAILED']).optional(),
+  // Refund payment-statuses are intentionally NOT settable here: they must go
+  // through /api/admin/orders/[id]/refund, which creates the canonical Refund
+  // row, enforces the cumulative cap, and moves the money. Allowing them on this
+  // generic PATCH let an admin mark an order REFUNDED with no Refund record,
+  // no cap check, and no money moved.
+  paymentStatus: z.enum(['UNPAID', 'PAID', 'FAILED']).optional(),
   trackingNumber: z.string().optional(),
   trackingUrl: z.string().optional(),
   notes: z.string().optional(),
@@ -126,9 +131,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.status === 'SHIPPED' && prev.status !== 'SHIPPED'
     const becameDelivered =
       data.status === 'DELIVERED' && prev.status !== 'DELIVERED'
+    // paymentStatus REFUNDED is no longer settable here (refunds go through the
+    // /refund route, which sends its own refund email), so this only reacts to a
+    // manual order-status flip to REFUNDED.
     const becameRefunded =
-      (data.status === 'REFUNDED' && prev.status !== 'REFUNDED') ||
-      (data.paymentStatus === 'REFUNDED' && prev.paymentStatus !== 'REFUNDED')
+      data.status === 'REFUNDED' && prev.status !== 'REFUNDED'
 
     if (becameShipped || becameDelivered || becameRefunded) {
       void (async () => {
