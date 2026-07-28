@@ -1,19 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { blogPosts } from '@/lib/blog-data'
+import { getPostBySlug } from '@/lib/posts'
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
-function getPost(slug: string) {
-  return blogPosts.find((p) => p.slug === slug)
-}
+// Revalidate hourly so edits/new posts appear without a deploy.
+export const revalidate = 3600
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = getPost(slug)
+  const post = await getPostBySlug(slug)
   if (!post) return { title: 'Post Not Found' }
   return {
     title: `${post.title} — The Vitality Project`,
@@ -23,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params
-  const post = getPost(slug)
+  const post = await getPostBySlug(slug)
   if (!post) notFound()
 
   const jsonLd = {
