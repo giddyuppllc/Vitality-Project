@@ -32,7 +32,10 @@ jobs:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
           HETZNER_USER: ${{ secrets.HETZNER_USER || 'root' }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 "$HETZNER_USER@$HETZNER_HOST" <<'EOF'
+          # -T: no pseudo-TTY, and the remote script comes from the heredoc on
+          # stdin. See the -T on `compose run` below — without it that command
+          # ATE the rest of this script.
+          ssh -T -i ~/.ssh/id_ed25519 "$HETZNER_USER@$HETZNER_HOST" <<'EOF'
             set -euo pipefail
             cd /opt/vitality
             git fetch --all --prune
@@ -42,9 +45,24 @@ jobs:
             # prisma CLI). Fails the deploy if the migration errors, so a bad
             # schema change never ships against a stale DB.
             docker compose --profile migrate build migrate
-            docker compose --profile migrate run --rm migrate
-            docker compose pull || true
-            docker compose up -d --build app
+            # -T AND </dev/null are both load-bearing.
+            #
+            # This script reaches the box as ssh's STDIN (the heredoc above).
+            # `docker compose run` without -T attaches the container to that
+            # same stdin — so it CONSUMED the remaining lines of this script as
+            # container input. `compose pull` and `compose up --build app`
+            # never executed, ssh still exited 0, and the workflow reported
+            # SUCCESS.
+            #
+            # The result: every deploy pulled the new code onto the box and
+            # left the OLD container running. `git log` on the server showed
+            # the new commit while users were served a build up to 13 days old
+            # — indistinguishable from "my change didn't do anything".
+            docker compose --profile migrate run --rm -T migrate < /dev/null
+            docker compose pull </dev/null || true
+            docker compose up -d --build app </dev/null
+            # Fail loudly if the app container was not actually recreated.
+            docker compose ps app
             docker image prune -f || true
           EOF
 
