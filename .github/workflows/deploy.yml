@@ -37,6 +37,12 @@ jobs:
             cd /opt/vitality
             git fetch --all --prune
             git reset --hard origin/master
+            # Sync the DB schema (+ first-time post seed) BEFORE the new app
+            # serves, using the builder-stage one-shot (the runtime image has no
+            # prisma CLI). Fails the deploy if the migration errors, so a bad
+            # schema change never ships against a stale DB.
+            docker compose --profile migrate build migrate
+            docker compose --profile migrate run --rm migrate
             docker compose pull || true
             docker compose up -d --build app
             docker image prune -f || true

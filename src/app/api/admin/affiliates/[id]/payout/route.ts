@@ -12,6 +12,14 @@ const schema = z.object({
   notes: z.string().max(2000).optional(),
 })
 
+/** A rejectable condition inside the payout transaction, with an HTTP status. */
+class PayoutError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message)
+    this.name = 'PayoutError'
+  }
+}
+
 /**
  * POST /api/admin/affiliates/[id]/payout
  *
@@ -55,71 +63,101 @@ export async function POST(
     return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 })
   }
 
-  // Pull all approved unpaid commissions, oldest first — that's the queue
-  // we're paying out. (PENDING is what's recorded but not yet reviewed;
-  // PAID is already settled.)
-  const approved = await prisma.affiliateCommission.findMany({
-    where: { affiliateId, status: 'APPROVED' },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, amount: true },
-  })
-  const approvedTotal = approved.reduce((sum, c) => sum + c.amount, 0)
-  if (approvedTotal === 0) {
-    return NextResponse.json(
-      { error: 'No approved commissions waiting to be paid' },
-      { status: 400 },
-    )
+  // Settle in ONE serializable transaction. The old path created the payout row
+  // and incremented `totalPaid` by the requested amount even when the amount was
+  // smaller than the oldest commission (loop broke immediately → zero commissions
+  // marked PAID) — inflating totalPaid while settling nothing, repeatable. Now we
+  // (a) reject when nothing can settle, (b) increment totalPaid by what ACTUALLY
+  // settled, and (c) run atomically so concurrent payouts can't double-settle.
+  let result: {
+    payout: { id: string }
+    idsToMarkPaid: string[]
+    settled: number
+    approvedTotal: number
   }
+  try {
+    result = await prisma.$transaction(
+      async (tx) => {
+        const approved = await tx.affiliateCommission.findMany({
+          where: { affiliateId, status: 'APPROVED' },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, amount: true },
+        })
+        const approvedTotal = approved.reduce((sum, c) => sum + c.amount, 0)
+        if (approvedTotal === 0) {
+          throw new PayoutError('No approved commissions waiting to be paid', 400)
+        }
 
-  const payoutAmount = body.amount ?? approvedTotal
-  if (payoutAmount > approvedTotal) {
-    return NextResponse.json(
-      {
-        error: `Payout amount ($${(payoutAmount / 100).toFixed(2)}) exceeds approved commissions ($${(approvedTotal / 100).toFixed(2)})`,
+        const payoutAmount = body.amount ?? approvedTotal
+        if (payoutAmount > approvedTotal) {
+          throw new PayoutError(
+            `Payout amount ($${(payoutAmount / 100).toFixed(2)}) exceeds approved commissions ($${(approvedTotal / 100).toFixed(2)})`,
+            400,
+          )
+        }
+
+        // Commissions settle whole, oldest-first, up to the payout amount.
+        let remaining = payoutAmount
+        const idsToMarkPaid: string[] = []
+        for (const c of approved) {
+          if (c.amount <= remaining) {
+            idsToMarkPaid.push(c.id)
+            remaining -= c.amount
+          } else {
+            break
+          }
+        }
+        if (idsToMarkPaid.length === 0) {
+          throw new PayoutError(
+            `Payout amount ($${(payoutAmount / 100).toFixed(2)}) is smaller than the oldest approved commission ($${(approved[0].amount / 100).toFixed(2)}). Enter at least that much.`,
+            400,
+          )
+        }
+        const settled = payoutAmount - remaining // == sum of commissions marked PAID
+
+        // Conditional on status:'APPROVED' so a concurrent payout can't
+        // double-settle the same rows; the count must match what we planned.
+        const marked = await tx.affiliateCommission.updateMany({
+          where: { id: { in: idsToMarkPaid }, status: 'APPROVED' },
+          data: { status: 'PAID' },
+        })
+        if (marked.count !== idsToMarkPaid.length) {
+          throw new PayoutError('Commissions changed during payout — retry.', 409)
+        }
+
+        const payout = await tx.affiliatePayout.create({
+          data: {
+            affiliateId,
+            amount: settled,
+            method: body.method,
+            reference: body.reference ?? null,
+            notes: body.notes ?? null,
+          },
+        })
+
+        // Increment totalPaid by what ACTUALLY settled, so the affiliate's "Paid"
+        // total always equals the sum of PAID commissions.
+        await tx.affiliate.update({
+          where: { id: affiliateId },
+          data: { totalPaid: { increment: settled } },
+        })
+
+        return { payout, idsToMarkPaid, settled, approvedTotal }
       },
-      { status: 400 },
+      { isolationLevel: 'Serializable' },
     )
-  }
-
-  // Walk approved commissions oldest-first, marking PAID until we cover
-  // the payout amount. Last commission may need a split (we keep the row
-  // and just mark it paid — partial pay-outs are tracked on the Payout
-  // row, not the commission rows; commissions are PAID/UNPAID booleans).
-  const payout = await prisma.affiliatePayout.create({
-    data: {
-      affiliateId,
-      amount: payoutAmount,
-      method: body.method,
-      reference: body.reference ?? null,
-      notes: body.notes ?? null,
-    },
-  })
-
-  let remaining = payoutAmount
-  const idsToMarkPaid: string[] = []
-  for (const c of approved) {
-    if (remaining <= 0) break
-    if (c.amount <= remaining) {
-      idsToMarkPaid.push(c.id)
-      remaining -= c.amount
-    } else {
-      // Partial — leave this commission APPROVED for next payout.
-      break
+  } catch (e) {
+    if (e instanceof PayoutError) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
     }
+    if (e && typeof e === 'object' && 'code' in e && (e as { code?: string }).code === 'P2034') {
+      return NextResponse.json(
+        { error: 'Another payout for this affiliate is being processed — retry.' },
+        { status: 409 },
+      )
+    }
+    throw e
   }
-  if (idsToMarkPaid.length > 0) {
-    await prisma.affiliateCommission.updateMany({
-      where: { id: { in: idsToMarkPaid } },
-      data: { status: 'PAID' },
-    })
-  }
-
-  // Reflect the payout in the affiliate's running total so the admin "Paid"
-  // column and /api/affiliate/stats stop showing $0.00 after real payouts.
-  await prisma.affiliate.update({
-    where: { id: affiliateId },
-    data: { totalPaid: { increment: payoutAmount } },
-  })
 
   await prisma.auditLog.create({
     data: {
@@ -127,21 +165,21 @@ export async function POST(
       userEmail: session.user.email ?? null,
       action: 'affiliate.payout',
       entityType: 'AffiliatePayout',
-      entityId: payout.id,
+      entityId: result.payout.id,
       metadata: JSON.stringify({
         affiliateId,
-        amount: payoutAmount,
+        amount: result.settled,
         method: body.method,
         reference: body.reference,
-        commissionIds: idsToMarkPaid,
-        leftover: remaining,
+        commissionIds: result.idsToMarkPaid,
       }),
     },
   })
 
   return NextResponse.json({
-    payout,
-    commissionsMarkedPaid: idsToMarkPaid.length,
-    remainingApproved: approvedTotal - payoutAmount,
+    payout: result.payout,
+    commissionsMarkedPaid: result.idsToMarkPaid.length,
+    settled: result.settled,
+    remainingApproved: result.approvedTotal - result.settled,
   })
 }

@@ -20,7 +20,7 @@ import crypto from 'crypto'
 
 function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
   const secret = process.env.RESEND_WEBHOOK_SECRET
-  if (!secret) return true // dev — skip verification
+  if (!secret) return process.env.NODE_ENV !== 'production' // fail closed in prod; skip verify only in dev
   if (!signatureHeader) return false
   try {
     const expected = crypto

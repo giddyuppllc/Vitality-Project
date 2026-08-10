@@ -347,6 +347,9 @@ model ProductVariant {
   name      String  // e.g. "10mg / 30 vials"
   sku       String?
   price     Int     // in cents
+  vipPrice  Int?    // in cents — VIP/member price; present in prod (18 rows) but
+  // was missing from this schema, so `db push` wanted to drop it. Kept here to
+  // reconcile schema with the live DB (no data loss); currently unused by code.
   inventory Int     @default(0)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -1413,4 +1416,28 @@ model CertificateOfAnalysis {
   @@index([productSlug])
   @@index([lotNumber])
   @@index([createdAt])
+}
+
+// ─── Blog / Research content ─────────────────────────────────────────────────
+// DB-driven blog so staff can publish without a code deploy. The public /blog +
+// /blog/[slug] pages read PUBLISHED posts here; the 14 legacy static posts in
+// src/lib/blog-data.ts are seeded in (prisma/seed-posts.ts) so nothing is lost.
+model Post {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  title        String
+  excerpt      String    @db.Text
+  content      String    @db.Text // HTML body
+  category     String    @default("Research")
+  readTime     String? // e.g. "6 min read" — optional, computed from content if blank
+  coverImage   String?
+  relatedLinks Json      @default("[]") // { href: string; label: string }[]
+  authorName   String?
+  published    Boolean   @default(false)
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([published, publishedAt])
+  @@map("posts")
 }

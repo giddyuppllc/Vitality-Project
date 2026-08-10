@@ -12,7 +12,9 @@ import {
   newOrderAlert,
 } from '@/lib/email-templates'
 import { calculateShipping } from '@/lib/shipping'
-import { calculateTax } from '@/lib/tax'
+import { calculateTaxAsync } from '@/lib/tax'
+import { computeCartTotal } from '@/lib/pricing'
+import { TIER_BENEFITS } from '@/lib/membership'
 import {
   applyStoreCredit,
 } from '@/lib/store-credit'
@@ -59,6 +61,10 @@ export async function POST(req: NextRequest) {
   // Throttle checkout attempts per IP — limits card-testing / order spam.
   const limited = checkRateLimit(req, 'checkout', { limit: 10, windowMs: 60_000 })
   if (!limited.allowed) return tooManyRequests(limited.retryAfter)
+
+  // Tracks a discount-code use we atomically claim below, so a failed checkout
+  // can release it (see the catch).
+  let claimedDiscountCodeId: string | null = null
 
   try {
     const session = await getServerSession(authOptions)
@@ -124,30 +130,79 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    let discount = 0
-    let appliedDiscountCodeId: string | null = null
+    // Member + bundle + peptide-credit pricing through the SINGLE engine, exactly
+    // like checkout-zelle — so a member/bundle buyer is charged the same total the
+    // cart showed. Previously this route only applied the discount code and
+    // silently dropped the member %, the volume bundle discount, and free-peptide
+    // credits (charging full price vs the discounted cart display).
+    const membership = await prisma.membership.findUnique({
+      where: { userId: session.user.id },
+    })
+    const priced = await computeCartTotal(
+      data.items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId ?? null,
+        quantity: i.quantity,
+      })),
+      { userId: session.user.id },
+    ).catch(() => null)
+    const membershipDiscount = priced
+      ? priced.member.discountCents +
+        priced.bundle.discountCents +
+        priced.member.creditDiscountCents
+      : 0
+    const peptideCreditsApplied = priced?.member.peptideCreditsApplied ?? 0
+
+    // Discount code stacks on the post-membership amount. Claim one use atomically
+    // up-front (conditional on usedCount < maxUses) so concurrent checkouts can't
+    // redeem past the cap — the old read-then-increment let two orders both pass.
+    let discount = membershipDiscount
     if (data.discountCode) {
       const code = await prisma.discountCode.findUnique({
-        where: { code: data.discountCode.toUpperCase(), active: true },
+        where: { code: data.discountCode.trim().toUpperCase(), active: true },
       })
-      if (code && (!code.expiresAt || code.expiresAt > new Date()) && (!code.maxUses || code.usedCount < code.maxUses)) {
-        discount = code.type === 'PERCENTAGE'
-          ? Math.round(subtotal * (code.value / 100))
-          : Math.min(code.value, subtotal)
-        appliedDiscountCodeId = code.id
+      const notExpired = !!code && (!code.expiresAt || code.expiresAt > new Date())
+      if (code && notExpired) {
+        const claimed =
+          code.maxUses == null
+            ? (await prisma.discountCode.update({
+                where: { id: code.id },
+                data: { usedCount: { increment: 1 } },
+              }),
+              true)
+            : (
+                await prisma.discountCode.updateMany({
+                  where: { id: code.id, usedCount: { lt: code.maxUses } },
+                  data: { usedCount: { increment: 1 } },
+                })
+              ).count > 0
+        if (claimed) {
+          claimedDiscountCodeId = code.id
+          const base = Math.max(0, subtotal - membershipDiscount)
+          discount +=
+            code.type === 'PERCENTAGE'
+              ? Math.round(base * (code.value / 100))
+              : Math.min(code.value, base)
+        }
       }
     }
 
-    // Shipping & tax based on destination
-    const { rate: shippingCost } = await calculateShipping(
-      subtotal,
-      data.shippingAddress.country,
-      data.shippingAddress.state
-    )
-    const taxableBase = Math.max(0, subtotal - discount)
-    const taxAmount = calculateTax(taxableBase, data.shippingAddress.state)
+    // Member free shipping (active Plus/Premium).
+    const memberFreeShipping =
+      !!membership &&
+      membership.status === 'ACTIVE' &&
+      (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
+      TIER_BENEFITS[membership.tier].freeShipping
+    const { rate: shippingCost } = memberFreeShipping
+      ? { rate: 0 }
+      : await calculateShipping(
+          subtotal,
+          data.shippingAddress.country,
+          data.shippingAddress.state,
+        )
 
-    // Preview how many points the user wants to redeem, clamped to their balance.
+    // Preview how many points the user wants to redeem, clamped to their balance
+    // AND the remaining amount after the discount so the total can't go negative.
     let plannedPointsRedeem = 0
     let plannedPointsDiscount = 0
     if (data.useLoyaltyPoints && data.useLoyaltyPoints > 0) {
@@ -155,9 +210,15 @@ export async function POST(req: NextRequest) {
         where: { userId: session.user.id },
       })
       const available = acct?.points ?? 0
-      plannedPointsRedeem = Math.min(data.useLoyaltyPoints, available)
+      const remainingAfterDiscount = Math.max(0, subtotal - discount)
+      plannedPointsRedeem = Math.min(data.useLoyaltyPoints, available, remainingAfterDiscount)
       plannedPointsDiscount = pointsToDiscountCents(plannedPointsRedeem)
     }
+
+    const taxableBase = Math.max(0, subtotal - discount - plannedPointsDiscount)
+    const taxAmount = await calculateTaxAsync(taxableBase, data.shippingAddress.state, {
+      organizationId,
+    })
 
     // Preview store credit (actual apply happens once we have orderId)
     let plannedCreditUse = 0
@@ -189,6 +250,16 @@ export async function POST(req: NextRequest) {
       )
 
       if (!paymentResult.success) {
+        // Payment failed — release the discount-code use we claimed before
+        // charging, so a declined card doesn't permanently burn a use.
+        if (claimedDiscountCodeId) {
+          await prisma.discountCode
+            .updateMany({
+              where: { id: claimedDiscountCodeId, usedCount: { gt: 0 } },
+              data: { usedCount: { decrement: 1 } },
+            })
+            .catch(() => {})
+        }
         return NextResponse.json(
           { error: paymentResult.error ?? 'Payment failed. Please check your card details and try again.' },
           { status: 402 }
@@ -238,11 +309,34 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (appliedDiscountCodeId) {
-      await prisma.discountCode.update({
-        where: { id: appliedDiscountCodeId },
-        data: { usedCount: { increment: 1 } },
-      })
+    // The discount-code use was claimed atomically up-front; clear the release
+    // tracker so the catch won't roll it back now the order exists.
+    claimedDiscountCodeId = null
+
+    // Consume this cycle's free-peptide credits (mirrors checkout-zelle). BAC +
+    // syringes are free on every order, so nothing to decrement for those.
+    if (membership && peptideCreditsApplied > 0) {
+      await prisma.membership
+        .update({
+          where: { id: membership.id },
+          data: { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } },
+        })
+        .catch((err) => console.error('[checkout] credit decrement failed:', err))
+    }
+
+    // Decrement inventory NOW — this order is created PAID/PROCESSING, so it never
+    // traverses the mark-paid/PATCH path that decrements Zelle orders. Without
+    // this, every card order left stock untouched and oversold.
+    for (const item of orderItems) {
+      if (item.variantId) {
+        await prisma.productVariant
+          .update({ where: { id: item.variantId }, data: { inventory: { decrement: item.quantity } } })
+          .catch(() => null)
+      } else {
+        await prisma.product
+          .update({ where: { id: item.productId }, data: { inventory: { decrement: item.quantity } } })
+          .catch(() => null)
+      }
     }
 
     // Actually debit loyalty points + store credit now that the order exists.
@@ -391,6 +485,16 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Checkout error:', error)
+    // Release a discount-code use claimed before the order was created (the
+    // tracker is cleared once the order exists, so this only fires pre-order).
+    if (claimedDiscountCodeId) {
+      await prisma.discountCode
+        .updateMany({
+          where: { id: claimedDiscountCodeId, usedCount: { gt: 0 } },
+          data: { usedCount: { decrement: 1 } },
+        })
+        .catch(() => {})
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 })
     }

@@ -28,7 +28,7 @@ const MEMBERSHIP_PRODUCT_SLUG = 'vitality-membership'
 
 function authorize(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true
+  if (!secret) return process.env.NODE_ENV !== 'production' // fail closed in prod; bypass only in dev
   const url = new URL(req.url)
   const querySecret = url.searchParams.get('secret')
   const headerSecret = req.headers
