@@ -13,6 +13,8 @@ import {
   ChevronRight,
   CheckCircle,
   Clock,
+  Crown,
+  ArrowRight,
 } from 'lucide-react'
 import { CancelMembershipButton } from './cancel-button'
 
@@ -97,6 +99,26 @@ export default async function AccountMembershipPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Membership</h1>
+
+      {/* VIP clubhouse hand-off — active members only. /clubhouse mints a
+          single-use SSO token and bounces to vitalityproject.vip. */}
+      {membership.status === 'ACTIVE' && (
+        <Link
+          href="/clubhouse"
+          className="glass mb-6 flex items-center justify-between rounded-2xl border border-brand-500/30 bg-gradient-to-br from-brand-500/15 to-transparent p-5 transition-colors hover:border-brand-500/50"
+        >
+          <div className="flex items-center gap-3">
+            <Crown className="h-6 w-6 text-brand-400" />
+            <div>
+              <p className="font-semibold">Your VIP Clubhouse</p>
+              <p className="text-sm text-white/60">
+                Community, training &amp; rewards — members only.
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-brand-400" />
+        </Link>
+      )}
 
       {/* Plan card */}
       <div className="glass rounded-2xl p-6 mb-6 border border-brand-500/20">
