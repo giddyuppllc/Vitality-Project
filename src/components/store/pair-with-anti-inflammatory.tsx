@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { prisma } from '@/lib/prisma'
 import { formatPrice } from '@/lib/utils'
 import { Sparkles } from 'lucide-react'
+import { productImage, isFallbackImage } from '@/lib/product-image'
 
 const ANTI_INFLAMMATORY_SLUGS = ['bpc-157-5mg', 'tb-500-5mg']
 
@@ -51,11 +52,13 @@ export async function PairWithAntiInflammatory({ currentSlug, currentCategorySlu
               className="glass-subtle rounded-xl p-3 flex gap-3 items-center card-hover group"
             >
               <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-dark-800 shrink-0">
-                {img ? (
-                  <Image src={img.url} alt={p.name} fill className="object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white/10 text-xs">VP</div>
-                )}
+                {/* Was a 'VP' text box without a photo. */}
+                <Image
+                  src={productImage(p)}
+                  alt={p.name}
+                  fill
+                  className={isFallbackImage(p) ? 'object-contain p-2' : 'object-cover'}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-white text-sm line-clamp-1 group-hover:text-brand-300 transition-colors">{p.name}</p>

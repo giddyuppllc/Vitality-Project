@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Search, X, Loader2 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
+import { productImage, isFallbackImage } from '@/lib/product-image'
 
 interface Suggestion {
   id: string
@@ -122,15 +123,15 @@ export function SearchBar({
                     className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors"
                   >
                     <div className="w-10 h-10 rounded-lg bg-dark-800 shrink-0 overflow-hidden">
-                      {img ? (
-                        <Image
-                          src={img.url}
-                          alt=""
-                          width={40}
-                          height={40}
-                          className="object-cover w-full h-full"
-                        />
-                      ) : null}
+                      {/* Rendered nothing at all without a photo — an empty
+                          grey square. Falls back to the standard vial now. */}
+                      <Image
+                        src={productImage(p)}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className={`w-full h-full ${isFallbackImage(p) ? 'object-contain p-1' : 'object-cover'}`}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">

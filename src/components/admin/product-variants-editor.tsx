@@ -39,6 +39,14 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  /**
+   * Every save path used to be `if (res.ok) …` with no else. On failure the row
+   * kept the values you had just typed, the spinner stopped, and nothing else
+   * changed — visually IDENTICAL to a successful save. Only a refresh revealed
+   * that nothing persisted. An expired admin session (guard() -> 401) produces
+   * exactly that, silently.
+   */
+  const [error, setError] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -57,6 +65,20 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
     load()
   }, [productId])
 
+  /** Turn a failed Response into something a human can act on. */
+  const explain = async (res: Response, what: string) => {
+    let detail = ''
+    try {
+      const body = await res.json()
+      detail = typeof body?.error === 'string' ? body.error : JSON.stringify(body?.error ?? '')
+    } catch {
+      /* non-JSON body — the status is still worth showing */
+    }
+    if (res.status === 401 || res.status === 403)
+      return `Not saved — your admin session expired. Reload and sign in again.`
+    return `${what} failed (${res.status})${detail ? ` — ${detail}` : ''}`
+  }
+
   const update = (idx: number, patch: Partial<Draft>) =>
     setDrafts((ds) =>
       ds.map((d, i) => (i === idx ? { ...d, ...patch, dirty: true } : d)),
@@ -65,6 +87,7 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
   const saveRow = async (idx: number) => {
     const d = drafts[idx]
     if (!d.name) return
+    setError(null)
     const payload = {
       name: d.name,
       sku: d.sku || null,
@@ -86,6 +109,7 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
           },
         )
         if (res.ok) await load()
+        else setError(await explain(res, 'Save'))
       } else {
         const res = await fetch(`/api/admin/products/${productId}/variants`, {
           method: 'POST',
@@ -95,6 +119,8 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
         if (res.ok) {
           setAdding(false)
           await load()
+        } else {
+          setError(await explain(res, 'Add variant'))
         }
       }
     } finally {
@@ -113,6 +139,7 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
         { method: 'DELETE' },
       )
       if (res.ok) await load()
+      else setError(await explain(res, 'Delete'))
     } else {
       // Discard unsaved
       setDrafts((ds) => ds.filter((_, i) => i !== idx))
@@ -146,6 +173,22 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
 
   return (
     <div className="space-y-3">
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+        >
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-red-300/70 hover:text-red-200"
+            aria-label="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
       {drafts.length === 0 ? (
         <p className="text-sm text-white/40">
           No variants. Add one if this product has size/dose/pack variations.
