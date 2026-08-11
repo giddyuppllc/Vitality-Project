@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Save, Trash2, Users, Loader2 } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 type Tier = '' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM'
 type Role = '' | 'CUSTOMER' | 'AFFILIATE' | 'ADMIN'
@@ -64,7 +65,7 @@ const US_STATES = [
 
 function dollarsToCents(v: string): number | undefined {
   if (!v) return undefined
-  const n = Math.round(parseFloat(v) * 100)
+  const n = (parseMoneyToCents(v) ?? 0)
   if (Number.isNaN(n)) return undefined
   return n
 }

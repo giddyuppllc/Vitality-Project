@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRouter } from 'next/navigation'
 import { CheckCircle, Truck, XCircle, RotateCcw, DollarSign } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 interface Props {
   order: {
@@ -50,7 +51,7 @@ export function OrderActions({ order }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: Math.round(parseFloat(refundAmount) * 100),
+          amount: (parseMoneyToCents(refundAmount) ?? 0),
           reason: refundReason,
           refundMethod,
         }),

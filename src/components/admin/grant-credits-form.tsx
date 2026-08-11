@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Gift } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 export function GrantCreditsForm() {
   const router = useRouter()
@@ -27,7 +28,7 @@ export function GrantCreditsForm() {
         body: JSON.stringify({
           email,
           kind,
-          amount: kind === 'credit' ? Math.round(parseFloat(amount) * 100) : Math.floor(Number(amount)),
+          amount: kind === 'credit' ? (parseMoneyToCents(amount) ?? 0) : Math.floor(Number(amount)),
           reason,
         }),
       })

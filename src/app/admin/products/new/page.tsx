@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { parseMoneyToCents } from '@/lib/money'
 
 export default function NewProductPage() {
   const router = useRouter()
@@ -17,6 +18,15 @@ export default function NewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Required. A number input yields "" for anything it cannot parse, so
+    // pasting "$64" or "1,200" leaves this empty — and the old
+    // Math.round(parseFloat("") * 100) produced NaN, which JSON.stringify
+    // writes as null. Check it before we start.
+    const priceCents = parseMoneyToCents(form.price)
+    if (priceCents === null) {
+      alert('Enter a price, e.g. 49.99')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/admin/products', {
@@ -26,8 +36,8 @@ export default function NewProductPage() {
           name: form.name,
           description: form.description,
           shortDesc: form.shortDesc || undefined,
-          price: Math.round(parseFloat(form.price) * 100),
-          comparePrice: form.comparePrice ? Math.round(parseFloat(form.comparePrice) * 100) : undefined,
+          price: priceCents,
+          comparePrice: form.comparePrice ? (parseMoneyToCents(form.comparePrice) ?? undefined) : undefined,
           sku: form.sku || undefined,
           inventory: parseInt(form.inventory),
           featured: form.featured,

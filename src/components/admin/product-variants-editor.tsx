@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { parseMoneyToCents } from '@/lib/money'
 
 interface Variant {
   id: string
@@ -21,28 +22,6 @@ interface Draft {
   inventory: string
   dirty: boolean
   saving: boolean
-}
-
-/**
- * Money typed by a human -> cents, or null when it is not a number at all.
- *
- * `Math.round(parseFloat(v) * 100)` was used directly, and it has two failure
- * modes that both look like "the save did nothing":
- *
- *   "$64"    -> NaN -> JSON.stringify writes NULL -> Zod z.number() rejects it
- *               -> 400 -> and the old code swallowed the response entirely.
- *   "1,200"  -> parseFloat stops at the comma -> 100 -> saves $1.00 instead of
- *               $1,200.00. No error at all; just quietly the wrong price.
- *
- * Currency symbols, thousands separators and stray spaces are what people
- * actually type into a price box, so strip them rather than punish them.
- */
-export function parseMoneyToCents(raw: string): number | null {
-  const cleaned = String(raw ?? '').replace(/[^0-9.-]/g, '')
-  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null
-  const n = Number(cleaned)
-  if (!Number.isFinite(n) || n < 0) return null
-  return Math.round(n * 100)
 }
 
 function toDraft(v: Variant): Draft {

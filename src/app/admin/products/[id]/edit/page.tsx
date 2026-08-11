@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import { ProductVariantsEditor } from '@/components/admin/product-variants-editor'
 import { ProductImagesEditor } from '@/components/admin/product-images-editor'
+import { parseMoneyToCents } from '@/lib/money'
 
 type Status = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 
@@ -73,15 +74,24 @@ export default function EditProductPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
+      // Required. Without this an empty price box saves $0.00 — a number input
+      // yields "" for anything it cannot parse, so this is reachable by pasting
+      // "$64" or "1,200" and is exactly how a product would silently go free.
+      const priceCents = parseMoneyToCents(form.price)
+      if (priceCents === null) {
+        setError('Enter a price, e.g. 49.99')
+        setSaving(false)
+        return
+      }
     setSuccess(false)
     try {
       const body: Record<string, unknown> = {
         name: form.name,
         description: form.description,
         shortDesc: form.shortDesc || undefined,
-        price: Math.round(parseFloat(form.price) * 100),
-        comparePrice: form.comparePrice ? Math.round(parseFloat(form.comparePrice) * 100) : null,
-        salePrice: form.salePrice ? Math.round(parseFloat(form.salePrice) * 100) : null,
+        price: priceCents,
+        comparePrice: form.comparePrice ? (parseMoneyToCents(form.comparePrice) ?? 0) : null,
+        salePrice: form.salePrice ? (parseMoneyToCents(form.salePrice) ?? 0) : null,
         sku: form.sku || undefined,
         inventory: parseInt(form.inventory),
         featured: form.featured,

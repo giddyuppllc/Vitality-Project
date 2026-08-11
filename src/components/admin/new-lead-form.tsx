@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LEAD_PRIORITIES, LEAD_SOURCES } from './lead-constants'
+import { parseMoneyToCents } from '@/lib/money'
 
 interface AdminInfo {
   id: string
@@ -50,7 +51,7 @@ export function NewLeadForm({ admins }: { admins: AdminInfo[] }) {
           source,
           priority,
           estimatedValue: estimatedValue
-            ? Math.round(parseFloat(estimatedValue) * 100)
+            ? (parseMoneyToCents(estimatedValue) ?? 0)
             : null,
           probability: probability ? parseInt(probability, 10) : null,
           assignedTo: assignedTo || null,

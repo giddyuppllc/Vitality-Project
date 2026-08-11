@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatPrice } from '@/lib/utils'
 import { Plus, Trash2, Star } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 type AssignedProduct = {
   id: string // ProductFacility id
@@ -54,7 +55,7 @@ export function FacilityProducts({ facilityId, assigned, available }: Props) {
         body: JSON.stringify({
           productId: selected,
           primary,
-          cost: cost ? Math.round(parseFloat(cost) * 100) : null,
+          cost: cost ? (parseMoneyToCents(cost) ?? 0) : null,
           inventory: Number(inventory) || 0,
         }),
       })

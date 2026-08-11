@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { parseMoneyToCents } from '@/lib/money'
 
 export function DiscountActions() {
   const [open, setOpen] = useState(false)
@@ -25,8 +26,8 @@ export function DiscountActions() {
         body: JSON.stringify({
           code: form.code.toUpperCase(),
           type: form.type,
-          value: form.type === 'PERCENTAGE' ? parseInt(form.value) : Math.round(parseFloat(form.value) * 100),
-          minOrder: form.minOrder ? Math.round(parseFloat(form.minOrder) * 100) : undefined,
+          value: form.type === 'PERCENTAGE' ? parseInt(form.value) : (parseMoneyToCents(form.value) ?? 0),
+          minOrder: form.minOrder ? (parseMoneyToCents(form.minOrder) ?? 0) : undefined,
           maxUses: form.maxUses ? parseInt(form.maxUses) : undefined,
           expiresAt: form.expiresAt || undefined,
         }),

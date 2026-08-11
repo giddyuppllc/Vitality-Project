@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Save, Trash2 } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 type CouponType = 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING' | 'BOGO'
 type Tier = 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM'
@@ -126,7 +127,7 @@ export function CouponForm({
   const valueAsInt = () => {
     if (!form.value) return 0
     if (form.type === 'PERCENTAGE') return parseInt(form.value) || 0
-    return Math.round(parseFloat(form.value) * 100)
+    return (parseMoneyToCents(form.value) ?? 0)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,7 +140,7 @@ export function CouponForm({
         type: form.type,
         value: valueAsInt(),
         minOrder: form.minOrder
-          ? Math.round(parseFloat(form.minOrder) * 100)
+          ? (parseMoneyToCents(form.minOrder) ?? 0)
           : null,
         maxUses: form.maxUses ? parseInt(form.maxUses) : null,
         expiresAt: form.expiresAt || null,
@@ -148,7 +149,7 @@ export function CouponForm({
       if (form.ruleEnabled) {
         payload.rule = {
           minOrderCents: form.minOrderCents
-            ? Math.round(parseFloat(form.minOrderCents) * 100)
+            ? (parseMoneyToCents(form.minOrderCents) ?? 0)
             : null,
           productIds: form.productIds,
           categoryIds: form.categoryIds,

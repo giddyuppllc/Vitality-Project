@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, X } from 'lucide-react'
+import { parseMoneyToCents } from '@/lib/money'
 
 interface Props {
   mode: 'create' | 'edit'
@@ -35,7 +36,7 @@ export function RateEditor({ mode, zoneId, initial }: Props) {
 
   const submit = async () => {
     setError(null)
-    const priceN = Math.round(parseFloat(price) * 100)
+    const priceN = (parseMoneyToCents(price) ?? 0)
     if (!name.trim()) return setError('Name required')
     if (!Number.isFinite(priceN) || priceN < 0) return setError('Valid price required')
     const url =
@@ -51,7 +52,7 @@ export function RateEditor({ mode, zoneId, initial }: Props) {
     body.minWeight = minWeight ? parseFloat(minWeight) : null
     body.maxWeight = maxWeight ? parseFloat(maxWeight) : null
     body.minOrderValue = minOrderValue
-      ? Math.round(parseFloat(minOrderValue) * 100)
+      ? (parseMoneyToCents(minOrderValue) ?? 0)
       : null
     const res = await fetch(url, {
       method,
