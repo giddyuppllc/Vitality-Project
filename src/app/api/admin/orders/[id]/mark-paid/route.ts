@@ -8,6 +8,7 @@ import { TIER_BENEFITS } from '@/lib/membership'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { awardPointsForOrder } from '@/lib/loyalty'
 import { createAdminNotification } from '@/lib/notifications'
+import { decrementStock } from '@/lib/inventory'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
 const LOW_STOCK_THRESHOLD = 5
@@ -198,31 +199,36 @@ export async function POST(
     for (const item of order.items) {
       try {
         if (item.variantId) {
-          const v = await prisma.productVariant.update({
+          // Guarded: never below zero, oversell logged. src/lib/inventory.ts
+          const res = await decrementStock(
+            { variantId: item.variantId, productId: item.productId, quantity: item.quantity },
+            'mark-paid',
+          )
+          const v = await prisma.productVariant.findUnique({
             where: { id: item.variantId },
-            data: { inventory: { decrement: item.quantity } },
             include: { product: { select: { name: true } } },
           })
-          if (v.inventory <= LOW_STOCK_THRESHOLD) {
+          if (v && res.remaining <= LOW_STOCK_THRESHOLD) {
             await createAdminNotification({
               type: 'LOW_STOCK',
               title: `Low stock: ${v.product.name} (${v.name})`,
-              body: `Variant inventory is at ${v.inventory}.`,
+              body: `Variant inventory is at ${res.remaining}.`,
               link: `/admin/products/${v.productId}/edit`,
               entityType: 'ProductVariant',
               entityId: v.id,
             })
           }
         } else {
-          const p = await prisma.product.update({
-            where: { id: item.productId },
-            data: { inventory: { decrement: item.quantity } },
-          })
-          if (p.inventory <= LOW_STOCK_THRESHOLD) {
+          const res = await decrementStock(
+            { productId: item.productId, quantity: item.quantity },
+            'mark-paid',
+          )
+          const p = await prisma.product.findUnique({ where: { id: item.productId } })
+          if (p && res.remaining <= LOW_STOCK_THRESHOLD) {
             await createAdminNotification({
               type: 'LOW_STOCK',
               title: `Low stock: ${p.name}`,
-              body: `Product inventory is at ${p.inventory}.`,
+              body: `Product inventory is at ${res.remaining}.`,
               link: `/admin/products/${p.id}/edit`,
               entityType: 'Product',
               entityId: p.id,

@@ -27,6 +27,7 @@ import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { attributeOrderToCampaigns } from '@/lib/campaign-attribution'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { z } from 'zod'
+import { decrementStock } from '@/lib/inventory'
 
 const checkoutSchema = z.object({
   items: z.array(z.object({
@@ -327,16 +328,13 @@ export async function POST(req: NextRequest) {
     // Decrement inventory NOW — this order is created PAID/PROCESSING, so it never
     // traverses the mark-paid/PATCH path that decrements Zelle orders. Without
     // this, every card order left stock untouched and oversold.
+    // Guarded so stock can never go below zero, and an oversell is logged
+    // rather than silently written as a negative. See src/lib/inventory.ts.
     for (const item of orderItems) {
-      if (item.variantId) {
-        await prisma.productVariant
-          .update({ where: { id: item.variantId }, data: { inventory: { decrement: item.quantity } } })
-          .catch(() => null)
-      } else {
-        await prisma.product
-          .update({ where: { id: item.productId }, data: { inventory: { decrement: item.quantity } } })
-          .catch(() => null)
-      }
+      await decrementStock(
+        { variantId: item.variantId, productId: item.productId, quantity: item.quantity },
+        'checkout',
+      )
     }
 
     // Actually debit loyalty points + store credit now that the order exists.
