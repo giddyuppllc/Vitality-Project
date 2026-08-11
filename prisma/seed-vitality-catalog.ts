@@ -654,6 +654,9 @@ async function main() {
   console.log(`✅ ${CATEGORIES.length} categories ready`);
 
   let prodCount = 0;
+  // Products the guard refused to create because the same name already exists
+  // under a different slug/SKU. Reported at the end so a deploy log shows it.
+  let refusedCount = 0;
   let varCount = 0;
 
   for (const p of PRODUCTS) {
@@ -674,8 +677,55 @@ async function main() {
     // reappear' problem at every layer", 2026-05-18.
     const force = process.env.SEED_FORCE === '1';
 
+    // ── IDENTITY: SKU first, slug second ──────────────────────────────
+    //
+    // This used to upsert on slug alone, and that is how the catalog grew
+    // duplicates. `seed.ts` and this file describe the SAME products under
+    // DIFFERENT slugs, so `upsert where slug` could not tell that
+    // "recon-kit" and "reconstitution-kit" are one product. Each seed was
+    // idempotent on its own terms; running both produced a parallel set:
+    //
+    //   recon-kit / reconstitution-kit      cjc-ipa-blend / cjc-1295-ipamorelin
+    //   nad-oral  / nad-plus-oral           oxytocin      / oxytocin-acetate
+    //   cjc-1295-dac / cjc-1295-w-dac
+    //
+    // The same thing happens the moment an admin renames a slug in
+    // /admin/products: the next deploy would not recognise the row and would
+    // create a second one, silently, on every deploy after that.
+    //
+    // SKU is the stable identity — it is @unique, it is what the warehouse
+    // uses, and it survives renames. Slug is a URL, and URLs get edited.
+    const seedSku = p.variants[0]?.sku ?? null;
+    let existing =
+      (seedSku
+        ? await prisma.product.findUnique({ where: { sku: seedSku }, select: { id: true, slug: true } })
+        : null) ??
+      (await prisma.product.findUnique({ where: { slug: p.slug }, select: { id: true, slug: true } }));
+
+    // ── GUARD: never create a second row for a name that already exists ──
+    //
+    // Last line of defence for the case SKU and slug both miss — a product
+    // re-listed under a new SKU *and* a new slug. Refuse to create, say so,
+    // and let a human decide. A noisy skip beats a silent duplicate.
+    if (!existing) {
+      const key = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const clash = (
+        await prisma.product.findMany({ select: { id: true, name: true, slug: true, sku: true } })
+      ).find((r) => key(r.name) === key(p.name));
+      if (clash) {
+        console.warn(
+          `[seed] REFUSED to create "${p.name}" (${p.slug} / ${seedSku ?? 'no sku'}) — ` +
+            `"${clash.name}" already exists as ${clash.slug} (${clash.sku ?? 'no sku'}). ` +
+            `Same product under a different identity. Reconcile these two rows, ` +
+            `then re-run. Skipping so a duplicate is not created.`,
+        );
+        refusedCount++;
+        continue;
+      }
+    }
+
     const product = await prisma.product.upsert({
-      where: { slug: p.slug },
+      where: existing ? { id: existing.id } : { slug: p.slug },
       // Default mode: empty update — preserve every admin-set field.
       // Force mode: full overwrite to match this seed file.
       update: force
@@ -745,6 +795,15 @@ async function main() {
   }
 
   console.log(`✅ ${prodCount} products seeded`);
+  if (refusedCount > 0) {
+    // Loud on purpose. A silent skip here is how the duplicates went unnoticed
+    // for three months in the first place.
+    console.warn(
+      `⚠️  ${refusedCount} product(s) REFUSED — a product with the same name already ` +
+        `exists under a different slug/SKU. See the [seed] REFUSED lines above. ` +
+        `Nothing was duplicated; reconcile those rows and re-run.`,
+    );
+  }
   console.log(`✅ ${varCount} variants seeded`);
   console.log(`\nVerification: SELECT COUNT(*) FROM products;  SELECT COUNT(*) FROM product_variants;`);
 }
