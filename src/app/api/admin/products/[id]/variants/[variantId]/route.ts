@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { syncProductInventory, hasVariants } from '@/lib/product-stock'
 
 const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -25,7 +26,7 @@ export async function PATCH(
 ) {
   if (!(await guard()))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { variantId } = await params
+  const { id, variantId } = await params
   try {
     const data = patchSchema.parse(await req.json())
     const variant = await prisma.productVariant.update({
@@ -35,6 +36,7 @@ export async function PATCH(
         sku: data.sku === null ? null : data.sku,
       },
     })
+    await syncProductInventory(id)
     return NextResponse.json(variant)
   } catch (error) {
     if (error instanceof z.ZodError)
@@ -52,9 +54,10 @@ export async function DELETE(
 ) {
   if (!(await guard()))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { variantId } = await params
+  const { id, variantId } = await params
   try {
     await prisma.productVariant.delete({ where: { id: variantId } })
+    await syncProductInventory(id)
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Variant delete error:', error)

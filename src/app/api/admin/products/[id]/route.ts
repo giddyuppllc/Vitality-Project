@@ -6,6 +6,7 @@ import { logAudit } from '@/lib/audit'
 import { setProductStatus } from '@/lib/products'
 import { purgeProductCache } from '@/lib/cloudflare-purge'
 import { z } from 'zod'
+import { hasVariants } from '@/lib/product-stock'
 
 const updateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -69,6 +70,15 @@ export async function PATCH(
     // update payload because the helper handled it (writing it twice
     // would be a no-op but the second write would not be audit-logged).
     const { status: _status, ...rest } = data
+
+    // Stock is DERIVED when a product has variants — the variants hold it and
+    // checkout decrements them. Accepting an `inventory` write here is exactly
+    // how the two ledgers drifted apart (22 of 24 active products disagreed,
+    // five variants negative). Drop it rather than fail the whole save: the
+    // rest of the edit is legitimate, and the UI marks the field read-only.
+    if (rest.inventory !== undefined && (await hasVariants(id))) {
+      delete (rest as { inventory?: number }).inventory
+    }
     const product = await prisma.product.update({
       where: { id },
       data: rest,

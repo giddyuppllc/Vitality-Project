@@ -34,6 +34,10 @@ const empty: Form = {
 export default function EditProductPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
+  // Stock is derived from the variants when a product has any — the editor
+  // below reports its count so this form can show the total read-only instead
+  // of offering a second, competing number to type into.
+  const [variantCount, setVariantCount] = useState<number | null>(null)
   const [form, setForm] = useState<Form>(empty)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -166,7 +170,21 @@ export default function EditProductPage() {
           <h2 className="font-semibold text-white/80">Inventory</h2>
           <div className="grid grid-cols-2 gap-4">
             <Input label="SKU" value={form.sku} onChange={set('sku')} placeholder="VP-BPC-5MG" />
-            <Input label="Stock Count" type="number" min="0" value={form.inventory} onChange={set('inventory')} />
+            {variantCount && variantCount > 0 ? (
+              <div>
+                <label className="block text-sm text-white/60 mb-1.5">Stock Count</label>
+                <div className="w-full px-3 py-2 rounded-lg bg-dark-800 border border-white/10 text-white/50 tabular-nums">
+                  {form.inventory}
+                </div>
+                <p className="mt-1.5 text-xs text-white/40">
+                  Total of the {variantCount} variant{variantCount === 1 ? '' : 's'} below. Stock is
+                  held per variant because that is what checkout draws down — edit it on the
+                  variant lines.
+                </p>
+              </div>
+            ) : (
+              <Input label="Stock Count" type="number" min="0" value={form.inventory} onChange={set('inventory')} />
+            )}
           </div>
         </div>
 
@@ -207,7 +225,7 @@ export default function EditProductPage() {
           <p className="text-xs text-white/40">
             Optional product variations (e.g. different doses or pack sizes). Variant price & inventory override the product-level values at checkout.
           </p>
-          <ProductVariantsEditor productId={id as string} />
+          <ProductVariantsEditor productId={id as string} onCountChange={setVariantCount} />
         </div>
 
         {/* Feedback */}

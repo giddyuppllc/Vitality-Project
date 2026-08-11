@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { syncProductInventory, hasVariants } from '@/lib/product-stock'
 
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -51,6 +52,8 @@ export async function POST(
         inventory: data.inventory,
       },
     })
+    // Keep the derived product total in step — see src/lib/product-stock.ts
+    await syncProductInventory(id)
     return NextResponse.json(variant, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError)

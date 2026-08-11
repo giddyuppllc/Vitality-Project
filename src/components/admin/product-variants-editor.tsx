@@ -57,7 +57,14 @@ function toDraft(v: Variant): Draft {
   }
 }
 
-export function ProductVariantsEditor({ productId }: { productId: string }) {
+export function ProductVariantsEditor({
+  productId,
+  onCountChange,
+}: {
+  productId: string
+  /** Lets the parent form show a read-only derived stock total. */
+  onCountChange?: (n: number) => void
+}) {
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -77,6 +84,7 @@ export function ProductVariantsEditor({ productId }: { productId: string }) {
       if (res.ok) {
         const data: Variant[] = await res.json()
         setDrafts(data.map(toDraft))
+        onCountChange?.(data.length)
       }
     } finally {
       setLoading(false)
