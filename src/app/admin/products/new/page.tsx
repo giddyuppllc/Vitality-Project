@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { parseMoneyToCents } from '@/lib/money'
@@ -9,6 +10,10 @@ import { parseMoneyToCents } from '@/lib/money'
 export default function NewProductPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  // Set when the API says this product looks like one that already exists.
+  const [duplicate, setDuplicate] = useState<
+    { message: string; id: string; name: string; status: string } | null
+  >(null)
   const [form, setForm] = useState({
     name: '', description: '', shortDesc: '', price: '', comparePrice: '',
     sku: '', inventory: '0', featured: false,
@@ -22,6 +27,7 @@ export default function NewProductPage() {
     // pasting "$64" or "1,200" leaves this empty — and the old
     // Math.round(parseFloat("") * 100) produced NaN, which JSON.stringify
     // writes as null. Check it before we start.
+    setDuplicate(null)
     const priceCents = parseMoneyToCents(form.price)
     if (priceCents === null) {
       alert('Enter a price, e.g. 49.99')
@@ -50,6 +56,13 @@ export default function NewProductPage() {
         router.push('/admin/products')
       } else {
         const d = await res.json()
+        // A near-duplicate comes back as 409 with the product it looks like.
+        // Offer to open that one — creating a second row is what produced five
+        // duplicate products in this catalog already.
+        if (res.status === 409 && d.match) {
+          setDuplicate({ message: d.message, id: d.match.id, name: d.match.name, status: d.match.status })
+          return
+        }
         alert('Error: ' + JSON.stringify(d.error))
       }
     } finally {
@@ -69,6 +82,30 @@ export default function NewProductPage() {
         <a href="/admin/products" className="text-white/40 hover:text-white transition-colors text-sm">← Products</a>
         <h1 className="text-2xl font-bold">Add Product</h1>
       </div>
+
+      {duplicate && (
+        <div
+          role="alert"
+          className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          <p className="font-medium">{duplicate.message}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Link
+              href={`/admin/products/${duplicate.id}/edit`}
+              className="underline underline-offset-2 hover:text-amber-100"
+            >
+              Open &ldquo;{duplicate.name}&rdquo; ({duplicate.status.toLowerCase()}) instead
+            </Link>
+            <button
+              type="button"
+              onClick={() => setDuplicate(null)}
+              className="text-amber-200/70 hover:text-amber-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="glass rounded-2xl p-6 space-y-4">
