@@ -13,8 +13,19 @@ import type { CartState } from '@/types'
  * for any line — and the cart total — is always derived from the server
  * by POSTing the refs to /api/cart and rendering the response.
  *
- * `itemCount` is a sum of quantities (for the navbar badge) — no price
- * info needed for that.
+ * The badge count is NOT stored. It used to be a getter on the store:
+ *
+ *     get itemCount() { return get().items.reduce(...) }
+ *
+ * which zustand destroys. setState does Object.assign({}, state, partial),
+ * and Object.assign reads an accessor and copies its VALUE — so the first
+ * write flattened the getter into a frozen number. persist's own rehydrate
+ * counts as a write, so on every page load the badge froze at 0 and never
+ * moved again, however full the cart was. It was even serialised into
+ * localStorage as "itemCount":0.
+ *
+ * Derive it with the selector below instead, which recomputes on every change
+ * and cannot go stale.
  */
 export const useCart = create<CartState>()(
   persist(
@@ -63,10 +74,6 @@ export const useCart = create<CartState>()(
       },
 
       clearCart: () => set({ items: [] }),
-
-      get itemCount() {
-        return get().items.reduce((sum, i) => sum + i.quantity, 0)
-      },
     }),
     {
       name: 'vitality-cart',
@@ -86,7 +93,14 @@ export const useCart = create<CartState>()(
         }
         return state as unknown as CartState
       },
-      version: 2,
+      version: 3,
+      // Only `items` is real state. Without this, anything else on the store
+      // (like the old flattened itemCount) gets written to localStorage too.
+      partialize: (state) => ({ items: state.items }),
+      onRehydrateStorage: () => (state) => {
+        useCartHydrated.setState({ hydrated: true })
+        void state
+      },
     }
   )
 )
@@ -136,3 +150,26 @@ export function useCartAutoSave(email?: string | null) {
     }
   }, [email])
 }
+
+/**
+ * Live item count for the navbar badge and the cart heading.
+ *
+ * A selector, not stored state — it recomputes from `items` on every change,
+ * so it cannot drift from what is actually in the cart.
+ */
+export function useCartItemCount(): number {
+  return useCart((state) => state.items.reduce((sum, i) => sum + i.quantity, 0))
+}
+
+/**
+ * Whether the persisted cart has been read back from localStorage yet.
+ *
+ * The server renders with an empty cart because localStorage does not exist
+ * there. Without this flag the first client paint also shows empty, then the
+ * cart appears a moment later — which reads as "my cart vanished". Components
+ * can hold the badge back until this is true instead of rendering a wrong
+ * number and correcting it.
+ */
+export const useCartHydrated = create<{ hydrated: boolean }>(() => ({
+  hydrated: false,
+}))

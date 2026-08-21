@@ -25,7 +25,6 @@ export interface CartState {
   removeItem: (productId: string, variantId?: string) => void
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void
   clearCart: () => void
-  itemCount: number
 }
 
 export interface ProductWithImages extends Product {
