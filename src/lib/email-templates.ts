@@ -1877,3 +1877,113 @@ Approve or suspend at: ${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/affiliates
   </body></html>`
   return { subject, html, text }
 }
+
+// ─── Membership renewal overdue ──────────────────────────────────────────────
+// Sent while a paid membership is past its renewal date but still inside the
+// grace window, so benefits are intact and the tone stays a nudge. Escalates on
+// the days in REMINDER_DAYS_OVERDUE (membershipLapse.ts).
+export function membershipRenewalOverdue(args: {
+  name: string | null
+  planLabel: string
+  amountCents: number
+  invoiceNumber: string
+  daysOverdue: number
+  daysLeftInGrace: number
+  zelle: ZelleIdentity
+}) {
+  const { name, planLabel, amountCents, invoiceNumber, daysOverdue, daysLeftInGrace, zelle } = args
+  const greeting = name ? `Hi ${name.split(' ')[0]}` : 'Hi'
+  const amount = `$${(amountCents / 100).toFixed(2)}`
+  const dayWord = daysLeftInGrace === 1 ? 'day' : 'days'
+  const subject = `Your ${planLabel} renewal is overdue (${amount} via Zelle)`
+
+  const text = `${greeting},
+
+Your ${planLabel} renewal is ${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'} past due. Your benefits are still on — the discount, free shipping and this cycle's peptide credits all keep working for another ${daysLeftInGrace} ${dayWord}.
+
+To keep them, send ${amount} via Zelle to ${zelle.primary}${zelle.altHandle ? ` (or ${zelle.altHandle})` : ''} with memo ${invoiceNumber}.
+
+If the payment is already on its way, ignore this — it can take a day or two to land and we will pick it up.
+
+— The Vitality Project`
+
+  const body = `
+    <h1 style="font:600 20px/1.3 -apple-system,sans-serif;color:#0f172a;margin:0 0 12px;">Your ${escapeHtml(planLabel)} renewal is overdue</h1>
+    <p style="font:14px/1.6 -apple-system,sans-serif;color:#334155;margin:0 0 14px;">${escapeHtml(greeting)},</p>
+    <p style="font:14px/1.6 -apple-system,sans-serif;color:#334155;margin:0 0 14px;">
+      Your <strong>${escapeHtml(planLabel)}</strong> renewal is <strong>${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'}</strong> past due.
+      Nothing has changed yet — your discount, free shipping and this cycle's peptide credits
+      all keep working for another <strong>${daysLeftInGrace} ${dayWord}</strong>.
+    </p>
+    <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:0 0 14px;">
+      <p style="font:12px/1.4 -apple-system,sans-serif;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">Zelle to</p>
+      ${zelle.displayName ? `<p style="font:13px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 2px;">${escapeHtml(zelle.displayName)}</p>` : ''}
+      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelle.primary)}</p>
+      ${zelle.altHandle ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zelle.altHandle)}</p>` : ''}
+      <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Memo / note:</strong> ${escapeHtml(invoiceNumber)}</p>
+      <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Amount:</strong> ${amount}</p>
+    </div>
+    <p style="font:13px/1.6 -apple-system,sans-serif;color:#64748b;margin:0 0 8px;">
+      Already sent it? Ignore this — Zelle can take a day or two to land and we will pick it up.
+    </p>
+    <p style="font:13px/1.6 -apple-system,sans-serif;color:#94a3b8;margin:18px 0 0;">— The Vitality Project</p>
+  `
+  return {
+    subject,
+    html: `<!doctype html><html><body style="margin:0;padding:24px;background:#f8fafc;"><div style="max-width:560px;margin:0 auto;background:#ffffff;padding:28px 32px;border-radius:14px;border:1px solid #e2e8f0;">${body}</div></body></html>`,
+    text,
+  }
+}
+
+// ─── Membership benefits paused ──────────────────────────────────────────────
+// Sent once, when the grace window closes and status flips to PAST_DUE. This is
+// a pause, not a cancellation: the tier and history stay, and mark-paid puts
+// everything back with a fresh cycle.
+export function membershipSuspended(args: {
+  name: string | null
+  planLabel: string
+  amountCents: number
+  invoiceNumber: string
+  daysOverdue: number
+  zelle: ZelleIdentity
+}) {
+  const { name, planLabel, amountCents, invoiceNumber, daysOverdue, zelle } = args
+  const greeting = name ? `Hi ${name.split(' ')[0]}` : 'Hi'
+  const amount = `$${(amountCents / 100).toFixed(2)}`
+  const subject = `Your ${planLabel} benefits are paused`
+
+  const text = `${greeting},
+
+Your ${planLabel} renewal has been unpaid for ${daysOverdue} days, so your member benefits are paused for now.
+
+Your membership has not been cancelled and nothing has been lost — your tier and history are exactly where you left them. Send ${amount} via Zelle to ${zelle.primary}${zelle.altHandle ? ` (or ${zelle.altHandle})` : ''} with memo ${invoiceNumber} and everything switches back on with a fresh cycle of credits.
+
+— The Vitality Project`
+
+  const body = `
+    <h1 style="font:600 20px/1.3 -apple-system,sans-serif;color:#0f172a;margin:0 0 12px;">Your ${escapeHtml(planLabel)} benefits are paused</h1>
+    <p style="font:14px/1.6 -apple-system,sans-serif;color:#334155;margin:0 0 14px;">${escapeHtml(greeting)},</p>
+    <p style="font:14px/1.6 -apple-system,sans-serif;color:#334155;margin:0 0 14px;">
+      Your renewal has been unpaid for <strong>${daysOverdue} days</strong>, so your member
+      discount, free shipping and peptide credits are paused for now.
+    </p>
+    <p style="font:14px/1.6 -apple-system,sans-serif;color:#334155;margin:0 0 14px;">
+      Your membership has <strong>not</strong> been cancelled — your tier and history are exactly
+      where you left them. Send the renewal and everything switches back on with a fresh cycle.
+    </p>
+    <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:0 0 14px;">
+      <p style="font:12px/1.4 -apple-system,sans-serif;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">Zelle to</p>
+      ${zelle.displayName ? `<p style="font:13px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 2px;">${escapeHtml(zelle.displayName)}</p>` : ''}
+      <p style="font:600 15px/1.4 -apple-system,sans-serif;color:#0f172a;margin:0 0 4px;">${escapeHtml(zelle.primary)}</p>
+      ${zelle.altHandle ? `<p style="font:14px/1.4 -apple-system,sans-serif;color:#475569;margin:0 0 8px;">or ${escapeHtml(zelle.altHandle)}</p>` : ''}
+      <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Memo / note:</strong> ${escapeHtml(invoiceNumber)}</p>
+      <p style="font:13px/1.4 -apple-system,sans-serif;color:#334155;margin:6px 0 0;"><strong>Amount:</strong> ${amount}</p>
+    </div>
+    <p style="font:13px/1.6 -apple-system,sans-serif;color:#94a3b8;margin:18px 0 0;">— The Vitality Project</p>
+  `
+  return {
+    subject,
+    html: `<!doctype html><html><body style="margin:0;padding:24px;background:#f8fafc;"><div style="max-width:560px;margin:0 auto;background:#ffffff;padding:28px 32px;border-radius:14px;border:1px solid #e2e8f0;">${body}</div></body></html>`,
+    text,
+  }
+}

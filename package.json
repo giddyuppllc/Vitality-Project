@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
-    "seed:posts": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed-posts.ts"
+    "seed:posts": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed-posts.ts",
+    "verify:lapse": "tsx scripts/verify-membership-lapse.ts"
   },
   "repository": {
     "type": "git",

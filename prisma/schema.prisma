@@ -1373,6 +1373,11 @@ model Membership {
   pendingInvoiceOrderId         String?
   // Rate-limit reminder emails to PENDING_PAYMENT signups.
   lastReminderSentAt            DateTime?
+  // Rate-limit the OVERDUE notices sent to an ACTIVE member past renewsAt.
+  // Deliberately separate from lastReminderSentAt: that one paces the
+  // pre-activation signup chase, this one paces the renewal chase, and a
+  // membership can legitimately have been through both.
+  lastOverdueNoticeAt           DateTime?
   user                          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
