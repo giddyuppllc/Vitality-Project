@@ -17,7 +17,6 @@ interface WishlistState {
   toggle: (item: WishlistItem) => void
   clear: () => void
   has: (productId: string) => boolean
-  count: number
   mergeFromServer: (serverItems: WishlistItem[]) => void
 }
 
@@ -70,9 +69,6 @@ export const useWishlist = create<WishlistState>()(
         }
       },
       has: (productId) => get().items.some((i) => i.id === productId),
-      get count() {
-        return get().items.length
-      },
       mergeFromServer: (serverItems: WishlistItem[]) => {
         const existing = get().items
         const seen = new Set(existing.map((i) => i.id))
