@@ -55,6 +55,8 @@ async function doRun() {
   const pending = await prisma.membership.findMany({
     where: {
       status: 'PENDING_PAYMENT',
+      // Never chase a free-tier member for payment — there is nothing to pay.
+      tier: { not: 'NONE' },
       startedAt: { lte: twoDaysAgo },
       OR: [
         { lastReminderSentAt: null },

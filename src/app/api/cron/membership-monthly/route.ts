@@ -57,6 +57,12 @@ async function doRun() {
     where: {
       status: 'ACTIVE',
       renewsAt: { lte: dueWindow },
+      // Free tier has nothing to renew. Without this it is picked up like any
+      // other ACTIVE row, falls through TIER_LABELS to the generic
+      // 'Membership' label, and produces a $0.00 invoice telling a free member
+      // to Zelle nothing — or fails the run looking for a variant that does
+      // not exist. Either way it should never have been in the result set.
+      tier: { not: 'NONE' },
     },
     include: { user: { select: { id: true, name: true, email: true } } },
     take: 200,
@@ -126,6 +132,19 @@ async function doRun() {
       m.monthlyPriceCents > 0
         ? m.monthlyPriceCents
         : TIER_BENEFITS[tierKey]?.monthlyPriceCents ?? 0
+    // Belt and braces: a paid tier misconfigured to $0 would otherwise email
+    // an invoice asking for nothing. Nobody should ever receive that.
+    if (amountCents <= 0) {
+      skipped += 1
+      results.push({
+        membershipId: m.id,
+        email: m.user.email,
+        status: 'skipped',
+        error: 'zero amount — nothing to invoice',
+      })
+      continue
+    }
+
     const variant = product.variants.find((v) => v.name === planLabel)
     if (!variant) {
       failed += 1
