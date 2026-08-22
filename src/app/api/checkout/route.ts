@@ -118,6 +118,16 @@ export async function POST(req: NextRequest) {
       if (!product) throw new Error(`Product ${item.productId} not found`)
       const variant = item.variantId ? product.variants.find((v) => v.id === item.variantId) : null
       const price = variant?.price ?? product.price
+      // `??` falls back on null/undefined but NOT on 0, so a variant saved
+      // without a price resolves to 0 and this line would be sold for nothing.
+      // Refuse the order rather than charge $0 or silently substitute the
+      // product price, which nobody set for this variant. Member freebies are
+      // appended after this loop and are unaffected.
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error(
+          `No price set for ${product.name}${variant ? ` — ${variant.name}` : ''}`,
+        )
+      }
       const itemTotal = price * item.quantity
       subtotal += itemTotal
       return {

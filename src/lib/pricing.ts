@@ -43,7 +43,7 @@ export interface PricedLine {
   /** true if the line can actually be ordered (ACTIVE + (no variant OR variant exists)). */
   available: boolean
   /** Why available is false, if applicable. */
-  reason?: 'archived' | 'product-not-found' | 'variant-not-found'
+  reason?: 'archived' | 'product-not-found' | 'variant-not-found' | 'price-unset'
 }
 
 export interface PricedCart {
@@ -162,6 +162,30 @@ export async function computeCartTotal(
       }
     }
     const unitPrice = variant?.price ?? p.price
+    // `??` falls back on null/undefined but NOT on 0, so a variant saved with
+    // no price resolves to 0 and the line sells for nothing. Two live variants
+    // were in that state (Glutathione 1000mg with stock on hand). Falling back
+    // to the product price would silently charge a figure nobody set for this
+    // variant, so the line is refused instead — an item that cannot be bought
+    // is recoverable, an item sold for $0 is not.
+    //
+    // Member freebies are unaffected: those are pushed straight onto the order
+    // in checkout, never priced through here.
+    if (unitPrice <= 0) {
+      return {
+        productId: p.id,
+        variantId: variant?.id ?? null,
+        name: variant ? `${p.name} — ${variant.name}` : p.name,
+        slug: p.slug,
+        image: p.images[0]?.url ?? null,
+        unitPrice: 0,
+        quantity: ref.quantity,
+        lineTotal: 0,
+        productStatus: p.status,
+        available: false,
+        reason: 'price-unset',
+      }
+    }
     return {
       productId: p.id,
       variantId: variant?.id ?? null,
