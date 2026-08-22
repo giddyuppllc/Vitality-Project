@@ -43,9 +43,27 @@ export async function GET(req: NextRequest) {
     'Membership reminders',
     () => doRun(),
     (r) =>
-      `examined=${r.examined} sent=${r.sent} skipped=${r.skipped} failed=${r.failed}`,
+      `examined=${r.examined} sent=${r.sent} closed=${r.closed} skipped=${r.skipped} failed=${r.failed}`,
   )
 }
+
+/** Days after signup on which an unpaid signup is nudged, then silence. */
+const REMINDER_DAYS = [2, 5, 10] as const
+
+/**
+ * Days after signup before an unpaid signup is closed.
+ *
+ * This is not a new policy — the reminder email has been telling people
+ * "pending signups auto-close after 14 days" since it was written, and nothing
+ * ever closed one. Seven signups were sitting at 33 to 99 days still marked
+ * PENDING_PAYMENT, so the statement was simply untrue.
+ *
+ * Closing is reversible and costs the member nothing: PENDING_PAYMENT grants no
+ * benefits, and if they pay later mark-paid sets the membership straight back
+ * to ACTIVE. Only signups that actually received a reminder are closed — nobody
+ * is closed without having been told.
+ */
+const AUTOCLOSE_AFTER_DAYS = 14
 
 async function doRun() {
   const now = Date.now()
@@ -113,11 +131,18 @@ async function doRun() {
     }
 
     const daysWaiting = Math.floor((now - m.startedAt.getTime()) / 86400e3)
-    // Bucket: 2d, 5d, 10d, then quiet. Skip if outside buckets.
-    const inBucket =
-      (daysWaiting >= 2 && daysWaiting < 3) ||
-      (daysWaiting >= 5 && daysWaiting < 6) ||
-      (daysWaiting >= 10 && daysWaiting < 11)
+    // Reminders at 2d, 5d and 10d, then quiet.
+    //
+    // These used to be exact one-day windows (>= 2 && < 3). A run that missed
+    // its day — a deploy, an outage, a slow night — skipped that reminder
+    // permanently, because the next run saw day 3 and matched nothing. The
+    // schedule now advances off the LAST reminder actually sent, so a missed
+    // day is caught up on the following run instead of being lost.
+    const dayOfLastReminder = m.lastReminderSentAt
+      ? Math.floor((m.lastReminderSentAt.getTime() - m.startedAt.getTime()) / 86400e3)
+      : -1
+    const nextDue = REMINDER_DAYS.find((d) => d > dayOfLastReminder)
+    const inBucket = nextDue !== undefined && daysWaiting >= nextDue
     if (!inBucket) {
       skipped += 1
       results.push({
@@ -185,11 +210,50 @@ async function doRun() {
     }
   }
 
+  // ── Close signups that were reminded and still never paid ────────────────
+  let closed = 0
+  const closeCutoff = new Date(now - AUTOCLOSE_AFTER_DAYS * 86400e3)
+  const stale = await prisma.membership.findMany({
+    where: {
+      status: 'PENDING_PAYMENT',
+      tier: { not: 'NONE' },
+      startedAt: { lte: closeCutoff },
+      // Never close someone who was never told. Every reminder stamps this.
+      lastReminderSentAt: { not: null },
+    },
+    select: { id: true, tier: true, startedAt: true, pendingInvoiceOrderId: true },
+    take: 100,
+  })
+
+  for (const m of stale) {
+    const daysWaiting = Math.floor((now - m.startedAt.getTime()) / 86400e3)
+    try {
+      await prisma.membership.update({
+        where: { id: m.id },
+        data: { status: 'CANCELLED', cancelledAt: new Date(), pendingInvoiceOrderId: null },
+      })
+      // Take the dead invoice out of the payment-reminder queue with it,
+      // rather than leaving an UNPAID/PENDING order chasing a closed signup.
+      if (m.pendingInvoiceOrderId) {
+        await prisma.order.updateMany({
+          where: { id: m.pendingInvoiceOrderId, paymentStatus: 'UNPAID' },
+          data: { status: 'CANCELLED' },
+        })
+      }
+      closed += 1
+      results.push({ membershipId: m.id, email: '(auto-closed)', status: 'skipped', error: `closed after ${daysWaiting}d unpaid` })
+    } catch (err) {
+      failed += 1
+      results.push({ membershipId: m.id, email: '(auto-close failed)', status: 'failed', error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
   return {
     ok: true as const,
     examined: pending.length,
     sent,
     skipped,
+    closed,
     failed,
     results,
   }
