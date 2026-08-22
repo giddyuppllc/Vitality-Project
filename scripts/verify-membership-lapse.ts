@@ -72,6 +72,26 @@ check('CANCELLED is left alone', assessMembership({ ...base, status: 'CANCELLED'
 check('paid invoice is not chased', assessMembership({ ...base, invoiceUnpaid: false }, day(20)).action, 'none')
 check('no renewal date -> nothing to judge', assessMembership({ ...base, renewsAt: null }, day(20)).action, 'none')
 
+// Walk a real sequence, updating lastOverdueNoticeAt as a live run would.
+// The per-case checks above all passed while this was broken: once the schedule
+// ran out, `nextDay` was undefined and every later day sent another reminder —
+// six emails instead of three. Asserting the COUNT over a timeline is what
+// caught it; asserting each day in isolation never could.
+console.log('\n  the whole sequence, as a daily run would see it:')
+{
+  let last: Date | null = null
+  const sent: number[] = []
+  let suspendedOn: number | null = null
+  for (let d = 1; d <= 20; d++) {
+    const r = assessMembership({ ...base, lastOverdueNoticeAt: last }, day(d))
+    if (r.action === 'remind') { sent.push(d); last = day(d) }
+    if (r.action === 'suspend') { suspendedOn = d; break }
+  }
+  check(`reminders land on days ${REMINDER_DAYS_OVERDUE.join('/')}`, sent.join('/'), REMINDER_DAYS_OVERDUE.join('/'))
+  check('exactly one reminder per scheduled day', String(sent.length), String(REMINDER_DAYS_OVERDUE.length))
+  check('suspends on the grace day', String(suspendedOn), String(GRACE_DAYS))
+}
+
 // Positive control. If the happy path stopped producing actions, every
 // assertion above could pass by returning 'none' forever and this file would
 // look green while enforcing nothing.

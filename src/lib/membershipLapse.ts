@@ -93,7 +93,14 @@ export function assessMembership(m: LapseInput, now: Date): LapseAction {
   if (lastNotice) {
     const dayOfLastNotice = daysBetween(lastNotice, renewsAt)
     const nextDay = REMINDER_DAYS_OVERDUE.find(d => d > dayOfLastNotice)
-    if (nextDay !== undefined && daysOverdue < nextDay) {
+    // Past the last scheduled day there is nothing left to say — the only
+    // remaining event is suspension. Without this the schedule runs out and
+    // every subsequent daily run sends another reminder: days 11, 12 and 13
+    // each produced an email, six in total instead of three.
+    if (nextDay === undefined) {
+      return { action: 'none', reason: 'all scheduled reminders sent; awaiting suspension' }
+    }
+    if (daysOverdue < nextDay) {
       return { action: 'none', reason: `next reminder at day ${nextDay}` }
     }
   }
