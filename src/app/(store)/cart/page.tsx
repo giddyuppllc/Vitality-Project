@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Trash2, ShoppingBag, ArrowRight, LogIn, AlertTriangle, Loader2 } from 'lucide-react'
-import { useCart } from '@/hooks/useCart'
+import { useCart, useCartItemCount } from '@/hooks/useCart'
 import { useSession } from 'next-auth/react'
 import { formatPrice } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -34,7 +34,8 @@ interface PricedCart {
 
 export default function CartPage() {
   const { data: session, status } = useSession()
-  const { items, removeItem, updateQuantity, itemCount } = useCart()
+  const { items, removeItem, updateQuantity } = useCart()
+  const itemCount = useCartItemCount()
 
   // The cart's authoritative state lives on the server. We POST our refs
   // (productId / variantId / quantity) and render whatever comes back.

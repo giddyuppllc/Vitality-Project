@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { ShoppingCart, User, Menu, X, ChevronDown, Search } from 'lucide-react'
-import { useCart } from '@/hooks/useCart'
+import { useCart, useCartItemCount, useCartHydrated } from '@/hooks/useCart'
 import { useSession, signOut } from 'next-auth/react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,10 @@ const learnLinks = [
 ]
 
 export function Navbar() {
-  const { itemCount } = useCart()
+  // Derived, not stored — see useCart.ts. Reading a stored count is what
+  // pinned this badge at 0.
+  const itemCount = useCartItemCount()
+  const hydrated = useCartHydrated((s) => s.hydrated)
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -132,7 +135,7 @@ export function Navbar() {
             {/* Cart */}
             <Link href="/cart" className="relative p-2 text-white/60 hover:text-white transition-colors">
               <ShoppingCart className="w-5 h-5" />
-              {itemCount > 0 && (
+              {hydrated && itemCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
                   {itemCount > 9 ? '9+' : itemCount}
                 </span>
