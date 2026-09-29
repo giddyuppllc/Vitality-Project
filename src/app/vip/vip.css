@@ -1,0 +1,56 @@
+/* Clubhouse-only styles (vitalityproject.vip). Imported by src/app/vip/layout.tsx,
+   so none of this is loaded on vitalityproject.global routes. */
+
+.vip-surface {
+  background: rgba(14, 17, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.vip-surface-strong {
+  background: rgba(14, 17, 34, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.vip-body {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.vip-body .vip-link,
+.vip-prose a {
+  color: #a5b8fc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vip-body .vip-mention {
+  color: #c7d5fe;
+  font-weight: 600;
+}
+
+.vip-prose h2 { font-size: 1.35rem; font-weight: 700; margin: 1.5rem 0 0.6rem; }
+.vip-prose h3 { font-size: 1.15rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
+.vip-prose h4 { font-size: 1rem; font-weight: 700; margin: 1rem 0 0.4rem; }
+.vip-prose p { margin: 0.75rem 0; line-height: 1.7; color: rgba(255, 255, 255, 0.85); }
+.vip-prose ul { list-style: disc; padding-left: 1.4rem; margin: 0.75rem 0; }
+.vip-prose ol { list-style: decimal; padding-left: 1.4rem; margin: 0.75rem 0; }
+.vip-prose li { margin: 0.3rem 0; color: rgba(255, 255, 255, 0.85); }
+
+.vip-focus:focus-visible {
+  outline: 2px solid #8193f8;
+  outline-offset: 2px;
+}
+
+/* Keep content clear of the fixed mobile tab bar + iOS home indicator. */
+.vip-safe-bottom {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .vip-safe-bottom { padding-bottom: 3rem; }
+}
