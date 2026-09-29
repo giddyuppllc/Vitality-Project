@@ -45,6 +45,14 @@ const JOBS: Array<{
     scheduleHuman: 'Daily 13:30 UTC',
     maxAgeMinutes: 26 * 60,
   },
+  {
+    // Not in the box's crontab until the clubhouse deploys — see
+    // docs/VIP_CLUBHOUSE.md. Grants nothing while every tier is $0.
+    name: 'VIP member rewards',
+    endpoint: '/api/cron/vip-member-rewards',
+    scheduleHuman: 'Daily',
+    maxAgeMinutes: 26 * 60,
+  },
 ]
 
 export default async function AdminCronStatusPage() {

@@ -34,6 +34,7 @@ const PRIMARY: NavItem[] = [
 ]
 
 const MORE: NavItem[] = [
+  { href: '/admin/vip', label: 'Clubhouse (.vip)', icon: Crown },
   { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/fulfillments', label: 'Fulfillments', icon: Truck },
   { href: '/admin/coa', label: 'Certificates (CoA)', icon: FileText },
