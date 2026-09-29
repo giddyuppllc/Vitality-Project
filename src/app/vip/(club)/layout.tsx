@@ -3,6 +3,7 @@ import { requireVipPage } from '@/lib/vip/page-gate'
 import { listSpaces } from '@/lib/vip/feed'
 import { GLOBAL_LINKS, globalUrl } from '@/lib/vip/links'
 import { VipShell } from '@/components/vip/shell'
+import { sendClubhouseWelcome } from '@/lib/vip/mailer'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,11 @@ export const dynamic = 'force-dynamic'
  */
 export default async function ClubLayout({ children }: { children: React.ReactNode }) {
   const viewer = await requireVipPage('member')
+  // First visit by a member who was active before launch: the one-time
+  // welcome email (no-op once sent — claimed with a conditional update).
+  if (!viewer.welcomed && !viewer.isAdmin) {
+    void sendClubhouseWelcome(viewer.userId).catch(() => {})
+  }
   const [unread, spaces] = await Promise.all([
     viewer.suspended
       ? Promise.resolve(0)

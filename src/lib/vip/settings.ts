@@ -15,6 +15,8 @@ export const VIP_SETTING_DEFAULTS = {
   'vip.emailReplyTo': 'vital@vitalityproject.global',
   /** Hour (UTC) the daily reply/mention digest goes out. 13 UTC = 9am US Eastern (EDT). */
   'vip.digestHourUtc': 13,
+  /** Time zone for event times in emails and for monthly event series. */
+  'vip.timeZone': 'America/New_York',
   /** Unpaid Zelle orders are cancelled after this many days (credit returned). 0 = never. */
   'zelle.unpaidExpiryDays': 14,
 } as const

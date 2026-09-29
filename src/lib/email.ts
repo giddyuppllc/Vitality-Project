@@ -44,6 +44,8 @@ export type SendEmailArgs = {
   html: string
   text?: string
   tags?: Array<{ name: string; value: string }>
+  /** Optional per-message Reply-To (clubhouse mail → vital@). Default: EMAIL_REPLY_TO. */
+  replyTo?: string
 }
 
 export type SendEmailResult =
@@ -56,6 +58,7 @@ export async function sendEmail({
   html,
   text,
   tags,
+  replyTo,
 }: SendEmailArgs): Promise<SendEmailResult> {
   // Synthetic test recipients: never actually call Resend — every send would
   // bounce and add the address to the suppression list, damaging the domain
@@ -77,7 +80,7 @@ export async function sendEmail({
       subject,
       html,
       text,
-      replyTo: REPLY_TO,
+      replyTo: replyTo || REPLY_TO,
       ...(tags && tags.length ? { tags } : {}),
     })
 

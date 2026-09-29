@@ -50,6 +50,10 @@ export interface VipViewer {
   joinedAt: Date | null
   displayName: string
   avatarUrl: string | null
+  /** Welcome email already sent (VipProfile.welcomeEmailAt). */
+  welcomed: boolean
+  /** "Start here" checklist dismissed. */
+  onboarded: boolean
 }
 
 export async function loadVipViewer(userId: string): Promise<VipViewer | null> {
@@ -61,7 +65,7 @@ export async function loadVipViewer(userId: string): Promise<VipViewer | null> {
       name: true,
       username: true,
       role: true,
-      vipProfile: { select: { displayName: true, avatarUrl: true, suspendedAt: true } },
+      vipProfile: { select: { displayName: true, avatarUrl: true, suspendedAt: true, welcomeEmailAt: true, onboardedAt: true } },
     },
   })
   if (!user) return null
@@ -82,6 +86,8 @@ export async function loadVipViewer(userId: string): Promise<VipViewer | null> {
     joinedAt: membership?.paymentConfirmedAt ?? membership?.startedAt ?? null,
     displayName: user.vipProfile?.displayName || user.name || user.username || 'Member',
     avatarUrl: user.vipProfile?.avatarUrl ?? null,
+    welcomed: !!user.vipProfile?.welcomeEmailAt,
+    onboarded: !!user.vipProfile?.onboardedAt,
   }
 }
 

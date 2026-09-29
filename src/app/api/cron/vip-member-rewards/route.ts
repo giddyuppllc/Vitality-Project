@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { trackCronRun } from '@/lib/cron-tracker'
 import { runMemberRewards } from '@/lib/vip/rewards'
 
-// Cron — deposits each ACTIVE member's monthly clubhouse reward (admin-set
-// store credit per tier, /admin/vip/rewards) into the existing StoreCredit
-// ledger, spent at vitalityproject.global checkout.
+// Cron — deposits each ACTIVE member's monthly clubhouse reward (store credit
+// per tier, /admin/vip/rewards; defaults Club $5 / Plus $20 / Premium Stacks
+// $50) into the existing StoreCredit ledger, spent at vitalityproject.global
+// checkout. Run it DAILY:
+//   • on the 1st (UTC) it grants to members ACTIVE that day (not suspended);
+//     every other day it grants nothing — `&catchUp=1` grants for the current
+//     month if the 1st was missed. Idempotent per member per month.
+//   • every day it expires reward credit older than `vip.rewardExpiryMonths`.
 //
-// DEFAULT OFF: every tier's amount is 0 until an admin sets one, and a 0 tier
-// grants nothing. Idempotent per member per calendar month (UTC): run it daily
-// — the first run in a month grants, every later run that month is a no-op.
-//
-// `&dryRun=1` returns every decision and writes nothing.
+// `&dryRun=1` returns every decision and writes/sends nothing.
 // Auth: Bearer <CRON_SECRET> or ?secret=<CRON_SECRET> (same as every cron here).
 
 function authorize(req: NextRequest): boolean {
@@ -31,10 +32,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   const dryRun = req.nextUrl.searchParams.get('dryRun') === '1'
+  const catchUp = req.nextUrl.searchParams.get('catchUp') === '1'
   return trackCronRun(
     dryRun ? 'VIP member rewards (dry run)' : 'VIP member rewards',
-    () => runMemberRewards({ dryRun }),
+    () => runMemberRewards({ dryRun, catchUp }),
     (r) =>
-      `period=${r.period} examined=${r.examined} granted=${r.granted} already=${r.alreadyGranted} off=${r.off} failed=${r.failed} totalCents=${r.totalCents}`,
+      `period=${r.period}${r.skipped ? ` skipped=${r.skipped}` : ''} examined=${r.examined} granted=${r.granted} already=${r.alreadyGranted} off=${r.off} suspended=${r.suspended} failed=${r.failed} totalCents=${r.totalCents} emailed=${r.emailed} expiredCents=${r.expiry?.expiredCents ?? 0}`,
   )
 }

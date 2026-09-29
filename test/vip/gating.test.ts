@@ -20,6 +20,9 @@ import * as media from '@/app/api/vip/media/[...path]/route'
 import * as progress from '@/app/api/vip/lessons/[id]/progress/route'
 import * as rsvp from '@/app/api/vip/events/[id]/rsvp/route'
 import * as rewards from '@/app/api/vip/rewards/route'
+import * as emailPrefs from '@/app/api/vip/email-prefs/route'
+import * as onboarding from '@/app/api/vip/onboarding/route'
+import * as adminSettings from '@/app/api/admin/vip/settings/route'
 import * as adminSpaces from '@/app/api/admin/vip/spaces/route'
 import * as adminSpace from '@/app/api/admin/vip/spaces/[id]/route'
 import * as adminModeration from '@/app/api/admin/vip/moderation/route'
@@ -57,6 +60,9 @@ const CASES: Case[] = [
   { name: 'POST /events/:id/rsvp', gate: 'member', run: () => h(rsvp.POST)(req('/api/vip/events/missing/rsvp', { method: 'POST' }), ctx({ id: 'missing' })) },
   { name: 'DELETE /events/:id/rsvp', gate: 'member', run: () => h(rsvp.DELETE)(req('/api/vip/events/missing/rsvp', { method: 'DELETE' }), ctx({ id: 'missing' })) },
   { name: 'GET /rewards', gate: 'member', run: () => h(rewards.GET)(req('/api/vip/rewards'), ctx({})) },
+  { name: 'GET /email-prefs', gate: 'member', run: () => h(emailPrefs.GET)(req('/api/vip/email-prefs'), ctx({})) },
+  { name: 'PATCH /email-prefs', gate: 'member', run: () => h(emailPrefs.PATCH)(req('/api/vip/email-prefs', { method: 'PATCH', body: { emailDigest: true } }), ctx({})) },
+  { name: 'POST /onboarding', gate: 'member', run: () => h(onboarding.POST)(req('/api/vip/onboarding', { method: 'POST' }), ctx({})) },
 ]
 
 const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
@@ -68,6 +74,8 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'POST events', run: () => h(adminEvents.POST)(req('/api/admin/vip/events', { body: { op: 'delete', id: 'x' } }), ctx({})) },
   { name: 'GET rewards', run: () => h(adminRewards.GET)(req('/api/admin/vip/rewards'), ctx({})) },
   { name: 'PUT rewards', run: () => h(adminRewards.PUT)(req('/api/admin/vip/rewards', { method: 'PUT', body: { CLUB: 1, PLUS: 1, PREMIUM: 1 } }), ctx({})) },
+  { name: 'GET settings', run: () => h(adminSettings.GET)(req('/api/admin/vip/settings'), ctx({})) },
+  { name: 'PUT settings', run: () => h(adminSettings.PUT)(req('/api/admin/vip/settings', { method: 'PUT', body: { 'vip.digestHourUtc': 13 } }), ctx({})) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -98,12 +106,15 @@ describe('members-only gating — every clubhouse API', () => {
     }
     walk(root)
     // auth/login + auth/logout are intentionally public (they create/clear the session).
+    // email-prefs POST is the signed one-click opt-out (token-gated, tested in emails.test.ts);
+    // its GET/PATCH are member-gated and listed in CASES.
     const gated = files.filter((f) => !f.startsWith('auth/'))
     expect(gated.sort()).toEqual(
       [
         'comments/[id]/route.ts', 'events/[id]/rsvp/route.ts', 'lessons/[id]/progress/route.ts', 'media/[...path]/route.ts',
         'members/route.ts', 'notifications/route.ts', 'posts/[id]/comments/route.ts', 'posts/[id]/route.ts', 'posts/route.ts',
         'profile/route.ts', 'reactions/route.ts', 'reports/route.ts', 'rewards/route.ts', 'uploads/route.ts',
+        'email-prefs/route.ts', 'onboarding/route.ts',
       ].sort(),
     )
   })

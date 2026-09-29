@@ -10,6 +10,7 @@ import { awardPointsForOrder } from '@/lib/loyalty'
 import { createAdminNotification } from '@/lib/notifications'
 import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit } from '@/lib/order-credit'
+import { sendClubhouseWelcome } from '@/lib/vip/mailer'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
 const LOW_STOCK_THRESHOLD = 5
@@ -67,6 +68,14 @@ async function activateMembershipFromOrder(order: {
       freeSuppliesClaimedThisPeriod: false,
     },
   })
+
+  // First activation opens the members' clubhouse (vitalityproject.vip):
+  // send its welcome email once — the hand-off back to .vip after joining.
+  if (isFirstActivation) {
+    void sendClubhouseWelcome(membership.userId).catch((err) =>
+      console.error('[mark-paid] clubhouse welcome failed:', err),
+    )
+  }
 
   void (async () => {
     try {

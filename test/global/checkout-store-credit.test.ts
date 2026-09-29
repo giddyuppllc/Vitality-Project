@@ -21,7 +21,7 @@ describe('.global checkout still applies store credit', () => {
       update: { monthlyCreditCents: 100_000 },
       create: { tier: 'CLUB', monthlyCreditCents: 100_000 },
     })
-    await runMemberRewards({ now: new Date('2031-01-15T00:00:00Z') })
+    await runMemberRewards({ now: new Date('2031-01-01T00:00:00Z') })
     await prisma.vipTierReward.update({ where: { tier: 'CLUB' }, data: { monthlyCreditCents: 0 } })
     expect((await prisma.storeCredit.findUniqueOrThrow({ where: { userId: member.id } })).balance).toBe(100_000)
 
