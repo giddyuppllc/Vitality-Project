@@ -39,7 +39,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
               {member.joinedAt && (
                 <span>
                   Member since{' '}
-                  {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
                 </span>
               )}
             </div>

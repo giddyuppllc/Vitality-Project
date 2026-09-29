@@ -12,16 +12,22 @@ import sharp from 'sharp'
  * when .withMetadata() is asked for, which it never is here.
  *
  * Unlike admin uploads these are PRIVATE: written outside public/, served
- * only through the members-only /api/vip/media/… route. Directory is
- * VIP_MEDIA_DIR, default <cwd>/private-uploads/vip (docker volume — see
- * docs/VIP_CLUBHOUSE.md).
+ * only through the members-only /api/vip/media/… route. Directory:
+ * <cwd>/private-uploads/vip (a docker volume — see docs/VIP_CLUBHOUSE.md).
  */
 
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 const MAX_DIMENSION = 1600
 
-export function mediaRoot(): string {
-  return process.env.VIP_MEDIA_DIR || path.join(process.cwd(), 'private-uploads', 'vip')
+/**
+ * <cwd>/private-uploads/vip/<YYYY-MM>/<file>. Statically scoped (same shape as
+ * api/admin/upload's public/uploads path) so the build's file tracing stays
+ * scoped. Callers pass only regex-validated segments — no '/' or '..'.
+ */
+function mediaPath(bucket: string, file?: string): string {
+  return file
+    ? path.join(process.cwd(), 'private-uploads', 'vip', bucket, file)
+    : path.join(process.cwd(), 'private-uploads', 'vip', bucket)
 }
 
 /** Public-facing (members-only) URL shape. Anything else is rejected as an image URL. */
@@ -50,9 +56,8 @@ export async function saveMemberImage(
   const now = new Date()
   const bucket = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
   const name = `${randomUUID()}.jpg`
-  const dir = path.join(mediaRoot(), bucket)
-  await mkdir(dir, { recursive: true })
-  await writeFile(path.join(dir, name), processed)
+  await mkdir(mediaPath(bucket), { recursive: true })
+  await writeFile(mediaPath(bucket, name), processed)
   return { ok: true, url: `/api/vip/media/${bucket}/${name}` }
 }
 
@@ -61,11 +66,8 @@ export async function readMemberImage(segments: string[]): Promise<Buffer | null
   if (segments.length !== 2) return null
   const [bucket, file] = segments
   if (!/^\d{4}-\d{2}$/.test(bucket) || !/^[0-9a-f-]{36}\.jpg$/.test(file)) return null
-  const root = path.resolve(mediaRoot())
-  const full = path.resolve(root, bucket, file)
-  if (!full.startsWith(root + path.sep)) return null
   try {
-    return await readFile(full)
+    return await readFile(mediaPath(bucket, file))
   } catch {
     return null
   }

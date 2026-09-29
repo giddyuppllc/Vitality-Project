@@ -3,17 +3,18 @@ import { requireVipPage } from '@/lib/vip/page-gate'
 import { listUpcomingEvents } from '@/lib/vip/classroom'
 import { EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
 import { RsvpButton } from '@/components/vip/rsvp-button'
+import { LocalTime } from '@/components/vip/local-time'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Events' }
 
+// Date badge in UTC (deterministic on the server); the full time line is
+// shown in the member's own time zone by <LocalTime>.
 function fmt(iso: string) {
   const d = new Date(iso)
   return {
-    day: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }),
-    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-    date: d.getDate(),
+    month: d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase(),
+    date: d.getUTCDate(),
   }
 }
 
@@ -40,9 +41,7 @@ export default async function EventsPage() {
                   <h2 className="font-semibold">{e.title}</h2>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-white/55">
                     <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                    <time dateTime={e.startsAt}>
-                      {f.day} · {f.time}
-                    </time>
+                    <LocalTime iso={e.startsAt} />
                   </p>
                   {e.description && <p className="mt-2 whitespace-pre-line text-sm text-white/70">{e.description}</p>}
                   <div className="mt-3 flex flex-wrap items-center gap-2">

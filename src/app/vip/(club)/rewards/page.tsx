@@ -26,7 +26,7 @@ export default async function RewardsPage() {
           <div>
             <p id="bal" className="text-sm text-white/55">Store credit balance</p>
             <p className="mt-1 text-4xl font-bold tracking-tight">{formatPrice(r.balanceCents)}</p>
-            <p className="mt-2 text-sm text-white/55">Applied at checkout on vitalityproject.global.</p>
+            <p className="mt-2 text-sm text-white/55">Store credit at vitalityproject.global.</p>
           </div>
           <a
             href={GLOBAL_LINKS.shop()}
@@ -70,7 +70,7 @@ export default async function RewardsPage() {
             <li key={t.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
               <div className="min-w-0">
                 <p className="truncate text-white/85">{t.description}</p>
-                <p className="text-xs text-white/45">{new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                <p className="text-xs text-white/45">{new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</p>
               </div>
               <span className={t.amountCents >= 0 ? 'font-semibold text-emerald-300' : 'font-semibold text-white/70'}>
                 {t.amountCents >= 0 ? '+' : '−'}

@@ -20,27 +20,22 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
   const result = await consumeSsoToken(token)
 
-  const to = (path: string) => {
-    const url = req.nextUrl.clone()
-    url.pathname = path
-    url.search = ''
-    return url
-  }
+  // Relative Location on purpose: the browser resolves it against the host it
+  // actually requested (vitalityproject.vip), whatever Host the app server
+  // believes it is — so the session cookie and the next page stay on .vip.
+  const redirectTo = (pathWithQuery: string) =>
+    new NextResponse(null, {
+      status: 307,
+      headers: { Location: pathWithQuery, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
+    })
 
   if (!result.ok) {
     await logAudit({ action: 'vip.sso.rejected', metadata: { reason: result.reason } })
-    const url = to('/signin')
-    url.searchParams.set('error', result.reason === 'replayed' ? 'sso_used' : 'sso_invalid')
-    const res = NextResponse.redirect(url)
-    res.headers.set('Cache-Control', 'no-store')
-    res.headers.set('Referrer-Policy', 'no-referrer')
-    return res
+    return redirectTo(`/signin?error=${result.reason === 'replayed' ? 'sso_used' : 'sso_invalid'}`)
   }
 
-  const res = NextResponse.redirect(to(safeCallbackPath(req.nextUrl.searchParams.get('callbackUrl'))))
+  const res = redirectTo(safeCallbackPath(req.nextUrl.searchParams.get('callbackUrl')))
   await setSessionCookie(res, result.user)
-  res.headers.set('Cache-Control', 'no-store')
-  res.headers.set('Referrer-Policy', 'no-referrer')
   await logAudit({
     userId: result.user.id,
     userEmail: result.user.email,

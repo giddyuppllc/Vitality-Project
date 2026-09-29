@@ -26,7 +26,9 @@ describe('SSO consume (/api/sso)', () => {
     const user = await makeUser({ tag: 'sso-ok', tier: 'PLUS' })
     const res = await consume(mintSsoToken({ sub: user.id, email: user.email }))
     expect(res.status).toBe(307)
-    expect(new URL(res.headers.get('location')!).pathname).toBe('/feed')
+    expect(new URL(res.headers.get('location')!, 'http://vip.test').pathname).toBe('/feed')
+    // relative Location: stays on whatever host the member is on (.vip)
+    expect(res.headers.get('location')).toBe('/feed')
     const cookie = sessionCookie(res)
     expect(cookie).toBeTruthy()
     const decoded = await decode({ token: cookie!, secret: process.env.NEXTAUTH_SECRET! })
@@ -44,7 +46,7 @@ describe('SSO consume (/api/sso)', () => {
     expect(sessionCookie(first)).toBeTruthy()
     const second = await consume(token)
     expect(sessionCookie(second)).toBeNull()
-    const loc = new URL(second.headers.get('location')!)
+    const loc = new URL(second.headers.get('location')!, 'http://vip.test')
     expect(loc.pathname).toBe('/signin')
     expect(loc.searchParams.get('error')).toBe('sso_used')
   })
@@ -58,7 +60,7 @@ describe('SSO consume (/api/sso)', () => {
     )
     const res = await consume(token)
     expect(sessionCookie(res)).toBeNull()
-    expect(new URL(res.headers.get('location')!).searchParams.get('error')).toBe('sso_invalid')
+    expect(new URL(res.headers.get('location')!, 'http://vip.test').searchParams.get('error')).toBe('sso_invalid')
     // an expired token never reaches the replay table
     expect(await prisma.vipSsoConsumedToken.count({ where: { userId: user.id } })).toBe(0)
   })
@@ -73,7 +75,7 @@ describe('SSO consume (/api/sso)', () => {
     })
     const res = await consume(forged)
     expect(sessionCookie(res)).toBeNull()
-    expect(new URL(res.headers.get('location')!).searchParams.get('error')).toBe('sso_invalid')
+    expect(new URL(res.headers.get('location')!, 'http://vip.test').searchParams.get('error')).toBe('sso_invalid')
   })
 
   it('tampered payload, wrong issuer, alg=none, missing token → rejected', async () => {

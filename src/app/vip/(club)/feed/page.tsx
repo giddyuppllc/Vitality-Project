@@ -40,7 +40,7 @@ export default async function FeedPage({
       </form>
 
       {spaces.length > 0 && !q && (
-        <nav className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Spaces">
+        <nav className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" aria-label="Spaces">
           {[{ slug: '', name: 'All' }, ...spaces].map((s) => {
             const on = (s.slug || null) === (space || null)
             return (
