@@ -42,6 +42,17 @@ model User {
   refundsCreated Refund[]    @relation("RefundCreatedBy")
   wishlistItems WishlistItem[]
 
+  // VIP clubhouse (vitalityproject.vip) — relation fields only, no columns.
+  vipProfile       VipProfile?
+  vipPosts         VipPost[]
+  vipComments      VipComment[]
+  vipReports       VipReport[]       @relation("VipReportReporter")
+  vipNotifications VipNotification[] @relation("VipNotificationRecipient")
+  vipRewardGrants  VipRewardGrant[]
+  vipReactions     VipReaction[]
+  vipLessonProgress VipLessonProgress[]
+  vipEventRsvps    VipEventRsvp[]
+
   verifyToken      String?   @unique
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
@@ -891,6 +902,7 @@ enum CreditTxType {
   LOYALTY_REDEEM
   CHECKOUT_APPLY  // used at checkout
   EXPIRE
+  MEMBER_REWARD   // monthly VIP clubhouse tier reward (api/cron/vip-member-rewards)
 }
 
 // ─── Product Reviews (ENABLED via existing Review model) ────────────────────
@@ -1442,4 +1454,290 @@ model Post {
 
   @@index([published, publishedAt])
   @@map("posts")
+}
+
+// ─── VIP Clubhouse (vitalityproject.vip) ────────────────────────────────────
+// Members' community, classroom, events and tier rewards. Served by this same
+// app on the .vip host (src/proxy.ts rewrites into src/app/vip). One database,
+// one User table: membership status comes from `Membership`, never duplicated.
+// Hand-written SQL twin: prisma/migrations-manual/001_vip_clubhouse.sql.
+
+// Per-member community profile + community-only suspension (independent of
+// the paid membership status).
+model VipProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  displayName     String?
+  bio             String?   @db.Text
+  avatarUrl       String?
+  suspendedAt     DateTime?
+  suspendedReason String?
+  suspendedById   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vip_profiles")
+}
+
+// Admin-managed categories ("spaces") posts are filed under.
+model VipSpace {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?   @db.Text
+  sortOrder   Int       @default(0)
+  // Only admins may start posts here (announcement-style space).
+  adminOnly   Boolean   @default(false)
+  archived    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  posts       VipPost[]
+
+  @@map("vip_spaces")
+}
+
+model VipPost {
+  id             String        @id @default(cuid())
+  authorId       String
+  spaceId        String?
+  body           String        @db.Text
+  imageUrl       String?
+  pinned         Boolean       @default(false)
+  isAnnouncement Boolean       @default(false)
+  hiddenAt       DateTime?
+  hiddenById     String?
+  hiddenReason   String?
+  editedAt       DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  author         User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  space          VipSpace?     @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  comments       VipComment[]
+  reactions      VipReaction[]
+  reports        VipReport[]
+
+  @@index([createdAt])
+  @@index([spaceId, createdAt])
+  @@index([authorId])
+  @@map("vip_posts")
+}
+
+// Comments thread ONE level deep: a reply's parentId points at a top-level
+// comment, never at another reply (enforced in the API).
+model VipComment {
+  id         String        @id @default(cuid())
+  postId     String
+  authorId   String
+  parentId   String?
+  body       String        @db.Text
+  hiddenAt   DateTime?
+  hiddenById String?
+  editedAt   DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  post       VipPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent     VipComment?   @relation("VipCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    VipComment[]  @relation("VipCommentReplies")
+  reactions  VipReaction[]
+  reports    VipReport[]
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@map("vip_comments")
+}
+
+// A like on a post OR a comment (exactly one of postId/commentId is set).
+model VipReaction {
+  id        String      @id @default(cuid())
+  userId    String
+  postId    String?
+  commentId String?
+  kind      String      @default("LIKE")
+  createdAt DateTime    @default(now())
+  post      VipPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   VipComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, kind])
+  @@unique([userId, commentId, kind])
+  @@index([postId])
+  @@index([commentId])
+  @@map("vip_reactions")
+}
+
+model VipReport {
+  id           String      @id @default(cuid())
+  reporterId   String
+  postId       String?
+  commentId    String?
+  reason       String      @db.Text
+  // OPEN | RESOLVED | DISMISSED
+  status       String      @default("OPEN")
+  resolvedById String?
+  resolvedAt   DateTime?
+  resolution   String?
+  createdAt    DateTime    @default(now())
+  reporter     User        @relation("VipReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  post         VipPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment      VipComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, postId])
+  @@unique([reporterId, commentId])
+  @@index([status, createdAt])
+  @@map("vip_reports")
+}
+
+// In-app only (no email/SMS). type: REPLY | COMMENT | MENTION
+model VipNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  actorId   String?
+  postId    String?
+  commentId String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation("VipNotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("vip_notifications")
+}
+
+// ─── Classroom ──────────────────────────────────────────────────────────────
+// Ships EMPTY. Content is entered by admins in /admin/vip/courses.
+model VipCourse {
+  id         String         @id @default(cuid())
+  slug       String         @unique
+  title      String
+  summary    String?        @db.Text
+  coverImage String?
+  // Lowest membership tier that can open this course.
+  minTier    MembershipTier @default(CLUB)
+  published  Boolean        @default(false)
+  sortOrder  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  modules    VipModule[]
+
+  @@map("vip_courses")
+}
+
+model VipModule {
+  id        String      @id @default(cuid())
+  courseId  String
+  title     String
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  course    VipCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons   VipLesson[]
+
+  @@index([courseId, sortOrder])
+  @@map("vip_modules")
+}
+
+model VipLesson {
+  id        String              @id @default(cuid())
+  moduleId  String
+  title     String
+  // Lightweight markdown (headings, bold/italic, links, lists), rendered escaped.
+  body      String              @default("") @db.Text
+  videoUrl  String?
+  // Optional per-lesson override; null = inherit the course minTier.
+  minTier   MembershipTier?
+  published Boolean             @default(false)
+  sortOrder Int                 @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  module    VipModule           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress  VipLessonProgress[]
+
+  @@index([moduleId, sortOrder])
+  @@map("vip_lessons")
+}
+
+model VipLessonProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  completedAt DateTime  @default(now())
+  lesson      VipLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("vip_lesson_progress")
+}
+
+// ─── Events / live Q&A ──────────────────────────────────────────────────────
+model VipEvent {
+  id          String         @id @default(cuid())
+  title       String
+  description String?        @db.Text
+  startsAt    DateTime
+  endsAt      DateTime?
+  // Join link (video call etc.) — shown to eligible members only.
+  joinUrl     String?
+  minTier     MembershipTier @default(CLUB)
+  published   Boolean        @default(false)
+  cancelledAt DateTime?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  rsvps       VipEventRsvp[]
+
+  @@index([startsAt])
+  @@map("vip_events")
+}
+
+model VipEventRsvp {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+  event     VipEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("vip_event_rsvps")
+}
+
+// ─── Rewards (spent at vitalityproject.global checkout) ─────────────────────
+// Admin-set monthly store-credit grant per tier. No row / 0 = OFF.
+model VipTierReward {
+  tier               MembershipTier @id
+  monthlyCreditCents Int            @default(0)
+  updatedById        String?
+  updatedAt          DateTime       @updatedAt
+
+  @@map("vip_tier_rewards")
+}
+
+// One row per member per month — the unique key IS the idempotency guard for
+// api/cron/vip-member-rewards (a second run for the same period is a no-op).
+model VipRewardGrant {
+  id               String         @id @default(cuid())
+  userId           String
+  period           String // "YYYY-MM" (UTC)
+  tier             MembershipTier
+  amountCents      Int
+  storeCreditTxnId String?
+  createdAt        DateTime       @default(now())
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period])
+  @@index([period])
+  @@map("vip_reward_grants")
+}
+
+// Single-use guard for the .global → .vip SSO hand-off token (jti).
+model VipSsoConsumedToken {
+  jti        String   @id
+  userId     String
+  expiresAt  DateTime
+  consumedAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("vip_sso_consumed_tokens")
 }

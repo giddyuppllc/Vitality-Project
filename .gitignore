@@ -36,3 +36,7 @@ redis-data/
 
 # Generated docs from scripts/generate-supplier-order.ts
 scripts/out/
+
+# VIP clubhouse: local throwaway DB + private member uploads (never commit)
+.vip-dev-db/
+private-uploads/
