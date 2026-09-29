@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
+import { headers } from 'next/headers'
 import { Inter } from 'next/font/google'
-import '../globals.css'
+import './globals.css'
 import { Providers } from './providers'
 import { VitalityVeins } from '@/components/vitality-veins'
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 import { ExitIntentModal } from '@/components/store/exit-intent-modal'
+import { SITE_HEADER } from '@/lib/vip/host'
 
 // Marketing pixels — env-gated. Set the IDs in production to enable; dev
 // stays clean. Public-prefixed because they need to land in the bundle.
@@ -55,7 +57,20 @@ export const viewport: Viewport = {
   themeColor: '#141828',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // vitalityproject.vip (src/proxy.ts sets this request header on the
+  // clubhouse host only, and strips it everywhere else): a bare document —
+  // none of the store's pixels, JSON-LD, newsletter modal, background canvas
+  // or service worker are rendered, serialised or loaded. Every other host
+  // renders exactly the markup below, unchanged.
+  if ((await headers()).get(SITE_HEADER) === 'vip') {
+    return (
+      <html lang="en" className="dark">
+        <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
+      </html>
+    )
+  }
+
   const orgJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Organization',

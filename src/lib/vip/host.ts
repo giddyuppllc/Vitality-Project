@@ -16,6 +16,10 @@ export const VIP_PREFIX = '/vip'
 export const DEV_SITE_COOKIE = 'vp_dev_site'
 export const DEV_HOST_PARAM = '__host'
 
+/** Request header src/proxy.ts sets to 'vip' on clubhouse requests (and strips
+ *  from every other request, so a client cannot spoof it). Read by the root layout. */
+export const SITE_HEADER = 'x-vp-site'
+
 export type Site = 'vip' | 'global'
 
 /** Configured .vip host(s). VIP_HOST may be a comma-separated list. */

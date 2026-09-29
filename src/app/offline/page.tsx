@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { WifiOff } from 'lucide-react'
 import type { Metadata } from 'next'
 
+// Stays prerendered (see src/app/auth/layout.tsx for why).
+export const dynamic = 'force-static'
+
 export const metadata: Metadata = {
   title: 'Offline',
   description: 'You are currently offline.',

@@ -3,11 +3,6 @@ import path from 'path'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Two root layouts ((global) store + vip clubhouse) → unmatched URLs are
-  // rendered by src/app/global-not-found.tsx (the store's 404, unchanged).
-  experimental: {
-    globalNotFound: true,
-  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },

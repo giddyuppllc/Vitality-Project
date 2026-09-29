@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { NextRequest } from 'next/server'
 import { proxy } from '@/proxy'
@@ -21,9 +21,9 @@ const rewriteTarget = (res: Response) => {
 
 // Every top-level route segment of the existing .global app, read from disk
 // so a new store route is covered automatically.
-const appDir = path.resolve(__dirname, '../../src/app/(global)')
+const appDir = path.resolve(__dirname, '../../src/app')
 const globalTopLevel = readdirSync(appDir, { withFileTypes: true })
-  .filter((d) => d.isDirectory())
+  .filter((d) => d.isDirectory() && d.name !== 'vip')
   .map((d) => d.name)
 // plus the store's own top-level pages inside the (store) group
 const storeTopLevel = readdirSync(path.join(appDir, '(store)'), { withFileTypes: true })
@@ -34,7 +34,7 @@ describe('host routing — .global is untouched', () => {
   const hosts = ['vitalityproject.global', 'www.vitalityproject.global', 'localhost:3000', 'some-tenant.vitalityproject.global']
 
   it('found the existing store route segments', () => {
-    expect(globalTopLevel).toEqual(expect.arrayContaining(['(store)', 'admin', 'auth', 'clubhouse', 'kiosk']))
+    expect(globalTopLevel).toEqual(expect.arrayContaining(['(store)', 'admin', 'api', 'auth', 'clubhouse']))
     expect(storeTopLevel).toEqual(expect.arrayContaining(['shop', 'products', 'membership', 'account', 'checkout']))
   })
 
@@ -55,6 +55,8 @@ describe('host routing — .global is untouched', () => {
         expect(isPassthrough(res), `${host}${p}`).toBe(true)
         expect(res.headers.get('x-robots-tag'), `${host}${p}`).toBeNull()
         expect(res.headers.get('set-cookie'), `${host}${p}`).toBeNull()
+        // request headers untouched (no x-middleware-request-* overrides)
+        expect(res.headers.get('x-middleware-override-headers'), `${host}${p}`).toBeNull()
       }
     })
   }
@@ -84,6 +86,20 @@ describe('host routing — .vip serves the clubhouse', () => {
     })
   }
 
+  it('flags clubhouse requests for the root layout, and strips a spoofed flag on .global', () => {
+    for (const p of ['/', '/feed', '/api/vip/posts', '/does-not-exist']) {
+      expect(call('vitalityproject.vip', p).headers.get('x-middleware-request-x-vp-site'), p).toBe('vip')
+    }
+    const spoofed = proxy(
+      new NextRequest(new URL('/', 'http://vitalityproject.global'), {
+        headers: { host: 'vitalityproject.global', 'x-vp-site': 'vip' },
+      }),
+    )
+    expect(spoofed.headers.get('x-middleware-override-headers') ?? '').not.toContain('x-vp-site=')
+    expect(spoofed.headers.get('x-middleware-request-x-vp-site')).toBeNull()
+    expect(spoofed.headers.get('x-middleware-override-headers')).not.toBeNull() // header list rewritten without it
+  })
+
   it('sends noindex on every clubhouse response', () => {
     for (const p of ['/', '/feed', '/api/vip/posts', '/api/sso', '/robots.txt', '/logo.png', '/_next/data/x.json']) {
       expect(call('vitalityproject.vip', p).headers.get('x-robots-tag'), p).toContain('noindex')
@@ -110,21 +126,7 @@ describe('host routing — .vip serves the clubhouse', () => {
     const robots = vipMetadata.robots as { index: boolean; follow: boolean }
     expect(robots.index).toBe(false)
     expect(robots.follow).toBe(false)
-    expect(vipMetadata.manifest).toBeFalsy()
-  })
-
-  it('the clubhouse is its own root layout — none of the store document pieces are above it', () => {
-    const app = path.resolve(__dirname, '../../src/app')
-    // no shared root layout: (global) and vip are separate roots
-    expect(existsSync(path.join(app, 'layout.tsx'))).toBe(false)
-    expect(existsSync(path.join(app, '(global)', 'layout.tsx'))).toBe(true)
-    // code only (comments stripped) — the layout's doc comment names these on purpose
-    const vipLayout = readFileSync(path.join(app, 'vip', 'layout.tsx'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '')
-    for (const storeOnly of ['ExitIntentModal', 'ServiceWorkerRegistration', 'ld+json', 'fbevents', 'googletagmanager', 'tiktok', 'manifest', '(global)', 'VitalityVeins']) {
-      expect(vipLayout.includes(storeOnly), storeOnly).toBe(false)
-    }
+    expect(vipMetadata.manifest).toBeNull()
   })
 })
 
