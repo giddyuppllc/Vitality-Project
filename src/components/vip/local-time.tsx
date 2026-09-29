@@ -19,3 +19,19 @@ export function LocalTime({ iso }: { iso: string }) {
   )
   return <time dateTime={iso}>{text}</time>
 }
+
+/** Month + day badge in the viewer's time zone (matches <LocalTime>). */
+export function LocalDateBadge({ iso }: { iso: string }) {
+  const d = new Date(iso)
+  const [month, day] = useSyncExternalStore(
+    subscribe,
+    () => `${d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}|${d.getDate()}`,
+    () => `${d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase()}|${d.getUTCDate()}`,
+  ).split('|')
+  return (
+    <>
+      <span className="text-[10px] font-bold tracking-wider text-brand-300">{month}</span>
+      <span className="text-xl font-bold">{day}</span>
+    </>
+  )
+}

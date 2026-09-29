@@ -3,22 +3,12 @@ import { requireVipPage } from '@/lib/vip/page-gate'
 import { listUpcomingEvents } from '@/lib/vip/classroom'
 import { EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
 import { RsvpButton } from '@/components/vip/rsvp-button'
-import { LocalTime } from '@/components/vip/local-time'
+import { LocalDateBadge, LocalTime } from '@/components/vip/local-time'
 import { VIP_COPY } from '@/lib/vip/copy'
 import { Repeat } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Events' }
-
-// Date badge in UTC (deterministic on the server); the full time line is
-// shown in the member's own time zone by <LocalTime>.
-function fmt(iso: string) {
-  const d = new Date(iso)
-  return {
-    month: d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase(),
-    date: d.getUTCDate(),
-  }
-}
 
 export default async function EventsPage() {
   const viewer = await requireVipPage('member')
@@ -32,12 +22,10 @@ export default async function EventsPage() {
       ) : (
         <ul className="space-y-3">
           {events.map((e) => {
-            const f = fmt(e.startsAt)
             return (
               <li key={e.id} className="vip-surface flex gap-4 p-4 sm:p-5">
                 <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-center leading-none" aria-hidden="true">
-                  <span className="text-[10px] font-bold tracking-wider text-brand-300">{f.month}</span>
-                  <span className="text-xl font-bold">{f.date}</span>
+                  <LocalDateBadge iso={e.startsAt} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

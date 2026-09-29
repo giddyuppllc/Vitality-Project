@@ -83,7 +83,7 @@ export function ProfileForm({
         </label>
         <label className="block text-sm font-medium text-white/80">
           Bio
-          <textarea className={`${field} py-2.5`} value={bio} maxLength={600} rows={4} onChange={(e) => setBio(e.target.value)} />
+          <textarea className={`${field} py-2.5`} value={bio} maxLength={600} rows={5} onChange={(e) => setBio(e.target.value)} />
         </label>
       </fieldset>
       {msg && (
