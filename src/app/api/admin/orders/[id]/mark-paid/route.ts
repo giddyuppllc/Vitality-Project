@@ -9,6 +9,7 @@ import { routeOrderToFacilities } from '@/lib/fulfillment'
 import { awardPointsForOrder } from '@/lib/loyalty'
 import { createAdminNotification } from '@/lib/notifications'
 import { decrementStock } from '@/lib/inventory'
+import { outstandingOrderCredit } from '@/lib/order-credit'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
 const LOW_STOCK_THRESHOLD = 5
@@ -161,6 +162,21 @@ export async function POST(
       alreadyPaid: true,
       orderId: order.id,
     })
+  }
+
+  // A cancelled/expired Zelle order has already given its store credit back.
+  // Marking it paid would ship it with that credit spent twice — refuse and
+  // point the admin at re-placing the order instead.
+  if (order.status === 'CANCELLED') {
+    const credit = await outstandingOrderCredit(order.id)
+    if (credit.restored > 0) {
+      return NextResponse.json(
+        {
+          error: `This order was cancelled and its $${(credit.restored / 100).toFixed(2)} store credit was returned to the customer. Place a new order for them instead of marking this one paid.`,
+        },
+        { status: 409 },
+      )
+    }
   }
 
   const updated = await prisma.order.update({

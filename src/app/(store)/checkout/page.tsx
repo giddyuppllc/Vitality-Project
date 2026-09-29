@@ -107,6 +107,25 @@ export default function CheckoutPage() {
     }
   }, [session?.user?.id])
 
+  // Store credit (monthly member rewards, refunds, grants) — spent on the
+  // Zelle order by default; the server re-checks the balance atomically.
+  const [creditBalance, setCreditBalance] = useState<number>(0)
+  const [useCredit, setUseCredit] = useState<boolean>(true)
+  useEffect(() => {
+    if (!session?.user?.id) return
+    let cancelled = false
+    fetch('/api/account/credits')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return
+        setCreditBalance(data.storeCredit?.balance ?? 0)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.id])
+
   useEffect(() => {
     if (session?.user?.name && !name) setName(session.user.name)
   }, [session?.user?.name, name])
@@ -132,6 +151,12 @@ export default function CheckoutPage() {
       }
     : null
   const finalTotal = cart?.total ?? 0
+  // Estimated credit applied before shipping/tax; the server applies it to
+  // the full amount (shipping + tax included) when the order is placed.
+  const creditEstimate =
+    useCredit && creditBalance > 0
+      ? Math.min(creditBalance, Math.max(0, finalTotal - pointsToRedeem))
+      : 0
 
   // Sign-in gate
   if (sessionStatus === 'loading') {
@@ -196,6 +221,7 @@ export default function CheckoutPage() {
           },
           discountCode: discountCode || undefined,
           loyaltyPointsToRedeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
+          useStoreCredit: creditBalance > 0 ? useCredit : false,
         }),
       })
 
@@ -389,6 +415,31 @@ export default function CheckoutPage() {
             </div>
           )}
 
+          {/* Store credit — only visible when the customer has some. */}
+          {creditBalance > 0 && (
+            <div className="glass rounded-2xl p-6 space-y-3" data-testid="store-credit-card">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-semibold">Store credit</h2>
+                <span className="text-sm text-white/50">
+                  Balance: <span className="text-white">{formatPrice(creditBalance)}</span>
+                </span>
+              </div>
+              <label className="flex items-start gap-3 text-sm text-white/70 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCredit}
+                  onChange={(e) => setUseCredit(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-emerald-500"
+                />
+                <span>
+                  Apply my store credit to this order. It comes off the amount you send by
+                  Zelle — shipping and tax included — and returns to your balance if the order
+                  is cancelled.
+                </span>
+              </label>
+            </div>
+          )}
+
           {/* Payment notice */}
           <div className="glass rounded-2xl p-6 space-y-3">
             <h2 className="text-lg font-semibold">Payment</h2>
@@ -424,7 +475,7 @@ export default function CheckoutPage() {
             ) : (
               <>
                 <Lock className="w-5 h-5" />
-                Place Zelle order — {formatPrice(finalTotal)}+
+                Place Zelle order — {formatPrice(Math.max(0, finalTotal - creditEstimate))}+
               </>
             )}
           </Button>
@@ -522,6 +573,18 @@ export default function CheckoutPage() {
                 />
               )}
 
+              {/* Store credit applied */}
+              {creditEstimate > 0 && (
+                <Row
+                  label={<span className="text-emerald-300">Store credit</span>}
+                  value={
+                    <span className="text-emerald-300 tabular-nums" data-testid="summary-store-credit">
+                      −{formatPrice(creditEstimate)}
+                    </span>
+                  }
+                />
+              )}
+
               <Row label="Shipping" value="Calculated next" muted />
               <Row label="Tax" value="Calculated next" muted />
             </div>
@@ -532,7 +595,7 @@ export default function CheckoutPage() {
               label={<span className="font-semibold">Estimated total</span>}
               value={
                 <span className="font-semibold tabular-nums">
-                  {formatPrice(Math.max(0, finalTotal - pointsToRedeem))}+
+                  {formatPrice(Math.max(0, finalTotal - pointsToRedeem - creditEstimate))}+
                 </span>
               }
             />

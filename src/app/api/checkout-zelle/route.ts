@@ -16,6 +16,11 @@ import { calculateTaxAsync } from '@/lib/tax'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { computeCartTotal } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
+import {
+  InsufficientCreditError,
+  plannedCreditUse,
+  spendCreditForOrder,
+} from '@/lib/order-credit'
 import { z } from 'zod'
 
 // Shared system user that owns guest shipping-address rows (Address.userId is a
@@ -58,6 +63,10 @@ const zelleCheckoutSchema = z.object({
   // Optional loyalty redemption — points to spend on this order. Server
   // validates against the user's current balance before applying.
   loyaltyPointsToRedeem: z.number().int().min(0).optional(),
+  // Spend available store credit (monthly clubhouse rewards, refunds, grants)
+  // against this order. On by default for signed-in customers; the checkout
+  // shows a toggle. Guests and tenant/B2B orders never spend credit.
+  useStoreCredit: z.boolean().optional().default(true),
 })
 
 async function getZelleConfig(): Promise<{
@@ -296,10 +305,18 @@ export async function POST(req: NextRequest) {
       data.shippingAddress.state,
       { organizationId },
     )
-    const total = Math.max(
+    const preCreditTotal = Math.max(
       0,
       subtotal - discount - loyaltyDiscount + shippingCost + taxAmount,
     )
+    // Store credit covers the order after discounts, shipping and tax — the
+    // same base the card checkout uses. It is debited atomically with the
+    // order row below (lib/order-credit.ts); Zelle is due on the remainder.
+    const creditToUse =
+      userId && data.useStoreCredit && !locationId
+        ? await plannedCreditUse(userId, preCreditTotal)
+        : 0
+    const total = preCreditTotal - creditToUse
 
     // Free BAC + syringes — auto-added as $0 line items on EVERY order for
     // active Plus/Premium members (no per-cycle limit; members only).
@@ -389,7 +406,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const order = await prisma.order.create({
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
       data: {
         orderNumber,
         userId,
@@ -411,8 +429,19 @@ export async function POST(req: NextRequest) {
         affiliateId: resolvedAffiliateId,
         affiliateCode: resolvedAffiliateCode,
         loyaltyPointsUsed: loyaltyPointsToUse,
+        storeCreditUsed: creditToUse,
         items: { create: orderItems },
       },
+      })
+      if (creditToUse > 0 && userId) {
+        await spendCreditForOrder(tx, {
+          userId,
+          orderId: created.id,
+          orderNumber: created.orderNumber,
+          amountCents: creditToUse,
+        })
+      }
+      return created
     })
 
     // Mark this visitor's referral click(s) as converted so the affiliate's
@@ -521,6 +550,7 @@ export async function POST(req: NextRequest) {
             zelleEmail: zelleConfig.email,
             zelleDisplayName: zelleConfig.displayName,
             zellePhone: zelleConfig.phone,
+            storeCreditUsed: creditToUse,
           })
           await sendEmail({
             to: data.email,
@@ -575,6 +605,7 @@ export async function POST(req: NextRequest) {
       total: order.total,
       shipping: shippingCost,
       tax: taxAmount,
+      storeCreditUsed: creditToUse,
       zelleEmail: zelleConfig.email,
       paymentMethod: 'zelle',
       paymentStatus: 'UNPAID',
@@ -596,6 +627,9 @@ export async function POST(req: NextRequest) {
         { error: error.issues[0].message },
         { status: 400 },
       )
+    }
+    if (error instanceof InsufficientCreditError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Checkout failed' },

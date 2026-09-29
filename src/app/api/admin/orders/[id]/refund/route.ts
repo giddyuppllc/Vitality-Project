@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { grantStoreCredit, processRefund } from '@/lib/store-credit'
+import { restoreOrderCredit } from '@/lib/order-credit'
 import { sendEmail } from '@/lib/email'
 import { orderRefunded } from '@/lib/email-templates'
 import { z } from 'zod'
@@ -172,6 +173,14 @@ export async function POST(
           : `[Refund ${amount / 100} via ${refundMethod}] ${reason}`,
       },
     })
+
+    // Fully refunded Zelle order → the store credit it spent comes back too
+    // (idempotent; card orders untouched — lib/order-credit.ts).
+    if (fullyRefunded) {
+      await restoreOrderCredit(order.id, 'refunded').catch((err) =>
+        console.error('[refund] store-credit restore failed:', err),
+      )
+    }
 
     // Audit
     await prisma.auditLog.create({

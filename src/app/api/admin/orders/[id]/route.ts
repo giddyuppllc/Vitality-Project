@@ -12,6 +12,7 @@ import { logAudit } from '@/lib/audit'
 import { createAdminNotification } from '@/lib/notifications'
 import { z } from 'zod'
 import { decrementStock } from '@/lib/inventory'
+import { restoreOrderCredit } from '@/lib/order-credit'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -128,6 +129,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const updated = await prisma.order.update({ where: { id: id }, data })
+
+    // A cancelled/refunded Zelle order gives back the store credit it spent
+    // (exactly once — lib/order-credit.ts). Card orders are untouched.
+    if (
+      (data.status === 'CANCELLED' && prev.status !== 'CANCELLED') ||
+      (data.status === 'REFUNDED' && prev.status !== 'REFUNDED')
+    ) {
+      await restoreOrderCredit(id, data.status === 'CANCELLED' ? 'cancelled' : 'refunded').catch((err) =>
+        console.error('[admin/orders] store-credit restore failed:', err),
+      )
+    }
 
     // Detect status transitions that should trigger customer emails
     const customerName = prev.user?.name || 'there'

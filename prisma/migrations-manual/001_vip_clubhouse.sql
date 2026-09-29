@@ -1,6 +1,6 @@
 -- 001_vip_clubhouse.sql — vitalityproject.vip members' clubhouse
 --
--- ADDITIVE ONLY: one enum value + new vip_* tables, indexes and foreign keys.
+-- ADDITIVE ONLY: two enum values + new vip_* tables, indexes and foreign keys.
 -- No existing table or column is altered, no row is updated or deleted.
 -- Idempotent: every statement is guarded (IF NOT EXISTS / pg_constraint
 -- lookup), so running it twice is a no-op.
@@ -20,6 +20,7 @@
 -- same transaction that adds it; nothing below uses it).
 -- AlterEnum
 ALTER TYPE "CreditTxType" ADD VALUE IF NOT EXISTS 'MEMBER_REWARD';
+ALTER TYPE "CreditTxType" ADD VALUE IF NOT EXISTS 'CHECKOUT_RESTORE';
 
 BEGIN;
 
@@ -245,6 +246,23 @@ CREATE TABLE IF NOT EXISTS "vip_sso_consumed_tokens" (
 
     CONSTRAINT "vip_sso_consumed_tokens_pkey" PRIMARY KEY ("jti")
 );
+
+-- Clubhouse columns added 09-29 (email preferences, event reminders, monthly
+-- series). Written as ADD COLUMN IF NOT EXISTS on the new vip_* tables so a
+-- database that already ran an earlier copy of this file catches up too.
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "emailDigest" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "emailEvents" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "emailRewards" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "welcomeEmailAt" TIMESTAMP(3);
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "digestSentAt" TIMESTAMP(3);
+ALTER TABLE "vip_profiles" ADD COLUMN IF NOT EXISTS "onboardedAt" TIMESTAMP(3);
+ALTER TABLE "vip_events" ADD COLUMN IF NOT EXISTS "repeatMonthly" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "vip_events" ADD COLUMN IF NOT EXISTS "seriesId" TEXT;
+ALTER TABLE "vip_event_rsvps" ADD COLUMN IF NOT EXISTS "reminded24hAt" TIMESTAMP(3);
+ALTER TABLE "vip_event_rsvps" ADD COLUMN IF NOT EXISTS "reminded1hAt" TIMESTAMP(3);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "vip_events_seriesId_startsAt_idx" ON "vip_events"("seriesId", "startsAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "vip_profiles_userId_key" ON "vip_profiles"("userId");

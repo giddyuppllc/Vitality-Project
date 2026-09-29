@@ -903,6 +903,7 @@ enum CreditTxType {
   CHECKOUT_APPLY  // used at checkout
   EXPIRE
   MEMBER_REWARD   // monthly VIP clubhouse tier reward (api/cron/vip-member-rewards)
+  CHECKOUT_RESTORE // credit returned when a Zelle order that spent it is cancelled / expires / is refunded (lib/order-credit.ts)
 }
 
 // ─── Product Reviews (ENABLED via existing Review model) ────────────────────
@@ -1473,6 +1474,13 @@ model VipProfile {
   suspendedAt     DateTime?
   suspendedReason String?
   suspendedById   String?
+  // Clubhouse email preferences (per member; every clubhouse email links here).
+  emailDigest     Boolean   @default(true) // daily reply/mention digest
+  emailEvents     Boolean   @default(true) // 24h + 1h reminders for RSVP'd events
+  emailRewards    Boolean   @default(true) // "your monthly reward landed"
+  welcomeEmailAt  DateTime? // welcome-to-the-clubhouse sent (once)
+  digestSentAt    DateTime? // last digest sent
+  onboardedAt     DateTime? // "Start here" checklist dismissed
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1683,11 +1691,16 @@ model VipEvent {
   published   Boolean        @default(false)
   cancelledAt DateTime?
   createdById String?
+  // Monthly series: when the latest occurrence starts, the vip-notify cron
+  // publishes the next one (same weekday-of-month, same time).
+  repeatMonthly Boolean      @default(false)
+  seriesId    String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   rsvps       VipEventRsvp[]
 
   @@index([startsAt])
+  @@index([seriesId, startsAt])
   @@map("vip_events")
 }
 
@@ -1695,6 +1708,9 @@ model VipEventRsvp {
   id        String   @id @default(cuid())
   eventId   String
   userId    String
+  // Reminder e-mails already sent (each at most once).
+  reminded24hAt DateTime?
+  reminded1hAt  DateTime?
   createdAt DateTime @default(now())
   event     VipEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

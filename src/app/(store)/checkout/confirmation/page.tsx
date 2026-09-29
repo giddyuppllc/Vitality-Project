@@ -41,6 +41,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
         select: {
           orderNumber: true,
           total: true,
+          storeCreditUsed: true,
           paymentMethod: true,
           paymentStatus: true,
           items: { select: { quantity: true } },
@@ -52,6 +53,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
           select: {
             orderNumber: true,
             total: true,
+            storeCreditUsed: true,
             paymentMethod: true,
             paymentStatus: true,
             items: { select: { quantity: true } },
@@ -82,6 +84,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
         <ZellePendingView
           orderNumber={resolvedOrderNumber}
           totalCents={order?.total ?? 0}
+          storeCreditCents={order?.storeCreditUsed ?? 0}
           zelleIdentity={zelle!}
         />
       ) : (
@@ -94,10 +97,12 @@ export default async function ConfirmationPage({ searchParams }: Props) {
 function ZellePendingView({
   orderNumber,
   totalCents,
+  storeCreditCents = 0,
   zelleIdentity,
 }: {
   orderNumber: string | null
   totalCents: number
+  storeCreditCents?: number
   zelleIdentity: { primary: string; displayName: string | null; phone: string | null }
 }) {
   return (
@@ -168,6 +173,12 @@ function ZellePendingView({
           <p className="font-mono text-2xl font-bold">
             ${(totalCents / 100).toFixed(2)}
           </p>
+          {storeCreditCents > 0 && (
+            <p className="text-sm text-emerald-300 mt-2" data-testid="zelle-credit-applied">
+              Store credit applied: −${(storeCreditCents / 100).toFixed(2)}
+              {totalCents === 0 && ' — your credit covers this order, so there is nothing to send.'}
+            </p>
+          )}
         </div>
       </div>
 

@@ -1387,6 +1387,8 @@ export function zelleOrderInstructions(args: {
   zelleEmail: string
   zelleDisplayName?: string
   zellePhone?: string
+  /** Store credit spent on this order (cents). 0/absent renders nothing. */
+  storeCreditUsed?: number
 }) {
   const {
     orderNumber,
@@ -1399,6 +1401,16 @@ export function zelleOrderInstructions(args: {
     zelleDisplayName,
     zellePhone,
   } = args
+  const creditUsed = Math.max(0, args.storeCreditUsed ?? 0)
+  const creditRowHtml = creditUsed
+    ? `
+      <tr>
+        <td style="padding:8px 0;color:#6ee7b7;font-size:14px;">Store credit applied</td>
+        <td align="right" style="padding:8px 0;color:#6ee7b7;font-size:14px;">−${formatMoney(creditUsed)}</td>
+      </tr>`
+    : ''
+  const creditRowText = creditUsed ? `Store credit applied: −${formatMoney(creditUsed)}
+` : ''
 
   const itemsHtml = items
     .map((it) => {
@@ -1460,7 +1472,7 @@ export function zelleOrderInstructions(args: {
       <tr>
         <td style="padding:8px 0;color:#9ca3af;font-size:14px;">Subtotal</td>
         <td align="right" style="padding:8px 0;color:#e5e7eb;font-size:14px;">${formatMoney(subtotal)}</td>
-      </tr>
+      </tr>${creditRowHtml}
       <tr>
         <td style="padding:8px 0;color:#ffffff;font-size:15px;font-weight:700;">Total to send</td>
         <td align="right" style="padding:8px 0;color:#ffffff;font-size:15px;font-weight:700;">${formatMoney(total)}</td>
@@ -1494,7 +1506,7 @@ Order #${orderNumber}
 ${items.map((it) => `  ${it.name} x${it.quantity} — ${formatMoney(it.total ?? it.price * it.quantity)}`).join('\n')}
 
 Subtotal: ${formatMoney(subtotal)}
-Total to send: ${formatMoney(total)}
+${creditRowText}Total to send: ${formatMoney(total)}
 
 Shipping to:
 ${shippingAddress.name}

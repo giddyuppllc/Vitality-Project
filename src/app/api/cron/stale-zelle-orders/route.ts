@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { trackCronRun } from '@/lib/cron-tracker'
+import { expireUnpaidZelleOrders } from '@/lib/zelle-expiry'
 
 // Cron — finds Zelle orders that have been sitting PENDING+UNPAID for >7 days
 // and sends a single admin nudge email. Prevents orders from quietly aging in
@@ -12,6 +13,12 @@ import { trackCronRun } from '@/lib/cron-tracker'
 //
 // Auth: Bearer <CRON_SECRET> matching env var, or query ?secret=<CRON_SECRET>.
 //   GET /api/cron/stale-zelle-orders?secret=<CRON_SECRET>
+//
+// EXPIRY (added 09-29): a Zelle order still PENDING+UNPAID after
+// `zelle.unpaidExpiryDays` (admin setting, default 14, 0 = never) is
+// cancelled and any store credit it spent is returned exactly once
+// (lib/order-credit.ts). Membership invoices are left to the membership
+// lifecycle. `&dryRun=1` lists what would expire and changes nothing.
 
 const STALE_THRESHOLD_DAYS = 7
 const NUDGE_MARKER_PREFIX = 'stale_zelle_nudge_'
@@ -31,10 +38,16 @@ export async function GET(req: NextRequest) {
   if (!authorize(req)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  const dryRun = new URL(req.url).searchParams.get('dryRun') === '1'
   return trackCronRun(
-    'Stale Zelle nudge',
-    () => doRun(),
-    (r) => `examined=${r.examined} nudged=${r.nudged} skipped=${r.skipped} failed=${r.failed}`,
+    dryRun ? 'Stale Zelle nudge (dry run)' : 'Stale Zelle nudge',
+    async () => {
+      const expiry = await expireUnpaidZelleOrders({ dryRun })
+      const nudges = dryRun ? { examined: 0, nudged: 0, skipped: 0, failed: 0, results: [] } : await doRun()
+      return { ...nudges, ok: true as const, dryRun, expiry }
+    },
+    (r) =>
+      `examined=${r.examined} nudged=${r.nudged} skipped=${r.skipped} failed=${r.failed} expired=${r.expiry.expired} creditReturnedCents=${r.expiry.creditReturnedCents}`,
   )
 }
 
