@@ -131,6 +131,15 @@ describe('event reminders (24h + 1h, RSVPs only)', () => {
     expect(sentTo(late.email).map((m) => m.subject)).toEqual([`Starting in an hour: ${e.title}`])
   })
 
+  it('overlapping cron runs send each reminder once (the claim is the guard)', async () => {
+    const u = await makeUser({ tag: 'em-ev-race', tier: 'PLUS' })
+    const e = await event(10 * 60)
+    await prisma.vipEventRsvp.create({ data: { eventId: e.id, userId: u.id } })
+    const now = new Date()
+    await Promise.all([runEventReminders(now, false), runEventReminders(now, false), runEventReminders(now, false)])
+    expect(sentTo(u.email)).toHaveLength(1)
+  })
+
   it('skips members whose tier the event excludes and members who turned reminders off', async () => {
     const club = await makeUser({ tag: 'em-ev-club', tier: 'CLUB' })
     const off = await makeUser({ tag: 'em-ev-off', tier: 'PREMIUM' })

@@ -178,6 +178,14 @@ describe('reward credit expiry (12 months, FIFO ledger replay)', () => {
     expect(expirableRewardCents(txns, cutoff)).toBe(300) // Jan reward left: 300; Feb reward is not past cutoff
     // After expiring those 300 the replay finds nothing more (idempotent).
     expect(expirableRewardCents([...txns, { type: 'EXPIRE', amount: -300, createdAt: t('2027-01-02T00:00:00Z') }], cutoff)).toBe(0)
+    // Only reward lots expire: an untouched older grant stays, and an EXPIRE line
+    // is charged to the reward it expired (never to the older grant).
+    const withGrant = [
+      { type: 'ADMIN_GRANT', amount: 1000, createdAt: t('2025-06-01T00:00:00Z') },
+      { type: 'MEMBER_REWARD', amount: 500, createdAt: t('2026-01-01T00:00:00Z') },
+    ]
+    expect(expirableRewardCents(withGrant, cutoff)).toBe(500)
+    expect(expirableRewardCents([...withGrant, { type: 'EXPIRE', amount: -500, createdAt: t('2027-01-02T00:00:00Z') }], cutoff)).toBe(0)
     // A restore opens a fresh non-expiring lot.
     expect(
       expirableRewardCents([...txns, { type: 'CHECKOUT_RESTORE', amount: 1200, createdAt: t('2026-03-01T00:00:00Z') }], cutoff),

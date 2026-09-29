@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { POST as zellePOST } from '@/app/api/checkout-zelle/route'
+import { POST as cardPOST } from '@/app/api/checkout/route'
 import { PATCH as orderPATCH } from '@/app/api/admin/orders/[id]/route'
 import { POST as refundPOST } from '@/app/api/admin/orders/[id]/refund/route'
 import { POST as markPaidPOST } from '@/app/api/admin/orders/[id]/mark-paid/route'
@@ -174,6 +175,31 @@ describe('credit comes back exactly once', () => {
     const restores = await prisma.storeCreditTxn.findMany({ where: { orderId: body.orderId, type: 'CHECKOUT_RESTORE' } })
     expect(restores).toHaveLength(1)
     expect(restores[0].amount).toBe(900)
+  })
+
+  it('card checkout behaviour is unchanged: cancelling a card order does not restore its credit here', async () => {
+    const m = await makeUser({ tag: 'zc-card' })
+    await giveCredit(m.id, 700)
+    const p = await product(5000)
+    setSession(m)
+    const res = await cardPOST(
+      req('/api/checkout', {
+        body: {
+          items: [{ productId: p.id, quantity: 1 }],
+          email: m.email,
+          shippingAddress: ADDRESS,
+          useStoreCredit: true,
+          card: { number: '4111111111111111', expMonth: '12', expYear: '2035', cvv: '123', name: 'ZZ Test', zip: '85001' },
+        },
+      }),
+    )
+    expect(res.status).toBe(200)
+    const order = await prisma.order.findFirstOrThrow({ where: { userId: m.id }, orderBy: { createdAt: 'desc' } })
+    expect(order.storeCreditUsed).toBe(700)
+    await adminSession()
+    await orderPATCH(req(`/api/admin/orders/${order.id}`, { method: 'PATCH', body: { status: 'CANCELLED' } }), params({ id: order.id }))
+    expect(await balance(m.id)).toBe(0)
+    expect((await restoreOrderCredit(order.id, 'cancelled')).skipped).toBe('not_zelle')
   })
 
   it('two restores racing on a freshly cancelled order return the credit once', async () => {
