@@ -35,3 +35,8 @@ vi.mock('@/lib/sms', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/sms')>()
   return { ...actual, sendOwnerSms: vi.fn(async () => undefined), sendSMS: vi.fn(async () => ({ success: true })) }
 })
+
+// next/font is a build-time transform; give layouts a stand-in under test.
+vi.mock('next/font/google', () => ({
+  Inter: () => ({ variable: '--font-inter', className: 'font-inter', style: { fontFamily: 'Inter' } }),
+}))

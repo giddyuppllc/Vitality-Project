@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { NextRequest } from 'next/server'
 import { proxy } from '@/proxy'
@@ -21,16 +21,21 @@ const rewriteTarget = (res: Response) => {
 
 // Every top-level route segment of the existing .global app, read from disk
 // so a new store route is covered automatically.
-const appDir = path.resolve(__dirname, '../../src/app')
+const appDir = path.resolve(__dirname, '../../src/app/(global)')
 const globalTopLevel = readdirSync(appDir, { withFileTypes: true })
-  .filter((d) => d.isDirectory() && d.name !== 'vip')
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name)
+// plus the store's own top-level pages inside the (store) group
+const storeTopLevel = readdirSync(path.join(appDir, '(store)'), { withFileTypes: true })
+  .filter((d) => d.isDirectory())
   .map((d) => d.name)
 
 describe('host routing — .global is untouched', () => {
   const hosts = ['vitalityproject.global', 'www.vitalityproject.global', 'localhost:3000', 'some-tenant.vitalityproject.global']
 
   it('found the existing store route segments', () => {
-    expect(globalTopLevel).toEqual(expect.arrayContaining(['(store)', 'admin', 'api', 'auth', 'clubhouse']))
+    expect(globalTopLevel).toEqual(expect.arrayContaining(['(store)', 'admin', 'auth', 'clubhouse', 'kiosk']))
+    expect(storeTopLevel).toEqual(expect.arrayContaining(['shop', 'products', 'membership', 'account', 'checkout']))
   })
 
   for (const host of hosts) {
@@ -41,7 +46,9 @@ describe('host routing — .global is untouched', () => {
         '/api/auth/session', '/api/admin/vip/moderation', '/api/cron/vip-member-rewards',
         '/robots.txt', '/sitemap.xml', '/service-worker.js', '/manifest.json', '/logo.png', '/uploads/2026-01/a.jpg',
         '/feed', '/members', // paths that exist on .vip must NOT be rewritten on .global
-        ...globalTopLevel.filter((s) => !s.startsWith('(') && !s.startsWith('[') && !s.includes('.')).map((s) => `/${s}`),
+        ...[...globalTopLevel, ...storeTopLevel]
+          .filter((s) => !s.startsWith('(') && !s.startsWith('[') && !s.includes('.'))
+          .map((s) => `/${s}`),
       ]
       for (const p of paths) {
         const res = call(host, p)
@@ -103,7 +110,21 @@ describe('host routing — .vip serves the clubhouse', () => {
     const robots = vipMetadata.robots as { index: boolean; follow: boolean }
     expect(robots.index).toBe(false)
     expect(robots.follow).toBe(false)
-    expect(vipMetadata.manifest).toBeNull()
+    expect(vipMetadata.manifest).toBeFalsy()
+  })
+
+  it('the clubhouse is its own root layout — none of the store document pieces are above it', () => {
+    const app = path.resolve(__dirname, '../../src/app')
+    // no shared root layout: (global) and vip are separate roots
+    expect(existsSync(path.join(app, 'layout.tsx'))).toBe(false)
+    expect(existsSync(path.join(app, '(global)', 'layout.tsx'))).toBe(true)
+    // code only (comments stripped) — the layout's doc comment names these on purpose
+    const vipLayout = readFileSync(path.join(app, 'vip', 'layout.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+    for (const storeOnly of ['ExitIntentModal', 'ServiceWorkerRegistration', 'ld+json', 'fbevents', 'googletagmanager', 'tiktok', 'manifest', '(global)', 'VitalityVeins']) {
+      expect(vipLayout.includes(storeOnly), storeOnly).toBe(false)
+    }
   })
 })
 

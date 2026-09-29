@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import { KioskExitButton } from '@/app/kiosk/kiosk-exit-button'
+import { KioskExitButton } from '@/app/(global)/kiosk/kiosk-exit-button'
 
 /**
  * Path-based kiosk layout: `vitalityproject.global/k/<slug>/*`.
