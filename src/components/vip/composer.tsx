@@ -73,7 +73,7 @@ export function Composer({
             onChange={(e) => setBody(e.target.value)}
             rows={body.length > 80 ? 5 : 2}
             maxLength={5000}
-            placeholder="Share with the community"
+            placeholder="Share a win, a check-in or a question…"
             className="vip-focus w-full resize-y rounded-xl border border-white/10 bg-white/[0.04] p-3 text-[15px] text-white placeholder:text-white/40"
           />
         </label>

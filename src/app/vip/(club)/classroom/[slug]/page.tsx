@@ -5,6 +5,7 @@ import { requireVipPage } from '@/lib/vip/page-gate'
 import { getCourse } from '@/lib/vip/classroom'
 import { GLOBAL_LINKS } from '@/lib/vip/links'
 import { TierBadge } from '@/components/vip/ui'
+import { VIP_COPY, tierName } from '@/lib/vip/copy'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Course' }
@@ -33,10 +34,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         <div className="vip-surface mt-4 flex flex-wrap items-center gap-3 p-4 text-sm">
           <Lock className="h-4 w-4 text-white/50" aria-hidden="true" />
           <span className="text-white/70">
-            This course requires <TierBadge tier={course.minTier} className="mx-1" /> or higher.
+            {VIP_COPY.classroom.lockedLesson(tierName(course.minTier)).replace('This lesson', 'This course')}
           </span>
           <a href={GLOBAL_LINKS.manageMembership()} className="ml-auto font-semibold text-brand-300 hover:text-brand-200">
-            Membership options →
+            {VIP_COPY.classroom.upgrade} →
           </a>
         </div>
       )}
@@ -49,7 +50,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               {m.title}
             </h2>
             {m.lessons.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-white/45">No lessons published yet.</p>
+              <p className="px-5 py-4 text-sm text-white/45">Lessons for this module are being recorded.</p>
             ) : (
               <ol className="divide-y divide-white/[0.05]">
                 {m.lessons.map((l) => (
@@ -76,8 +77,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             )}
           </section>
         ))}
-        {modules.length === 0 && <p className="text-sm text-white/45">No modules yet.</p>}
+        {modules.length === 0 && <p className="text-sm text-white/45">Modules for this course are being recorded.</p>}
       </div>
+      <p className="mt-6 text-xs leading-relaxed text-white/45">{VIP_COPY.classroom.wellnessNote}</p>
     </div>
   )
 }

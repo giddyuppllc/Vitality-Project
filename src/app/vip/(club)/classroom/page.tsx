@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react'
 import { requireVipPage } from '@/lib/vip/page-gate'
 import { listCourses } from '@/lib/vip/classroom'
 import { EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
+import { VIP_COPY } from '@/lib/vip/copy'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Classroom' }
@@ -13,9 +14,9 @@ export default async function ClassroomPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title="Classroom" />
+      <PageHeader title={VIP_COPY.classroom.title} intro={VIP_COPY.classroom.intro} />
       {courses.length === 0 ? (
-        <EmptyState title="No courses published yet.">Courses appear here as the team publishes them.</EmptyState>
+        <EmptyState title={VIP_COPY.empty.classroom.title}>{VIP_COPY.empty.classroom.body}</EmptyState>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {courses.map((c) => {
@@ -27,7 +28,9 @@ export default async function ClassroomPage() {
                     // eslint-disable-next-line @next/next/no-img-element -- admin-entered cover URL
                     <img src={c.coverImage} alt="" className="h-36 w-full object-cover" />
                   ) : (
-                    <div className="h-24 w-full bg-gradient-to-br from-brand-900/60 via-dark-700/40 to-transparent" aria-hidden="true" />
+                    <div className="relative h-24 w-full overflow-hidden bg-gradient-to-br from-brand-900/70 via-dark-700/40 to-transparent" aria-hidden="true">
+                      <span className="vip-kicker absolute bottom-3 left-5">{c.lessonCount} lessons</span>
+                    </div>
                   )}
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -42,7 +45,7 @@ export default async function ClassroomPage() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5">
-                          Requires <TierBadge tier={c.minTier} />
+                          {VIP_COPY.events.requires} <TierBadge tier={c.minTier} />
                         </span>
                       )}
                     </div>
@@ -65,6 +68,7 @@ export default async function ClassroomPage() {
           })}
         </ul>
       )}
+      <p className="mt-6 text-xs leading-relaxed text-white/45">{VIP_COPY.classroom.wellnessNote}</p>
     </div>
   )
 }

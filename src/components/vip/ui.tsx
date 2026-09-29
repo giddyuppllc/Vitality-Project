@@ -1,31 +1,23 @@
 import type { MembershipTier } from '@prisma/client'
 import { cn } from '@/lib/utils'
 import { TIER_BENEFITS } from '@/lib/membership-tiers'
+import { Monogram } from './monogram'
 
 /**
  * Small presentational pieces shared by the clubhouse pages (server-safe).
  */
 
-/**
- * Text wordmark. PLACEHOLDER for Kevin's 09-21 "VP" monogram — the two PNGs
- * he sent are email attachments and are not in the repo. Swap this for the
- * asset once it is committed under public/.
- */
+/** Clubhouse wordmark: the VP monogram + name. */
 export function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5" aria-label="The Vitality Project Clubhouse">
-      <span
-        aria-hidden="true"
-        className="grid h-9 w-9 place-items-center rounded-xl border border-white/15 bg-white/[0.06] text-[13px] font-black tracking-tight text-white"
-      >
-        VP
-      </span>
+      <Monogram size={36} />
       {!compact && (
         <span className="leading-tight">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+          <span className="block text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/55">
             The Vitality Project
           </span>
-          <span className="block text-sm font-bold text-white">Clubhouse</span>
+          <span className="block text-[15px] font-extrabold tracking-tight text-white">Clubhouse</span>
         </span>
       )}
     </span>
@@ -36,7 +28,7 @@ const TIER_STYLE: Record<MembershipTier, string> = {
   NONE: 'border-white/10 text-white/50',
   CLUB: 'border-white/20 bg-white/[0.06] text-white/80',
   PLUS: 'border-brand-400/40 bg-brand-500/15 text-brand-200',
-  PREMIUM: 'border-amber-200/40 bg-amber-200/10 text-amber-100',
+  PREMIUM: 'border-[#d4b26a]/50 bg-[#d4b26a]/10 text-[#ead7a8]',
 }
 
 export function TierBadge({ tier, admin, className }: { tier: MembershipTier; admin?: boolean; className?: string }) {
@@ -75,7 +67,7 @@ export function Avatar({
       .join('') || '•'
   return (
     <span
-      className={cn('relative inline-grid shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-gradient-to-br from-brand-700/60 to-dark-700 font-semibold text-white/90', className)}
+      className={cn('relative inline-grid shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-gradient-to-br from-brand-800/70 to-dark-700 font-semibold text-white/90', className)}
       style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size / 2.8)) }}
       aria-hidden="true"
     >
@@ -89,19 +81,6 @@ export function Avatar({
   )
 }
 
-/** Clearly marked slot for copy Kevin/Edward have not supplied yet. */
-export function CopyPlaceholder({ slot, text, className }: { slot: string; text: string | null; className?: string }) {
-  if (text) return <p className={className}>{text}</p>
-  return (
-    <p
-      className={cn('rounded-lg border border-dashed border-amber-200/40 bg-amber-200/[0.04] px-3 py-2 text-xs font-medium text-amber-100/80', className)}
-      data-copy-slot={slot}
-    >
-      Copy needed — {slot} (to be supplied by Kevin / Edward)
-    </p>
-  )
-}
-
 export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="vip-surface px-6 py-10 text-center">
@@ -111,11 +90,14 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   )
 }
 
-export function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
+export function PageHeader({ title, intro, children }: { title: string; intro?: string; children?: React.ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h1>
-      {children}
+    <div className="mb-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h1>
+        {children}
+      </div>
+      {intro && <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/60">{intro}</p>}
     </div>
   )
 }

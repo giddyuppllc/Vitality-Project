@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Search } from 'lucide-react'
+import { VIP_COPY } from '@/lib/vip/copy'
 import { requireVipPage } from '@/lib/vip/page-gate'
 import { listMembers } from '@/lib/vip/members'
 import { Avatar, EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
@@ -31,7 +32,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
         </label>
       </form>
       {members.length === 0 ? (
-        <EmptyState title="No members found." />
+        <EmptyState title={VIP_COPY.empty.members.title}>{VIP_COPY.empty.members.body}</EmptyState>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {members.map((m) => (

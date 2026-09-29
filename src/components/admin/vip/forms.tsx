@@ -376,10 +376,12 @@ export function EventForm({
     joinUrl: string | null
     minTier: Tier
     published: boolean
+    repeatMonthly?: boolean
   }
 }) {
   const { busy, msg, send } = useSubmit()
   const [open, setOpen] = useState(!event)
+  const [repeatMonthly, setRepeatMonthly] = useState(event?.repeatMonthly ?? false)
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
   const [startsAt, setStartsAt] = useState(toLocalInput(event?.startsAt))
@@ -411,6 +413,7 @@ export function EventForm({
           joinUrl,
           minTier,
           published,
+          repeatMonthly,
         })
         if (ok && !event) {
           setTitle('')
@@ -457,6 +460,10 @@ export function EventForm({
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="accent-brand-500" />
         Published
       </label>
+      <label className="flex items-center gap-2 text-sm text-white/70">
+        <input type="checkbox" checked={repeatMonthly} onChange={(e) => setRepeatMonthly(e.target.checked)} className="accent-brand-500" />
+        Repeats monthly — the next date (same weekday of the month, same time) is published automatically once this one starts
+      </label>
       <Msg msg={msg} />
       <div className="flex gap-2">
         <Submit busy={busy}>{event ? 'Save event' : 'Create event'}</Submit>
@@ -492,8 +499,9 @@ export function RewardsForm({ initial }: { initial: Record<Tier, number> }) {
     >
       <h2 className="font-semibold">Monthly store credit per tier</h2>
       <p className="text-sm text-white/45">
-        Granted once per member per calendar month (UTC) by the “VIP member rewards” cron, into the member’s store
-        credit at vitalityproject.global. <strong className="text-white/70">$0.00 = off.</strong>
+        Granted on the 1st of each month (UTC) by the “VIP member rewards” cron to members active that day (not
+        suspended), into the member’s store credit at vitalityproject.global. Defaults: $5 / $20 / $50.{' '}
+        <strong className="text-white/70">$0.00 = off.</strong>
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {(['CLUB', 'PLUS', 'PREMIUM'] as Tier[]).map((t) => (
@@ -510,6 +518,72 @@ export function RewardsForm({ initial }: { initial: Record<Tier, number> }) {
       </div>
       <Msg msg={msg} />
       <Submit busy={busy}>Save reward settings</Submit>
+    </form>
+  )
+}
+
+// ─── Clubhouse settings ────────────────────────────────────────────────────
+
+export interface ClubhouseSettingsValues {
+  'vip.rewardExpiryMonths': number
+  'vip.emailReplyTo': string
+  'vip.digestHourUtc': number
+  'vip.timeZone': string
+  'zelle.unpaidExpiryDays': number
+}
+
+export function ClubhouseSettingsForm({ initial }: { initial: ClubhouseSettingsValues }) {
+  const { busy, msg, send } = useSubmit()
+  const [v, setV] = useState({
+    expiry: String(initial['vip.rewardExpiryMonths']),
+    replyTo: initial['vip.emailReplyTo'],
+    digestHour: String(initial['vip.digestHourUtc']),
+    tz: initial['vip.timeZone'],
+    zelleDays: String(initial['zelle.unpaidExpiryDays']),
+  })
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV((x) => ({ ...x, [k]: e.target.value }))
+  return (
+    <form
+      className="glass space-y-4 rounded-2xl p-5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        send('/api/admin/vip/settings', 'PUT', {
+          'vip.rewardExpiryMonths': Number.parseInt(v.expiry || '0', 10),
+          'vip.emailReplyTo': v.replyTo,
+          'vip.digestHourUtc': Number.parseInt(v.digestHour || '0', 10),
+          'vip.timeZone': v.tz,
+          'zelle.unpaidExpiryDays': Number.parseInt(v.zelleDays || '0', 10),
+        })
+      }}
+    >
+      <h2 className="font-semibold">Clubhouse settings</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className={label}>
+          Reward credit expires after (months, 0 = never)
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.expiry} onChange={set('expiry')} />
+        </label>
+        <label className={label}>
+          Unpaid Zelle orders cancel after (days, 0 = never)
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.zelleDays} onChange={set('zelleDays')} />
+        </label>
+        <label className={label}>
+          Clubhouse email Reply-To
+          <input className={`${adminInput} mt-1`} type="email" value={v.replyTo} onChange={set('replyTo')} />
+        </label>
+        <label className={label}>
+          Daily digest hour (UTC, 0–23)
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.digestHour} onChange={set('digestHour')} />
+        </label>
+        <label className={`${label} sm:col-span-2`}>
+          Time zone for event emails and monthly series (IANA, e.g. America/New_York)
+          <input className={`${adminInput} mt-1`} value={v.tz} onChange={set('tz')} />
+        </label>
+      </div>
+      <p className="text-xs text-white/40">
+        Unpaid-order expiry runs in the existing “Stale Zelle nudge” cron and returns any store credit the order used.
+      </p>
+      <Msg msg={msg} />
+      <Submit busy={busy}>Save clubhouse settings</Submit>
     </form>
   )
 }

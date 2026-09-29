@@ -55,6 +55,7 @@ export default async function AdminVipEventsPage() {
                         joinUrl: e.joinUrl,
                         minTier,
                         published: e.published,
+                        repeatMonthly: e.repeatMonthly,
                       }}
                     />
                   </div>

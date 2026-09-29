@@ -4,6 +4,8 @@ import { listUpcomingEvents } from '@/lib/vip/classroom'
 import { EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
 import { RsvpButton } from '@/components/vip/rsvp-button'
 import { LocalTime } from '@/components/vip/local-time'
+import { VIP_COPY } from '@/lib/vip/copy'
+import { Repeat } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Events' }
@@ -24,9 +26,9 @@ export default async function EventsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Events" />
+      <PageHeader title={VIP_COPY.events.title} intro={VIP_COPY.events.intro} />
       {events.length === 0 ? (
-        <EmptyState title="No upcoming events.">Live sessions appear here when the team schedules them.</EmptyState>
+        <EmptyState title={VIP_COPY.empty.events.title}>{VIP_COPY.empty.events.body}</EmptyState>
       ) : (
         <ul className="space-y-3">
           {events.map((e) => {
@@ -38,7 +40,15 @@ export default async function EventsPage() {
                   <span className="text-xl font-bold">{f.date}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold">{e.title}</h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold">{e.title}</h2>
+                    {e.minTier !== 'CLUB' && <TierBadge tier={e.minTier} />}
+                    {e.repeatMonthly && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/45">
+                        <Repeat className="h-3 w-3" aria-hidden="true" /> Monthly
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-white/55">
                     <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
                     <LocalTime iso={e.startsAt} />
@@ -61,7 +71,7 @@ export default async function EventsPage() {
                       </>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-sm text-white/55">
-                        <Lock className="h-4 w-4" aria-hidden="true" /> Requires <TierBadge tier={e.minTier} />
+                        <Lock className="h-4 w-4" aria-hidden="true" /> {VIP_COPY.events.requires} <TierBadge tier={e.minTier} />
                       </span>
                     )}
                   </div>

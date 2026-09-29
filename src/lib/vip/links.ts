@@ -10,7 +10,9 @@ export function globalUrl(path = '/'): string {
 
 export const GLOBAL_LINKS = {
   /** Existing membership signup (Zelle invoice flow, api/membership/subscribe). */
-  join: () => globalUrl('/membership'),
+  join: () => globalUrl('/membership?from=vip'),
+  /** Same flow with the tier chosen on .vip preselected (membership page reads ?tier=). */
+  joinTier: (tier: 'CLUB' | 'PLUS' | 'PREMIUM') => globalUrl(`/membership?tier=${tier.toLowerCase()}&from=vip`),
   /** Where rewards (store credit) are spent. */
   shop: () => globalUrl('/shop'),
   /** Existing store-credit + loyalty history page. */

@@ -110,9 +110,9 @@ export default async function AccountMembershipPage() {
           <div className="flex items-center gap-3">
             <Crown className="h-6 w-6 text-brand-400" />
             <div>
-              <p className="font-semibold">Your VIP Clubhouse</p>
+              <p className="font-semibold">Enter the Clubhouse</p>
               <p className="text-sm text-white/60">
-                Community, training &amp; rewards — members only.
+                Your members’ community, classroom and live sessions at vitalityproject.vip.
               </p>
             </div>
           </div>

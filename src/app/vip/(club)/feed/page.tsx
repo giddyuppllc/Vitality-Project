@@ -7,6 +7,9 @@ import { FeedList } from '@/components/vip/feed-list'
 import { Composer } from '@/components/vip/composer'
 import { EmptyState, PageHeader } from '@/components/vip/ui'
 import { cn } from '@/lib/utils'
+import { VIP_COPY } from '@/lib/vip/copy'
+import { onboardingSteps } from '@/lib/vip/onboarding'
+import { OnboardingCard } from '@/components/vip/onboarding-card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Community' }
@@ -18,12 +21,23 @@ export default async function FeedPage({
 }) {
   const viewer = await requireVipPage('community')
   const { space, q } = await searchParams
-  const [spaces, feed] = await Promise.all([listSpaces(), listFeed({ viewer, space, q })])
+  const [spaces, feed, steps] = await Promise.all([
+    listSpaces(),
+    listFeed({ viewer, space, q }),
+    viewer.onboarded ? Promise.resolve(null) : onboardingSteps(viewer.userId),
+  ])
   const current = spaces.find((s) => s.slug === space) ?? null
+  const showOnboarding = !!steps && !q && !space && steps.some((s) => !s.done)
+  const empty = q ? VIP_COPY.empty.search : current ? VIP_COPY.empty.space : VIP_COPY.empty.feed
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title={q ? 'Search' : current ? `# ${current.name}` : 'Community'} />
+      <PageHeader
+        title={q ? 'Search' : current ? `# ${current.name}` : VIP_COPY.feed.title}
+        intro={q || current ? undefined : VIP_COPY.feed.subtitle}
+      />
+
+      {showOnboarding && <OnboardingCard steps={steps!} />}
 
       <form action="/feed" method="get" role="search" className="mb-4 md:hidden">
         <label className="relative block">
@@ -88,9 +102,7 @@ export default async function FeedPage({
       )}
 
       {feed.posts.length === 0 && feed.pinned.length === 0 ? (
-        <EmptyState title={q ? 'No posts match that search.' : 'No posts yet.'}>
-          {!q && 'Be the first to start a conversation.'}
-        </EmptyState>
+        <EmptyState title={empty.title}>{empty.body}</EmptyState>
       ) : (
         <FeedList
           key={`${space ?? ''}|${q ?? ''}|${feed.posts[0]?.id ?? ''}|${feed.posts.length}`}

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AtSign, MessageCircle, Reply } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
+import { VIP_COPY } from '@/lib/vip/copy'
 import { requireVipPage } from '@/lib/vip/page-gate'
 import { Avatar, EmptyState, PageHeader, timeAgo } from '@/components/vip/ui'
 import { MarkAllRead } from '@/components/vip/mark-all-read'
@@ -40,7 +41,7 @@ export default async function NotificationsPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Notifications">{unread > 0 && <MarkAllRead />}</PageHeader>
       {items.length === 0 ? (
-        <EmptyState title="Nothing yet.">Replies, comments on your posts and mentions show up here.</EmptyState>
+        <EmptyState title={VIP_COPY.empty.notifications.title}>{VIP_COPY.empty.notifications.body}</EmptyState>
       ) : (
         <ul className="vip-surface divide-y divide-white/[0.06]">
           {items.map((n) => {

@@ -119,7 +119,21 @@ export async function getLesson(id: string, userId: string, accessTier: Membersh
   const done = await prisma.vipLessonProgress.findUnique({
     where: { userId_lessonId: { userId, lessonId: id } },
   })
-  return { lesson, ...access, completed: !!done }
+  // Neighbours in course order (published lessons only) for prev/next links.
+  const ordered = await prisma.vipLesson.findMany({
+    where: { published: true, module: { courseId: lesson.module.courseId } },
+    orderBy: [{ module: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, title: true },
+  })
+  const i = ordered.findIndex((l) => l.id === id)
+  return {
+    lesson,
+    ...access,
+    completed: !!done,
+    prev: i > 0 ? ordered[i - 1] : null,
+    next: i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null,
+    position: i >= 0 ? { index: i + 1, total: ordered.length } : null,
+  }
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────
@@ -148,6 +162,7 @@ export async function listUpcomingEvents(userId: string, accessTier: MembershipT
       startsAt: e.startsAt.toISOString(),
       endsAt: e.endsAt?.toISOString() ?? null,
       minTier: e.minTier,
+      repeatMonthly: e.repeatMonthly,
       allowed,
       // The join link is only ever sent to members who meet the tier.
       joinUrl: allowed ? e.joinUrl : null,

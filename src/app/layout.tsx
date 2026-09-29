@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if ((await headers()).get(SITE_HEADER) === 'vip') {
     return (
       <html lang="en" className="dark">
-        <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
+        <body className={`${inter.variable} vip-theme font-sans antialiased`}>{children}</body>
       </html>
     )
   }

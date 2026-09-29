@@ -1,3 +1,4 @@
+import { VIP_COPY } from '@/lib/vip/copy'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -55,7 +56,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
 
       <h2 className="mb-3 mt-7 text-lg font-semibold">Recent posts</h2>
       {posts.length === 0 ? (
-        <p className="text-sm text-white/45">No posts yet.</p>
+        <p className="text-sm text-white/45">{VIP_COPY.empty.memberPosts.title}</p>
       ) : (
         <ul className="space-y-3">
           {posts.map((p) => (

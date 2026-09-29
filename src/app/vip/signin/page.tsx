@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getVipViewer } from '@/lib/vip/access'
 import { GLOBAL_LINKS, globalUrl } from '@/lib/vip/links'
 import { Wordmark } from '@/components/vip/ui'
+import { VIP_COPY } from '@/lib/vip/copy'
 import { SignInForm } from '@/components/vip/signin-form'
 
 export const dynamic = 'force-dynamic'
@@ -24,8 +25,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         <Wordmark />
       </Link>
       <div className="vip-surface-strong p-6 sm:p-7">
-        <h1 className="text-xl font-bold">Member sign in</h1>
-        <p className="mt-1 text-sm text-white/60">Use the same email (or username) and password as vitalityproject.global.</p>
+        <h1 className="text-xl font-bold">{VIP_COPY.signin.title}</h1>
+        <p className="mt-1 text-sm leading-relaxed text-white/60">{VIP_COPY.signin.body}</p>
         {error && ERRORS[error] && (
           <p role="alert" className="mt-4 rounded-lg border border-amber-200/30 bg-amber-200/[0.06] px-3 py-2 text-sm text-amber-50">
             {ERRORS[error]}
@@ -39,9 +40,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <a href={GLOBAL_LINKS.resetPassword()} className="vip-focus block text-white/55 hover:text-white">
             Forgot password
           </a>
-          <a href={GLOBAL_LINKS.join()} className="vip-focus block text-white/55 hover:text-white">
-            Not a member yet? Join at vitalityproject.global
-          </a>
+          <Link href="/#levels" className="vip-focus block text-white/55 hover:text-white">
+            {VIP_COPY.signin.newHere} {VIP_COPY.signin.newHereLink} →
+          </Link>
         </div>
       </div>
     </div>

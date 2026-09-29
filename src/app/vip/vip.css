@@ -1,20 +1,97 @@
 /* Clubhouse-only styles (vitalityproject.vip). Imported by src/app/vip/layout.tsx,
-   so none of this is loaded on vitalityproject.global routes. */
+   so none of this is loaded on vitalityproject.global routes.
+
+   PALETTE (09-29): Vitality's own deep navy + white, with the brand's blue
+   pulled away from lavender into a clear "vital blue", and a champagne gold
+   reserved for premium moments (Premium Stacks, rewards, the P of the
+   monogram). The dominant hue is navy/blue — purple is not used.
+
+   The clubhouse re-themes Tailwind's `brand-*` scale by overriding the CSS
+   variables Tailwind v4 compiles every brand utility against, scoped to
+   <body class="vip-theme"> (set only in the clubhouse branch of the root
+   layout). .global keeps its own values untouched. */
+
+.vip-theme {
+  --vip-ink-950: #05080f;
+  --vip-ink-900: #070b14;
+  --vip-ink-850: #0b1220;
+  --vip-ink-800: #0f1729;
+  --vip-ink-700: #16213a;
+  --vip-ink-600: #1e2b48;
+  --vip-gold: #d4b26a;
+  --vip-gold-soft: #ead7a8;
+  --vip-mint: #6ee7b7;
+
+  --color-brand-50: #eef7ff;
+  --color-brand-100: #d9ecff;
+  --color-brand-200: #b6dbff;
+  --color-brand-300: #82c3ff;
+  --color-brand-400: #4aa3f7;
+  --color-brand-500: #1d6fd6;
+  --color-brand-600: #1760bd;
+  --color-brand-700: #154f9c;
+  --color-brand-800: #16447f;
+  --color-brand-900: #173a69;
+  --color-brand-950: #0e2446;
+
+  --color-dark-900: #070b14;
+  --color-dark-800: #0b1220;
+  --color-dark-700: #0f1729;
+  --color-dark-600: #16213a;
+
+  background: var(--vip-ink-900);
+  color: #fff;
+}
+
+/* Replace the store's colour pools and dot grid with a quiet navy field. */
+body.vip-theme::before {
+  background:
+    radial-gradient(circle 900px at 12% -5%, rgba(29, 111, 214, 0.22), transparent),
+    radial-gradient(circle 700px at 95% 10%, rgba(74, 163, 247, 0.12), transparent),
+    radial-gradient(circle 800px at 70% 105%, rgba(212, 178, 106, 0.07), transparent);
+  filter: blur(60px);
+}
+body.vip-theme::after {
+  opacity: 0.05;
+}
 
 .vip-surface {
-  background: rgba(14, 17, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 41, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 18px;
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
 .vip-surface-strong {
-  background: rgba(14, 17, 34, 0.88);
+  background: rgba(15, 23, 41, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 18px;
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Premium edge — a single hairline of gold. */
+.vip-premium {
+  border-color: rgba(212, 178, 106, 0.45);
+  box-shadow: 0 0 0 1px rgba(212, 178, 106, 0.08) inset, 0 20px 60px -30px rgba(212, 178, 106, 0.35);
+}
+
+.vip-gold { color: var(--vip-gold); }
+.vip-gold-soft { color: var(--vip-gold-soft); }
+.vip-bg-gold { background-color: var(--vip-gold); color: #1a1406; }
+
+.vip-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.vip-rule {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
 }
 
 .vip-body {
@@ -24,26 +101,27 @@
 
 .vip-body .vip-link,
 .vip-prose a {
-  color: #a5b8fc;
+  color: #82c3ff;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .vip-body .vip-mention {
-  color: #c7d5fe;
+  color: #b6dbff;
   font-weight: 600;
 }
 
-.vip-prose h2 { font-size: 1.35rem; font-weight: 700; margin: 1.5rem 0 0.6rem; }
-.vip-prose h3 { font-size: 1.15rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
+.vip-prose h2 { font-size: 1.35rem; font-weight: 700; margin: 1.6rem 0 0.6rem; }
+.vip-prose h3 { font-size: 1.15rem; font-weight: 700; margin: 1.3rem 0 0.5rem; }
 .vip-prose h4 { font-size: 1rem; font-weight: 700; margin: 1rem 0 0.4rem; }
-.vip-prose p { margin: 0.75rem 0; line-height: 1.7; color: rgba(255, 255, 255, 0.85); }
+.vip-prose p { margin: 0.75rem 0; line-height: 1.75; color: rgba(255, 255, 255, 0.86); }
 .vip-prose ul { list-style: disc; padding-left: 1.4rem; margin: 0.75rem 0; }
 .vip-prose ol { list-style: decimal; padding-left: 1.4rem; margin: 0.75rem 0; }
-.vip-prose li { margin: 0.3rem 0; color: rgba(255, 255, 255, 0.85); }
+.vip-prose li { margin: 0.35rem 0; color: rgba(255, 255, 255, 0.86); line-height: 1.65; }
+.vip-prose strong { color: #fff; }
 
 .vip-focus:focus-visible {
-  outline: 2px solid #8193f8;
+  outline: 2px solid #4aa3f7;
   outline-offset: 2px;
 }
 

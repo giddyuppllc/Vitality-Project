@@ -5,6 +5,7 @@ import { GLOBAL_LINKS } from '@/lib/vip/links'
 import { PageHeader, TierBadge } from '@/components/vip/ui'
 import { ProfileForm } from '@/components/vip/profile-form'
 import { SignOutButton } from '@/components/vip/sign-out-button'
+import { EmailPrefsForm } from '@/components/vip/email-prefs-form'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Your profile' }
@@ -13,7 +14,7 @@ export default async function MyProfilePage() {
   const viewer = await requireVipPage('member')
   const profile = await prisma.vipProfile.findUnique({
     where: { userId: viewer.userId },
-    select: { displayName: true, bio: true, avatarUrl: true },
+    select: { displayName: true, bio: true, avatarUrl: true, emailDigest: true, emailEvents: true, emailRewards: true },
   })
 
   return (
@@ -26,9 +27,16 @@ export default async function MyProfilePage() {
         )}
       </PageHeader>
       <ProfileForm
-        initial={profile ?? { displayName: null, bio: null, avatarUrl: null }}
+        initial={{ displayName: profile?.displayName ?? null, bio: profile?.bio ?? null, avatarUrl: profile?.avatarUrl ?? null }}
         fallbackName={viewer.name || viewer.username || 'Member'}
         disabled={viewer.suspended}
+      />
+      <EmailPrefsForm
+        initial={{
+          emailDigest: profile?.emailDigest ?? true,
+          emailEvents: profile?.emailEvents ?? true,
+          emailRewards: profile?.emailRewards ?? true,
+        }}
       />
       <section className="vip-surface mt-5 space-y-3 p-5 text-sm" aria-labelledby="account-h">
         <h2 id="account-h" className="font-semibold">Account</h2>

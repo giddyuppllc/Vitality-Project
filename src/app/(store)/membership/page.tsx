@@ -86,6 +86,10 @@ function MembershipPageInner() {
   const params = useSearchParams()
   const { data: session, status } = useSession()
   const initialTier = (params.get('tier') ?? 'plus').toLowerCase()
+  // Arrived from the members' clubhouse (vitalityproject.vip): same Zelle
+  // flow, with a hand-off back to the clubhouse once it is done.
+  const fromVip = params.get('from') === 'vip'
+  const vipUrl = (process.env.NEXT_PUBLIC_VIP_URL || 'https://vitalityproject.vip').replace(/\/+$/, '')
   const [selectedPlan, setSelectedPlan] = useState(
     initialTier in PLAN_TO_TIER ? initialTier : 'plus',
   )
@@ -99,7 +103,7 @@ function MembershipPageInner() {
 
     // Not signed in — bounce to register, return here after with the tier preserved.
     if (!session?.user) {
-      const next = encodeURIComponent(`/membership?tier=${selectedPlan}&autostart=1`)
+      const next = encodeURIComponent(`/membership?tier=${selectedPlan}&autostart=1${fromVip ? '&from=vip' : ''}`)
       router.push(`/auth/register?next=${next}`)
       return
     }
@@ -113,6 +117,11 @@ function MembershipPageInner() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not start membership')
+      if (fromVip && data.alreadyActive) {
+        // Already a member on this level — straight back into the clubhouse.
+        window.location.href = '/clubhouse'
+        return
+      }
       setSubmitted({
         orderNumber: data.orderNumber ?? '—',
         total: data.total ?? 0,
@@ -151,6 +160,18 @@ function MembershipPageInner() {
           <p className="text-white/40 text-sm mb-8">
             Check your email for the Zelle send-to details. If you don't see it within a few minutes, look in spam.
           </p>
+          {fromVip && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 mb-8 text-left" data-testid="vip-handoff">
+              <p className="font-semibold text-white">Your Clubhouse is next.</p>
+              <p className="text-sm text-white/60 mt-1 leading-relaxed">
+                The moment your payment is confirmed, a welcome email brings you straight into the
+                Clubhouse at vitalityproject.vip — sign in with this same email and password.
+              </p>
+              <a href={vipUrl} className="inline-block mt-3 text-sm font-semibold text-brand-300 hover:text-brand-200">
+                Back to the Clubhouse →
+              </a>
+            </div>
+          )}
           <Link href="/products">
             <Button variant="secondary">
               Browse the Catalog <ArrowRight className="w-4 h-4" />
@@ -163,6 +184,11 @@ function MembershipPageInner() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      {fromVip && (
+        <div className="glass-subtle rounded-2xl px-5 py-3 mb-8 text-sm text-white/70 text-center" data-testid="vip-join-banner">
+          Joining the Clubhouse — your level is selected below. Confirm it and we'll email your Zelle details.
+        </div>
+      )}
       {/* Header */}
       <div className="text-center mb-16">
         <div className="inline-flex items-center gap-2 glass-subtle rounded-full px-4 py-1.5 text-sm text-brand-300 mb-6">

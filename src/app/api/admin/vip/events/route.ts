@@ -22,6 +22,7 @@ const schema = z.discriminatedUnion('op', [
       .nullish(),
     minTier: z.enum(['CLUB', 'PLUS', 'PREMIUM']),
     published: z.boolean(),
+    repeatMonthly: z.boolean().optional(),
   }),
   z.object({ op: z.literal('cancel'), id: z.string().max(64) }),
   z.object({ op: z.literal('uncancel'), id: z.string().max(64) }),
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
         joinUrl: d.joinUrl || null,
         minTier: d.minTier,
         published: d.published,
+        ...(d.repeatMonthly !== undefined ? { repeatMonthly: d.repeatMonthly } : {}),
       }
       const row = d.id
         ? await prisma.vipEvent.update({ where: { id: d.id }, data })

@@ -57,7 +57,7 @@ export function VipShell({
   return (
     <div className="min-h-screen">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#10132a]/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#070b14]/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link href="/feed" className="vip-focus rounded-xl" aria-label="Clubhouse home">
             <span className="sm:hidden"><Wordmark compact /></span>
@@ -115,10 +115,10 @@ export function VipShell({
                 aria-current={active(n.href) ? 'page' : undefined}
                 className={cn(
                   'vip-focus flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                  active(n.href) ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
+                  active(n.href) ? 'bg-brand-500/15 text-white ring-1 ring-inset ring-brand-400/25' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
                 )}
               >
-                <n.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                <n.icon className={cn('h-[18px] w-[18px]', active(n.href) && 'text-brand-300')} aria-hidden="true" />
                 {n.label}
               </Link>
             ))}
@@ -150,7 +150,7 @@ export function VipShell({
               className="vip-focus flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/[0.04] hover:text-white"
             >
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              Shop at vitalityproject.global
+              vitalityproject.global
             </a>
             {adminUrl && (
               <a
@@ -161,6 +161,10 @@ export function VipShell({
                 Clubhouse admin
               </a>
             )}
+            <div className="flex gap-3 px-3 pt-1 text-[11px] text-white/35">
+              <Link href="/guidelines" className="hover:text-white/70">Guidelines</Link>
+              <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
+            </div>
             <button
               type="button"
               onClick={signOut}
@@ -178,7 +182,7 @@ export function VipShell({
 
       {/* Mobile tab bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#10132a]/95 backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#070b14]/95 backdrop-blur-xl lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Clubhouse"
       >
@@ -190,7 +194,7 @@ export function VipShell({
               aria-current={active(n.href) ? 'page' : undefined}
               className={cn(
                 'vip-focus flex flex-col items-center gap-1 py-2.5 text-[10.5px] font-medium',
-                active(n.href) ? 'text-white' : 'text-white/50',
+                active(n.href) ? 'text-brand-200' : 'text-white/50',
               )}
             >
               <n.icon className="h-5 w-5" aria-hidden="true" />
