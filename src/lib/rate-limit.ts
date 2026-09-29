@@ -45,8 +45,12 @@ export function checkRateLimit(
   scope: string,
   opts: Options,
 ): CheckResult {
+  return checkRateLimitKey(`${scope}:${clientKey(req)}`, opts)
+}
+
+/** Same buckets, caller-chosen key (e.g. per signed-in member rather than per IP). */
+export function checkRateLimitKey(key: string, opts: Options): CheckResult {
   const now = Date.now()
-  const key = `${scope}:${clientKey(req)}`
   const existing = buckets.get(key)
 
   if (!existing || existing.resetAt <= now) {
