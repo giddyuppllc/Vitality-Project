@@ -36,6 +36,11 @@ services:
       # Without this mount, /app/public/coa lives inside the image and every
       # `docker compose up -d --build` wipes the uploads silently.
       - ./public/coa:/app/public/coa
+      # Clubhouse (vitalityproject.vip) member photos/avatars. PRIVATE: outside
+      # public/, served only through the members-only /api/vip/media route.
+      # Host dir must be writable by the container user (uid 1001) — see
+      # docs/VIP_CLUBHOUSE.md.
+      - ./private-uploads:/app/private-uploads
 
   # ─── One-off DB migration + first-time post seed ──────────────
   # Syncs the schema (`prisma db push` — creates the posts table etc.) and runs

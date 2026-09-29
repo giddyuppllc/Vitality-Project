@@ -14,7 +14,11 @@
     "prisma:seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "seed:posts": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed-posts.ts",
     "verify:cart": "node scripts/verify-cart-count.mjs",
-    "verify:lapse": "tsx scripts/verify-membership-lapse.ts"
+    "verify:lapse": "tsx scripts/verify-membership-lapse.ts",
+    "test": "vitest run",
+    "verify:vip-migration": "node scripts/vip/verify-migration.mjs",
+    "vip:dev-db": "node scripts/vip/throwaway-db.mjs --port 54329 --data .vip-dev-db",
+    "vip:seed-dev": "tsx scripts/vip/seed-dev.ts"
   },
   "repository": {
     "type": "git",
@@ -70,8 +74,11 @@
     "zustand": "~5.0.12"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "~0.5.8",
+    "@electric-sql/pglite-socket": "~0.2.11",
     "dotenv": "~17.3.1",
     "ts-node": "~10.9.2",
-    "tsx": "~4.21.0"
+    "tsx": "~4.21.0",
+    "vitest": "~5.0.2"
   }
 }
