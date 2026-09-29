@@ -18,7 +18,8 @@
     "test": "vitest run",
     "verify:vip-migration": "node scripts/vip/verify-migration.mjs",
     "vip:dev-db": "node scripts/vip/throwaway-db.mjs --port 54329 --data .vip-dev-db",
-    "vip:seed-dev": "tsx scripts/vip/seed-dev.ts"
+    "vip:seed-dev": "tsx scripts/vip/seed-dev.ts",
+    "vip:seed": "tsx scripts/seed-vip-clubhouse.ts"
   },
   "repository": {
     "type": "git",
