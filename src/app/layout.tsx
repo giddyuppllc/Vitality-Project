@@ -6,6 +6,7 @@ import { Providers } from './providers'
 import { VitalityVeins } from '@/components/vitality-veins'
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 import { ExitIntentModal } from '@/components/store/exit-intent-modal'
+import { GlobalOnly } from '@/components/global-only'
 
 // Marketing pixels — env-gated. Set the IDs in production to enable; dev
 // stays clean. Public-prefixed because they need to land in the bundle.
@@ -76,6 +77,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <head>
+        {/* Store-only head: none of the pixels load on the private .vip
+            clubhouse (see components/global-only.tsx). */}
+        <GlobalOnly>
         {/* Google Analytics 4 — fires on every page; conversion events fire
             from /checkout/confirmation client-side once the store goes live. */}
         {GA_MEASUREMENT_ID && (
@@ -116,18 +120,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${TIKTOK_PIXEL_ID}');ttq.page();}(window,document,'ttq');`}
           </Script>
         )}
+        </GlobalOnly>
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
-        />
+        <GlobalOnly>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+          />
+        </GlobalOnly>
         <Providers>
           <VitalityVeins />
           {children}
-          <ExitIntentModal />
+          <GlobalOnly>
+            <ExitIntentModal />
+          </GlobalOnly>
         </Providers>
-        <ServiceWorkerRegistration />
+        <GlobalOnly>
+          <ServiceWorkerRegistration />
+        </GlobalOnly>
       </body>
     </html>
   )
