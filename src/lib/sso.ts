@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 import { randomUUID } from 'crypto'
 
 /**
- * Cross-TLD SSO hand-off (docs/VIP_ARCHITECTURE.md §3).
+ * Cross-TLD SSO hand-off (docs/VIP_CLUBHOUSE.md §SSO).
  *
  * `.vip` and `.global` are different registrable domains, so a shared session
  * cookie can't span them. Instead `.global` mints a SHORT-LIVED signed token
@@ -11,10 +11,12 @@ import { randomUUID } from 'crypto'
  * The `.vip` /api/sso route verifies it and materialises a next-auth session
  * for that user against the shared user table.
  *
- * Both properties import THIS file so the mint + verify stay in lockstep.
+ * Both hosts are served by this one app, so mint + verify share THIS file.
+ * Replay protection (single use per jti) lives in lib/vip/sso-consume.ts.
  */
 
-const SSO_SECRET = process.env.VIP_SSO_SECRET || ''
+// Read per call (not at import) so a rotated secret or a test env applies.
+const ssoSecret = () => process.env.VIP_SSO_SECRET || ''
 const ISSUER = 'vitalityproject'
 const TTL_SECONDS = 120 // hand-off tokens are single-use in spirit and expire fast
 
@@ -28,8 +30,10 @@ export interface SsoClaims {
 /** Mint a single-use hand-off token. Used on the `.global` side to build the
  *  clubhouse link. Each carries a random jti the `.vip` side consumes once. */
 export function mintSsoToken(claims: { sub: string; email?: string }): string {
-  if (!SSO_SECRET) throw new Error('VIP_SSO_SECRET is not set')
-  return jwt.sign({ email: claims.email }, SSO_SECRET, {
+  const secret = ssoSecret()
+  if (!secret) throw new Error('VIP_SSO_SECRET is not set')
+  return jwt.sign({ email: claims.email }, secret, {
+    algorithm: 'HS256',
     subject: claims.sub,
     issuer: ISSUER,
     expiresIn: TTL_SECONDS,
@@ -39,9 +43,13 @@ export function mintSsoToken(claims: { sub: string; email?: string }): string {
 
 /** Verify a hand-off token. Returns null on any failure (bad sig, expired, etc.). */
 export function verifySsoToken(token: string): SsoClaims | null {
-  if (!SSO_SECRET) return null
+  const secret = ssoSecret()
+  if (!secret) return null
   try {
-    const decoded = jwt.verify(token, SSO_SECRET, { issuer: ISSUER }) as jwt.JwtPayload
+    const decoded = jwt.verify(token, secret, {
+      issuer: ISSUER,
+      algorithms: ['HS256'],
+    }) as jwt.JwtPayload
     if (!decoded.sub || !decoded.jti) return null
     return {
       sub: String(decoded.sub),

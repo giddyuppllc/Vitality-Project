@@ -8,6 +8,62 @@ const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN
 const isSecure = (process.env.NEXTAUTH_URL || '').startsWith('https://')
 const sessionCookieName = `${isSecure ? '__Secure-' : ''}next-auth.session-token`
 
+/**
+ * Email-or-username + password check shared by next-auth's credentials
+ * provider (vitalityproject.global) and the clubhouse sign-in
+ * (/api/vip/auth/login on vitalityproject.vip) — one User table, one rule.
+ */
+export async function authorizeCredentials(
+  credentials: Record<'email' | 'password', string> | undefined,
+) {
+  if (!credentials?.email || !credentials?.password) return null
+
+  const identifier = credentials.email.trim().toLowerCase()
+
+  // Heuristic: anything containing '@' = email, otherwise username.
+  // Avoids two round-trips on the common (email) path.
+  const user = identifier.includes('@')
+    ? await prisma.user.findUnique({ where: { email: identifier } })
+    : await prisma.user.findUnique({ where: { username: identifier } })
+
+  if (!user || !user.passwordHash) {
+    await logAudit({
+      userEmail: identifier,
+      action: 'auth.login.failure',
+      metadata: { reason: 'not_found_or_oauth_only' },
+    })
+    return null
+  }
+
+  const valid = await bcrypt.compare(credentials.password, user.passwordHash)
+  if (!valid) {
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'auth.login.failure',
+      metadata: { reason: 'bad_password' },
+    })
+    return null
+  }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    action: 'auth.login.success',
+  })
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  }
+}
+
+/** Exposed so the clubhouse can issue the SAME next-auth session cookie. */
+export const SESSION_COOKIE_NAME = sessionCookieName
+export const SESSION_COOKIE_SECURE = isSecure
+
 export const authOptions: NextAuthOptions = {
   useSecureCookies: isSecure,
   session: { strategy: 'jwt' },
@@ -39,50 +95,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email or username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
-
-        const identifier = credentials.email.trim().toLowerCase()
-
-        // Heuristic: anything containing '@' = email, otherwise username.
-        // Avoids two round-trips on the common (email) path.
-        const user = identifier.includes('@')
-          ? await prisma.user.findUnique({ where: { email: identifier } })
-          : await prisma.user.findUnique({ where: { username: identifier } })
-
-        if (!user || !user.passwordHash) {
-          await logAudit({
-            userEmail: identifier,
-            action: 'auth.login.failure',
-            metadata: { reason: 'not_found_or_oauth_only' },
-          })
-          return null
-        }
-
-        const valid = await bcrypt.compare(credentials.password, user.passwordHash)
-        if (!valid) {
-          await logAudit({
-            userId: user.id,
-            userEmail: user.email,
-            action: 'auth.login.failure',
-            metadata: { reason: 'bad_password' },
-          })
-          return null
-        }
-
-        await logAudit({
-          userId: user.id,
-          userEmail: user.email,
-          action: 'auth.login.success',
-        })
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        }
-      },
+      authorize: (credentials) => authorizeCredentials(credentials),
     }),
   ],
   callbacks: {
