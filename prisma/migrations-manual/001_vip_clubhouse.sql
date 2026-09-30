@@ -260,6 +260,8 @@ ALTER TABLE "vip_events" ADD COLUMN IF NOT EXISTS "repeatMonthly" BOOLEAN NOT NU
 ALTER TABLE "vip_events" ADD COLUMN IF NOT EXISTS "seriesId" TEXT;
 ALTER TABLE "vip_event_rsvps" ADD COLUMN IF NOT EXISTS "reminded24hAt" TIMESTAMP(3);
 ALTER TABLE "vip_event_rsvps" ADD COLUMN IF NOT EXISTS "reminded1hAt" TIMESTAMP(3);
+-- 09-30: reward notice held until vitalityproject.vip has DNS, then retried.
+ALTER TABLE "vip_reward_grants" ADD COLUMN IF NOT EXISTS "noticeAt" TIMESTAMP(3);
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "vip_events_seriesId_startsAt_idx" ON "vip_events"("seriesId", "startsAt");

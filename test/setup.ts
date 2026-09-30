@@ -40,3 +40,12 @@ vi.mock('@/lib/sms', async (importOriginal) => {
 vi.mock('next/font/google', () => ({
   Inter: () => ({ variable: '--font-inter', className: 'font-inter', style: { fontFamily: 'Inter' } }),
 }))
+
+// The clubhouse-domain DNS check (lib/vip/live.ts): live by default; a test
+// flips it with globalThis.__vipDomainLive.value = false.
+const vipLive = vi.hoisted(() => ({ value: true }))
+;(globalThis as Record<string, unknown>).__vipDomainLive = vipLive
+vi.mock('@/lib/vip/live', () => ({
+  vipDomainLive: vi.fn(async () => vipLive.value),
+  resetVipDomainLive: vi.fn(),
+}))

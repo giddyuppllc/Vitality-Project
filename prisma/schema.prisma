@@ -1739,6 +1739,9 @@ model VipRewardGrant {
   tier             MembershipTier
   amountCents      Int
   storeCreditTxnId String?
+  // When the "reward issued" email was handled (sent, or skipped because the
+  // member turned reward emails off). Null = still to send.
+  noticeAt         DateTime?
   createdAt        DateTime       @default(now())
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 

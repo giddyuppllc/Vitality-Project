@@ -133,6 +133,72 @@ describe('monthly member rewards (store credit)', () => {
     expect(vi.mocked(sendEmail)).not.toHaveBeenCalled()
   })
 
+  it('holds the reward notice while vitalityproject.vip has no DNS, then sends it once on a later day of the month', async () => {
+    const live = (globalThis as unknown as { __vipDomainLive: { value: boolean } }).__vipDomainLive
+    const m = await makeUser({ tag: 'rw-held', tier: 'PREMIUM' })
+    const off = await makeUser({ tag: 'rw-held-off', tier: 'PLUS' })
+    await prisma.vipProfile.create({ data: { userId: off.id, emailRewards: false } })
+    const mine = () => vi.mocked(sendEmail).mock.calls.filter((c) => c[0].to === m.email)
+    try {
+      live.value = false
+      const first = await runMemberRewards({ now: FIRST })
+      expect(await bal(m.id)).toBe(5000) // the credit itself is never held
+      expect(first.emailed).toBe(0)
+      expect(mine()).toHaveLength(0)
+      expect((await prisma.vipRewardGrant.findFirstOrThrow({ where: { userId: m.id } })).noticeAt).toBeNull()
+      // opted out: handled without sending, even while held
+      expect((await prisma.vipRewardGrant.findFirstOrThrow({ where: { userId: off.id } })).noticeAt).not.toBeNull()
+
+      live.value = true
+      const later = await runMemberRewards({ now: new Date('2026-10-04T00:15:00Z') })
+      expect(later.skipped).toBe('not_first_of_month')
+      expect(mine()).toHaveLength(1)
+      expect(mine()[0][0].subject).toBe('Your $50 Clubhouse credit just landed')
+      expect((await prisma.vipRewardGrant.findFirstOrThrow({ where: { userId: m.id } })).noticeAt).not.toBeNull()
+      expect(vi.mocked(sendEmail).mock.calls.filter((c) => c[0].to === off.email)).toHaveLength(0)
+
+      await runMemberRewards({ now: new Date('2026-10-05T00:15:00Z') })
+      expect(mine()).toHaveLength(1)
+      expect(await bal(m.id)).toBe(5000)
+    } finally {
+      live.value = true
+    }
+  })
+
+  it('overlapping runs send a held notice once (the noticeAt claim is the guard)', async () => {
+    const live = (globalThis as unknown as { __vipDomainLive: { value: boolean } }).__vipDomainLive
+    const m = await makeUser({ tag: 'rw-overlap', tier: 'PLUS' })
+    try {
+      live.value = false
+      await runMemberRewards({ now: FIRST })
+    } finally {
+      live.value = true
+    }
+    const day = new Date('2026-10-02T00:15:00Z')
+    await Promise.all([runMemberRewards({ now: day }), runMemberRewards({ now: day }), runMemberRewards({ now: day })])
+    expect(vi.mocked(sendEmail).mock.calls.filter((c) => c[0].to === m.email)).toHaveLength(1)
+  })
+
+  it('a failed send releases its claim; a notice from an earlier month is never sent late', async () => {
+    const m = await makeUser({ tag: 'rw-retry', tier: 'CLUB' })
+    const real = vi.mocked(sendEmail).getMockImplementation()!
+    vi.mocked(sendEmail).mockImplementation(async (a) => (a.to === m.email ? ({ success: false, error: 'boom' } as never) : real(a)))
+    try {
+      await runMemberRewards({ now: FIRST })
+    } finally {
+      vi.mocked(sendEmail).mockImplementation(real)
+    }
+    const mine = () => vi.mocked(sendEmail).mock.calls.filter((c) => c[0].to === m.email)
+    expect(mine()).toHaveLength(1)
+    expect((await prisma.vipRewardGrant.findFirstOrThrow({ where: { userId: m.id } })).noticeAt).toBeNull()
+    // next month: October's unsent notice is left alone; November's goes out
+    await runMemberRewards({ now: new Date('2026-11-01T00:15:00Z') })
+    const subjects = mine().map((c) => c[0].html)
+    expect(subjects).toHaveLength(2)
+    expect(subjects[1]).toContain('November 2026')
+    expect((await prisma.vipRewardGrant.findFirstOrThrow({ where: { userId: m.id, period: '2026-10' } })).noticeAt).toBeNull()
+  })
+
   it('cron endpoint: 403 without the secret (when set), runs with it, logs a CronRun', async () => {
     process.env.CRON_SECRET = 'zz-test-cron-secret'
     try {

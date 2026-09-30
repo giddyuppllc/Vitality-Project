@@ -1,6 +1,6 @@
 # vitalityproject.vip — members' clubhouse
 
-Branch `feat/vip-clubhouse` (pushed as a backup branch only). **Not merged, not deployed, never run against the production DB.** Finished 09-29 on Edward's instruction ("zelle for vitalityproject and email is shared from .global .. finish this off entirely use assumptions"). Every assumption is listed under **Assumptions made 09-29 (review)**; every one that is a setting is editable at `/admin/vip/rewards`.
+**Live on master since 2026-09-30** (60276a2; SQL 001 applied, starter content seeded, crons installed). `vitalityproject.vip` has **no DNS records yet**, so the clubhouse answers only when the Host header reaches the box; clubhouse email is held until the domain resolves (see **Email**). Built 09-29 on Edward's instruction ("zelle for vitalityproject and email is shared from .global .. finish this off entirely use assumptions"). Every assumption is listed under **Assumptions made 09-29 (review)**; every one that is a setting is editable at `/admin/vip/rewards`.
 
 ## What it is
 
@@ -56,6 +56,8 @@ All clubhouse email goes through .global's existing `sendEmail` (`src/lib/email.
 | Monthly reward issued | right after the 1st-of-month grant | the grant is once per month | `emailRewards` |
 
 Every email carries signed one-click preference links (`/email?u&k&t`, HMAC with `NEXTAUTH_SECRET`); the page changes nothing until the member presses the button, so mail scanners can't unsubscribe anyone. Members also toggle all three on their profile. Event emails show times in `vip.timeZone` (America/New_York) and link to the Events page — the join link stays inside the clubhouse. Tests mock `sendEmail`; nothing was sent from tests or local runs.
+
+**Held until the domain resolves.** Every clubhouse email links to vitalityproject.vip, so `sendVipEmail` sends nothing until the domain has an A or AAAA record on public DNS (1.1.1.1 / 8.8.8.8, checked from the app; a "not yet" is re-checked every 5 minutes, a "yes" is remembered; `lib/vip/live.ts`). A held welcome releases its claim and goes out on the member's next trigger. A held reward notice stays pending (`vip_reward_grants.noticeAt` null) and the daily rewards run sends it on a later day of the same month; a month's notice is never sent after that month ends. The store credit itself is never held. `VIP_MAIL_REQUIRE_DNS=0` turns the check off.
 
 New cron `/api/cron/vip-notify` (every 15 min): event reminders, the digest, and the next date of each **monthly event series** (`VipEvent.repeatMonthly`: when the latest occurrence starts, the next one — same weekday-of-month, same local time — is published; untick "Repeats monthly" on the latest to end a series).
 

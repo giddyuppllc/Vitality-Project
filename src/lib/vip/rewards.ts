@@ -124,6 +124,7 @@ export async function runMemberRewards(
 
   if (now.getUTCDate() !== 1 && !opts.catchUp) {
     result.skipped = 'not_first_of_month'
+    if (!dryRun && opts.sendEmails !== false) result.emailed = await sendPendingRewardNotices(period)
     return result
   }
 
@@ -141,7 +142,6 @@ export async function runMemberRewards(
   )
 
   const decisions: RewardDecision[] = []
-  const grantedNow: Array<{ userId: string; tier: MembershipTier; amountCents: number }> = []
 
   for (const m of memberships) {
     const amountCents = settings[m.tier as RewardTier] ?? 0
@@ -197,7 +197,6 @@ export async function runMemberRewards(
         result.granted++
         result.totalCents += amountCents
         decisions.push({ ...base, outcome: 'granted' })
-        grantedNow.push(base)
       } else {
         result.alreadyGranted++
         decisions.push({ ...base, outcome: 'already_granted' })
@@ -209,29 +208,44 @@ export async function runMemberRewards(
     }
   }
 
-  if (!dryRun && opts.sendEmails !== false && grantedNow.length) {
-    result.emailed = await emailRewardNotices(grantedNow, period)
+  if (!dryRun && opts.sendEmails !== false) {
+    result.emailed = await sendPendingRewardNotices(period)
   }
   if (dryRun) result.decisions = decisions
   return result
 }
 
-async function emailRewardNotices(
-  grants: Array<{ userId: string; tier: MembershipTier; amountCents: number }>,
-  period: string,
-): Promise<number> {
+/**
+ * Sends the "reward issued" email for this month's grants that haven't had
+ * one yet. Runs on every daily pass, so a notice held back (the clubhouse
+ * domain not live yet, or a failed send) goes out on a later day of the same
+ * month. `noticeAt` is claimed before the send and released if it fails, so
+ * overlapping runs never send twice. Earlier months are never sent late.
+ */
+async function sendPendingRewardNotices(period: string): Promise<number> {
+  const pending = await prisma.vipRewardGrant.findMany({
+    where: { period, noticeAt: null },
+    select: { id: true, userId: true, tier: true, amountCents: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  if (!pending.length) return 0
   const { 'vip.rewardExpiryMonths': months } = await getVipSettings()
   let sent = 0
-  for (const g of grants) {
+  for (const g of pending) {
+    const claimedAt = new Date()
+    const { count } = await prisma.vipRewardGrant.updateMany({ where: { id: g.id, noticeAt: null }, data: { noticeAt: claimedAt } })
+    if (count !== 1) continue
+    let ok = false
     try {
       const u = await prisma.user.findUnique({
         where: { id: g.userId },
         select: { email: true, name: true, storeCredit: { select: { balance: true } }, vipProfile: { select: { emailRewards: true } } },
       })
+      // Turned off (or gone): handled, nothing to send.
       if (!u || u.vipProfile?.emailRewards === false) continue
       const [y, m] = period.split('-').map(Number)
       const expires = months > 0 ? addUtcMonths(new Date(Date.UTC(y, m - 1, 1)), months) : null
-      const ok = await sendVipEmail(
+      ok = await sendVipEmail(
         u.email,
         rewardIssuedEmail({
           userId: g.userId,
@@ -250,6 +264,8 @@ async function emailRewardNotices(
     } catch (err) {
       console.error('[vip/rewards] reward email failed for', g.userId, err)
     }
+    // Not sent: release the claim so the next daily run tries again.
+    if (!ok) await prisma.vipRewardGrant.updateMany({ where: { id: g.id, noticeAt: claimedAt }, data: { noticeAt: null } })
   }
   return sent
 }

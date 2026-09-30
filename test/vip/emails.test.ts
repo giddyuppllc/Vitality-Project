@@ -52,6 +52,22 @@ describe('welcome to the clubhouse', () => {
     expect(sentTo(u.email).filter((m) => m.subject.startsWith('Welcome to the Clubhouse'))).toHaveLength(1)
   })
 
+  it('is held (not sent, not claimed) while vitalityproject.vip has no DNS, and goes out on the next trigger once it does', async () => {
+    const live = (globalThis as unknown as { __vipDomainLive: { value: boolean } }).__vipDomainLive
+    const u = await makeUser({ tag: 'em-held', tier: 'PLUS' })
+    try {
+      live.value = false
+      expect(await sendClubhouseWelcome(u.id)).toBe('failed')
+      expect(sentTo(u.email)).toHaveLength(0)
+      expect((await prisma.vipProfile.findUnique({ where: { userId: u.id } }))?.welcomeEmailAt ?? null).toBeNull()
+      live.value = true
+      expect(await sendClubhouseWelcome(u.id)).toBe('sent')
+      expect(sentTo(u.email)).toHaveLength(1)
+    } finally {
+      live.value = true
+    }
+  })
+
   it('never goes to someone without an active membership', async () => {
     const u = await makeUser({ tag: 'em-nomember', tier: 'CLUB', status: 'PAST_DUE' })
     expect(await sendClubhouseWelcome(u.id)).toBe('not_member')
@@ -78,21 +94,29 @@ describe('daily reply/mention digest', () => {
     return u
   }
   const at = (h: number) => new Date(Date.UTC(2026, 8, 29, h, 5))
+  // The next 13:05 UTC (digest hour) at or after the real clock: the test
+  // notifications are stamped with the real time, so the run must not be earlier.
+  const nextDigestRun = () => {
+    const t = new Date()
+    const due = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 13, 5))
+    if (due < t) due.setUTCDate(due.getUTCDate() + 1)
+    return due
+  }
 
   it('waits for the digest hour, sends once per day, then again the next day only for new activity', async () => {
     const u = await setup('em-dg')
     expect((await runDigest(at(10), false)).skipped).toBe('before_digest_hour')
     expect(sentTo(u.email)).toHaveLength(0)
 
-    const now = new Date()
-    await runDigest(new Date(Math.max(now.getTime(), at(13).getTime())), false)
+    const due = nextDigestRun()
+    expect((await runDigest(due, false)).skipped).toBeUndefined()
     const mail = sentTo(u.email)
     expect(mail).toHaveLength(1)
     expect(mail[0].subject).toBe('Coach Casey commented on your post in the Clubhouse')
     expect(mail[0].html).toContain('What changed in your wind-down?')
     expect(mail[0].replyTo).toBe('vital@vitalityproject.global')
 
-    await runDigest(new Date(Math.max(now.getTime(), at(13).getTime()) + 3600e3), false)
+    await runDigest(new Date(due.getTime() + 3600e3), false)
     expect(sentTo(u.email)).toHaveLength(1)
   })
 
@@ -101,7 +125,8 @@ describe('daily reply/mention digest', () => {
     const susp = await setup('em-dg-susp', { suspendedAt: new Date() })
     const mkt = await setup('em-dg-mkt')
     await prisma.communicationPreference.create({ data: { userId: mkt.id, marketingEmail: false } })
-    await runDigest(new Date(Math.max(Date.now(), at(13).getTime())), false)
+    const ran = await runDigest(nextDigestRun(), false)
+    expect(ran.skipped).toBeUndefined()
     for (const u of [off, susp, mkt]) expect(sentTo(u.email)).toHaveLength(0)
   })
 })

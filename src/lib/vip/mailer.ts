@@ -11,6 +11,7 @@ import {
   type Rendered,
 } from './emails'
 import { nextMonthlyOccurrence } from './time'
+import { vipDomainLive } from './live'
 
 /**
  * Clubhouse email flows. Everything sends through .global's sendEmail()
@@ -25,6 +26,14 @@ import { nextMonthlyOccurrence } from './time'
  */
 
 export async function sendVipEmail(to: string, r: Rendered): Promise<boolean> {
+  // Held (reported as not sent) until vitalityproject.vip resolves: every
+  // clubhouse email links there. The welcome and the monthly reward notice
+  // are retried once it does; digests and reminders need clubhouse activity,
+  // which can't happen before the domain is live.
+  if (!(await vipDomainLive())) {
+    console.warn('[vip/mail] held: clubhouse domain has no public DNS yet —', r.subject)
+    return false
+  }
   const { 'vip.emailReplyTo': replyTo } = await getVipSettings()
   const res = await sendEmail({ to, subject: r.subject, html: r.html, text: r.text, replyTo })
   return res.success
