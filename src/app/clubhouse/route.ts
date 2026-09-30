@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { mintSsoToken } from '@/lib/sso'
+import { vipDomainLive } from '@/lib/vip/live'
 
 // node runtime — jsonwebtoken needs it.
 export const runtime = 'nodejs'
@@ -19,6 +20,7 @@ const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL || 'https://vitalityproject.vip'
  *   signed out      → login, then back here
  *   not a member    → /membership (join/upgrade first)
  *   active member   → mint token → .vip clubhouse
+ *   .vip has no DNS yet → back to /account/membership (never a dead domain)
  */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -33,6 +35,9 @@ export async function GET(req: NextRequest) {
   const active = membership && membership.tier !== 'NONE' && membership.status === 'ACTIVE'
   if (!active) {
     return NextResponse.redirect(new URL('/membership', req.url))
+  }
+  if (!(await vipDomainLive())) {
+    return NextResponse.redirect(new URL('/account/membership', req.url))
   }
 
   let token: string

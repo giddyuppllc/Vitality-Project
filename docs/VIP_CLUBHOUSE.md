@@ -78,6 +78,8 @@ New cron `/api/cron/vip-notify` (every 15 min): event reminders, the digest, and
    - inserts the `jti` into `vip_sso_consumed_tokens`, so a replay is refused
    - checks that the user exists and that the email claim matches
    - issues the **same next-auth JWT session cookie**, scoped to the .vip host, and redirects with a relative Location.
+Until vitalityproject.vip resolves, the .global "Enter the Clubhouse" card is hidden and `/clubhouse` returns the member to `/account/membership` (same DNS check as the email hold); both switch on by themselves once the records exist.
+
 3. Members can also sign in directly on .vip at `/signin` → `/api/vip/auth/login`, using the same email or username and password. It uses `authorizeCredentials`, the credentials check extracted unchanged from `authOptions`.
 
 ## Environment variables (names only)

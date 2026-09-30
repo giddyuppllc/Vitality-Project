@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { formatDate, formatPrice } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { TIER_BENEFITS } from '@/lib/membership'
+import { vipDomainLive } from '@/lib/vip/live'
 import {
   Sparkles,
   Calendar,
@@ -101,8 +102,9 @@ export default async function AccountMembershipPage() {
       <h1 className="text-2xl font-bold mb-6">Membership</h1>
 
       {/* VIP clubhouse hand-off — active members only. /clubhouse mints a
-          single-use SSO token and bounces to vitalityproject.vip. */}
-      {membership.status === 'ACTIVE' && (
+          single-use SSO token and bounces to vitalityproject.vip; shown once
+          that domain resolves. */}
+      {membership.status === 'ACTIVE' && (await vipDomainLive()) && (
         <Link
           href="/clubhouse"
           className="glass mb-6 flex items-center justify-between rounded-2xl border border-brand-500/30 bg-gradient-to-br from-brand-500/15 to-transparent p-5 transition-colors hover:border-brand-500/50"
