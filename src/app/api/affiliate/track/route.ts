@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/public-url'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const redirect = searchParams.get('to') ?? '/'
 
   if (!code) {
-    return NextResponse.redirect(new URL(redirect, req.url))
+    return NextResponse.redirect(publicUrl(req, redirect))
   }
 
   // Cap per-IP click recording so a single source can't spray click rows /
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   // (never break the user-facing link) but skip the DB write + cookie set.
   const limited = checkRateLimit(req, 'affiliate-track', { limit: 30, windowMs: 60_000 })
   if (!limited.allowed) {
-    return NextResponse.redirect(new URL(redirect, req.url))
+    return NextResponse.redirect(publicUrl(req, redirect))
   }
 
   const affiliate = await prisma.affiliate.findUnique({
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
   })
 
   if (!affiliate) {
-    return NextResponse.redirect(new URL(redirect, req.url))
+    return NextResponse.redirect(publicUrl(req, redirect))
   }
 
   // Record click with server-side session ID (immune to ad blockers)
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
   // Set affiliate cookie (30 days, server-side)
   const cookieStore = cookies()
   const days = parseInt(process.env.AFFILIATE_COOKIE_DAYS ?? '30')
-  const response = NextResponse.redirect(new URL(redirect, req.url))
+  const response = NextResponse.redirect(publicUrl(req, redirect))
   response.cookies.set('aff_code', code.toUpperCase(), {
     maxAge: days * 24 * 60 * 60,
     httpOnly: false, // needs to be readable by JS for checkout

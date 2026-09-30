@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/public-url'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params
-  const origin = new URL(req.url).origin
+  const origin = new URL(publicUrl(req, '/')).origin
 
   if (!token) {
     return NextResponse.redirect(new URL('/unsubscribed', origin))

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/public-url'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -25,7 +26,7 @@ const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL || 'https://vitalityproject.vip'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL('/auth/login?callbackUrl=/clubhouse', req.url))
+    return NextResponse.redirect(publicUrl(req, '/auth/login?callbackUrl=/clubhouse'))
   }
 
   const membership = await prisma.membership.findUnique({
@@ -34,10 +35,10 @@ export async function GET(req: NextRequest) {
   })
   const active = membership && membership.tier !== 'NONE' && membership.status === 'ACTIVE'
   if (!active) {
-    return NextResponse.redirect(new URL('/membership', req.url))
+    return NextResponse.redirect(publicUrl(req, '/membership'))
   }
   if (!(await vipDomainLive())) {
-    return NextResponse.redirect(new URL('/account/membership', req.url))
+    return NextResponse.redirect(publicUrl(req, '/account/membership'))
   }
 
   let token: string

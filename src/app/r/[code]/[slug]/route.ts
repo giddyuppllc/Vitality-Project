@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/public-url'
 import { prisma } from '@/lib/prisma'
 import { recordClickAndRedirect } from '@/lib/affiliate-tracking'
 
@@ -23,7 +24,7 @@ export async function GET(
     link.affiliate.code !== code.toUpperCase() ||
     link.affiliate.status !== 'ACTIVE'
   ) {
-    return NextResponse.redirect(new URL('/', req.url))
+    return NextResponse.redirect(publicUrl(req, '/'))
   }
 
   return recordClickAndRedirect(req, code, link.url, { slug })
