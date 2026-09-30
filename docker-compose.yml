@@ -26,11 +26,8 @@ services:
     environment:
       REDIS_URL: "redis://redis:6379"
     ports:
-<<<<<<< HEAD
       # Loopback only: nginx reaches the app over the compose network (app:3000);
       # the host port must not be reachable from the internet.
-=======
->>>>>>> origin/master
       - "127.0.0.1:3000:3000"
     depends_on:
       redis:
