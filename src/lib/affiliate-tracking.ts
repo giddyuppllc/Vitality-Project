@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/public-url'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -21,18 +22,9 @@ export async function recordClickAndRedirect(
   opts: { slug?: string | null } = {},
 ) {
   const normalized = code.toUpperCase()
-  // Build the absolute redirect URL using the public proxy headers — inside
-  // Docker `req.url` resolves to `http://0.0.0.0:3000` which Cloudflare won't
-  // accept as a Location target.
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  const host =
-    req.headers.get('x-forwarded-host') ??
-    req.headers.get('host') ??
-    'vitalityproject.global'
-  const base = `${proto}://${host}`
-  const dest = destination.startsWith('http')
-    ? destination
-    : new URL(destination, base).toString()
+  // Absolute redirect URL on the visitor's public host (lib/public-url.ts):
+  // inside Docker `req.url` resolves to `http://0.0.0.0:3000`.
+  const dest = publicUrl(req, destination)
   const sessionId = req.cookies.get('session_id')?.value ?? crypto.randomUUID()
 
   const affiliate = await prisma.affiliate.findUnique({

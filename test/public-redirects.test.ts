@@ -6,6 +6,7 @@ import { GET as confirmGET } from '@/app/api/newsletter/confirm/[token]/route'
 import { GET as trackGET } from '@/app/api/affiliate/track/route'
 import { GET as slugGET } from '@/app/r/[code]/[slug]/route'
 import { GET as clubhouseGET } from '@/app/clubhouse/route'
+import { GET as refGET } from '@/app/r/[code]/route'
 import { params } from './helpers'
 
 /**
@@ -24,6 +25,23 @@ describe('redirects behind the proxy go to the public host, never 0.0.0.0', () =
     const fwd = new NextRequest('http://0.0.0.0:3000/', { headers: { host: '0.0.0.0:3000', 'x-forwarded-host': 'vitalityproject.global' } })
     expect(publicUrl(fwd, '/')).toBe('https://vitalityproject.global/')
     expect(publicUrl(behindProxy('/'), 'https://example.com/a')).toBe('https://example.com/a')
+  })
+
+  it("Cloudflare's CF-Visitor scheme wins over the origin nginx's X-Forwarded-Proto: http", () => {
+    const viaCf = (visitor: string) =>
+      new NextRequest('http://0.0.0.0:3000/', {
+        headers: { host: 'vitalityproject.global', 'x-forwarded-proto': 'http', 'cf-visitor': visitor },
+      })
+    expect(publicUrl(viaCf('{"scheme":"https"}'), '/shop')).toBe('https://vitalityproject.global/shop')
+    expect(publicUrl(viaCf('not json'), '/shop')).toBe('http://vitalityproject.global/shop')
+    expect(publicUrl(viaCf('{"scheme":"javascript"}'), '/shop')).toBe('http://vitalityproject.global/shop')
+  })
+
+  it('affiliate click (/r/<code>) lands on https behind Cloudflare', async () => {
+    const r = new NextRequest('http://0.0.0.0:3000/r/ZZNOPE?to=/shop', {
+      headers: { host: 'vitalityproject.global', 'x-forwarded-proto': 'http', 'cf-visitor': '{"scheme":"https"}', 'x-forwarded-for': '10.9.9.8' },
+    })
+    expect(loc(await refGET(r, params({ code: 'ZZNOPE' })))).toBe('https://vitalityproject.global/shop')
   })
 
   it('newsletter unsubscribe and confirm (links in customer email)', async () => {
