@@ -15,7 +15,8 @@ const updateSchema = z.object({
   price: z.number().int().min(0).optional(),
   comparePrice: z.number().int().nullable().optional(),
   salePrice: z.number().int().nullable().optional(),
-  sku: z.string().optional(),
+  // null (or an emptied box) clears the SKU.
+  sku: z.string().trim().nullable().optional().transform((v) => (v === '' ? null : v)),
   categoryId: z.string().nullable().optional(),
   inventory: z.number().int().min(0).optional(),
   featured: z.boolean().optional(),
@@ -55,19 +56,24 @@ export async function PATCH(
   try {
     const data = updateSchema.parse(await req.json())
 
-    // Status changes go through the central helper so they get an
-    // AuditLog row with before/after + an AdminNotification when an
-    // ACTIVE product is being hidden from the storefront.
-    if (data.status !== undefined) {
-      await setProductStatus(id, data.status, {
-        userId: session.user.id,
-        userEmail: session.user.email,
-        source: 'admin/products PATCH',
+    // A SKU is unique across products. Check it up front so a clash comes
+    // back as a clear 409 naming the other product — and so nothing is
+    // half-saved (status used to be committed before the update failed).
+    if (data.sku) {
+      const clash = await prisma.product.findFirst({
+        where: { sku: data.sku, NOT: { id } },
+        select: { name: true },
       })
+      if (clash) {
+        return NextResponse.json(
+          { error: `SKU ${data.sku} already belongs to "${clash.name}".` },
+          { status: 409 },
+        )
+      }
     }
 
     // All other fields update normally; we omit `status` from the
-    // update payload because the helper handled it (writing it twice
+    // update payload because the helper below handles it (writing it twice
     // would be a no-op but the second write would not be audit-logged).
     const { status: _status, ...rest } = data
 
@@ -79,11 +85,24 @@ export async function PATCH(
     if (rest.inventory !== undefined && (await hasVariants(id))) {
       delete (rest as { inventory?: number }).inventory
     }
-    const product = await prisma.product.update({
+    let product = await prisma.product.update({
       where: { id },
       data: rest,
       include: { images: true, category: true },
     })
+
+    // Status changes go through the central helper so they get an
+    // AuditLog row with before/after + an AdminNotification when an
+    // ACTIVE product is being hidden from the storefront. Done AFTER the
+    // field update so a failed save never leaves a lone status change.
+    if (data.status !== undefined) {
+      const r = await setProductStatus(id, data.status, {
+        userId: session.user.id,
+        userEmail: session.user.email,
+        source: 'admin/products PATCH',
+      })
+      product = { ...product, status: r.status }
+    }
 
     await logAudit({
       userId: session.user.id,
@@ -103,7 +122,11 @@ export async function PATCH(
 
     return NextResponse.json(product)
   } catch (error) {
-    if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error instanceof z.ZodError) {
+      const msg = error.issues.map((i) => `${i.path.join('.') || 'value'}: ${i.message}`).join('; ')
+      return NextResponse.json({ error: msg, issues: error.issues }, { status: 400 })
+    }
+    console.error('[admin/products PATCH] failed:', error)
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
   }
 }

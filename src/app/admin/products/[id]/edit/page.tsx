@@ -23,13 +23,14 @@ interface Form {
   status: Status
   featured: boolean
   tags: string
+  categoryId: string
 }
 
 const empty: Form = {
   name: '', shortDesc: '', description: '',
   price: '', comparePrice: '', salePrice: '',
   sku: '', inventory: '0',
-  status: 'ACTIVE', featured: false, tags: '',
+  status: 'ACTIVE', featured: false, tags: '', categoryId: '',
 }
 
 export default function EditProductPage() {
@@ -44,10 +45,22 @@ export default function EditProductPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch('/api/admin/categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((c) => setCategories(Array.isArray(c) ? c : []))
+      .catch(() => setCategories([]))
+  }, [])
 
   useEffect(() => {
     fetch(`/api/admin/products/${id}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        const p = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(p?.error ?? `Could not load this product (${r.status})`)
+        return p
+      })
       .then((p) => {
         setForm({
           name: p.name ?? '',
@@ -61,8 +74,10 @@ export default function EditProductPage() {
           status: p.status ?? 'ACTIVE',
           featured: p.featured ?? false,
           tags: (p.tags ?? []).join(', '),
+          categoryId: p.categoryId ?? '',
         })
       })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load this product'))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -83,6 +98,12 @@ export default function EditProductPage() {
         setSaving(false)
         return
       }
+      const inventory = form.inventory.trim() === '' ? 0 : Number(form.inventory)
+      if (!Number.isInteger(inventory) || inventory < 0) {
+        setError('Stock Count must be a whole number, 0 or more')
+        setSaving(false)
+        return
+      }
     setSuccess(false)
     try {
       const body: Record<string, unknown> = {
@@ -92,8 +113,10 @@ export default function EditProductPage() {
         price: priceCents,
         comparePrice: form.comparePrice ? (parseMoneyToCents(form.comparePrice) ?? 0) : null,
         salePrice: form.salePrice ? (parseMoneyToCents(form.salePrice) ?? 0) : null,
-        sku: form.sku || undefined,
-        inventory: parseInt(form.inventory),
+        // An emptied SKU box clears the SKU (it used to be silently kept).
+        sku: form.sku.trim() || null,
+        categoryId: form.categoryId || null,
+        inventory,
         featured: form.featured,
         status: form.status,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
@@ -107,9 +130,11 @@ export default function EditProductPage() {
         setSuccess(true)
         setTimeout(() => setSuccess(false), 3000)
       } else {
-        const d = await res.json()
-        setError(JSON.stringify(d.error))
+        const d = await res.json().catch(() => null)
+        setError(typeof d?.error === 'string' ? d.error : `Save failed (${res.status})`)
       }
+    } catch {
+      setError('Save failed — check your connection and try again')
     } finally {
       setSaving(false)
     }
@@ -225,6 +250,19 @@ export default function EditProductPage() {
                 <span className="text-sm font-medium text-white/70">Featured on homepage</span>
               </label>
             </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-white/70 mb-1.5 block">Category</label>
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">No category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
           <Input label="Tags (comma separated)" value={form.tags} onChange={set('tags')} placeholder="peptide, recovery, bpc-157" />
         </div>

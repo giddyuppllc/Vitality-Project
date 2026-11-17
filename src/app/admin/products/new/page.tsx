@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -12,17 +12,26 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false)
   // Set when the API says this product looks like one that already exists.
   const [duplicate, setDuplicate] = useState<
-    { message: string; id: string; name: string; status: string } | null
+    { message: string; id: string; name: string; status: string; canForce: boolean } | null
   >(null)
+  const [error, setError] = useState('')
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch('/api/admin/categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((c) => setCategories(Array.isArray(c) ? c : []))
+      .catch(() => setCategories([]))
+  }, [])
   const [form, setForm] = useState({
     name: '', description: '', shortDesc: '', price: '', comparePrice: '',
     sku: '', inventory: '0', featured: false,
     status: 'DRAFT' as 'DRAFT' | 'ACTIVE' | 'ARCHIVED',
-    tags: '', imageUrl: '', imageAlt: '',
+    tags: '', imageUrl: '', imageAlt: '', categoryId: '',
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent, force = false) => {
+    e?.preventDefault()
+    setError('')
     // Required. A number input yields "" for anything it cannot parse, so
     // pasting "$64" or "1,200" leaves this empty — and the old
     // Math.round(parseFloat("") * 100) produced NaN, which JSON.stringify
@@ -30,7 +39,12 @@ export default function NewProductPage() {
     setDuplicate(null)
     const priceCents = parseMoneyToCents(form.price)
     if (priceCents === null) {
-      alert('Enter a price, e.g. 49.99')
+      setError('Enter a price, e.g. 49.99')
+      return
+    }
+    const inventory = form.inventory.trim() === '' ? 0 : Number(form.inventory)
+    if (!Number.isInteger(inventory) || inventory < 0) {
+      setError('Inventory must be a whole number, 0 or more')
       return
     }
     setLoading(true)
@@ -45,26 +59,36 @@ export default function NewProductPage() {
           price: priceCents,
           comparePrice: form.comparePrice ? (parseMoneyToCents(form.comparePrice) ?? undefined) : undefined,
           sku: form.sku || undefined,
-          inventory: parseInt(form.inventory),
+          inventory,
+          categoryId: form.categoryId || undefined,
           featured: form.featured,
           status: form.status,
-          tags: form.tags ? form.tags.split(',').map((t) => t.trim()) : [],
+          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
           images: form.imageUrl ? [{ url: form.imageUrl, alt: form.imageAlt, position: 0 }] : [],
+          ...(force ? { force: true } : {}),
         }),
       })
       if (res.ok) {
         router.push('/admin/products')
       } else {
-        const d = await res.json()
+        const d = await res.json().catch(() => null)
         // A near-duplicate comes back as 409 with the product it looks like.
         // Offer to open that one — creating a second row is what produced five
         // duplicate products in this catalog already.
-        if (res.status === 409 && d.match) {
-          setDuplicate({ message: d.message, id: d.match.id, name: d.match.name, status: d.match.status })
+        if (res.status === 409 && d?.match) {
+          setDuplicate({
+            message: d.message,
+            id: d.match.id,
+            name: d.match.name,
+            status: d.match.status,
+            canForce: d.match.reason !== 'same-sku',
+          })
           return
         }
-        alert('Error: ' + JSON.stringify(d.error))
+        setError(typeof d?.error === 'string' ? d.error : `Could not create the product (${res.status})`)
       }
+    } catch {
+      setError('Could not create the product — check your connection and try again')
     } finally {
       setLoading(false)
     }
@@ -96,6 +120,16 @@ export default function NewProductPage() {
             >
               Open &ldquo;{duplicate.name}&rdquo; ({duplicate.status.toLowerCase()}) instead
             </Link>
+            {duplicate.canForce && (
+              <button
+                type="button"
+                onClick={() => handleSubmit(undefined, true)}
+                disabled={loading}
+                className="underline underline-offset-2 hover:text-amber-100 disabled:opacity-50"
+              >
+                It&rsquo;s a different product &mdash; create it anyway
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setDuplicate(null)}
@@ -162,8 +196,22 @@ export default function NewProductPage() {
               </label>
             </div>
           </div>
+          <div>
+            <label className="text-sm font-medium text-white/70 mb-1.5 block">Category</label>
+            <select
+              {...f('categoryId')}
+              className="w-full px-4 py-2.5 rounded-xl bg-dark-700 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">No category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
           <Input label="Tags (comma separated)" {...f('tags')} placeholder="peptide, recovery, bpc-157" />
         </div>
+
+        {error && <p role="alert" className="text-red-400 text-sm px-1">{error}</p>}
 
         <div className="flex gap-3">
           <Button type="submit" loading={loading} size="lg">Create Product</Button>
