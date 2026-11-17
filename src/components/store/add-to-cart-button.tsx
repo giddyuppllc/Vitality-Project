@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ShoppingCart, Check, Plus, Minus } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
+import { sellableVariants } from '@/lib/display-price'
 
 interface Variant {
   id: string
@@ -26,20 +27,28 @@ interface Props {
 
 export function AddToCartButton({ product }: Props) {
   const addItem = useCart((s) => s.addItem)
-  const hasVariants = product.variants && product.variants.length > 0
+  // A $0 variant is refused by the pricing engine ('price-unset'), so it is
+  // never offered here — it used to render as "Add to cart — $0.00" and then
+  // vanish from the cart as unavailable. Cheapest size first, matching the
+  // "from" price on the card and the page headline.
+  const variants = sellableVariants(product.variants)
+  const hasVariants = variants.length > 0
+  const unsellable =
+    (product.variants?.length ?? 0) > 0 ? !hasVariants : !(product.price > 0)
   const [variantId, setVariantId] = useState<string | null>(
-    hasVariants ? product.variants[0].id : null,
+    hasVariants ? variants[0].id : null,
   )
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
 
   const selectedVariant = hasVariants
-    ? product.variants.find((v) => v.id === variantId) ?? product.variants[0]
+    ? variants.find((v) => v.id === variantId) ?? variants[0]
     : null
 
   const unitPrice = selectedVariant?.price ?? product.price
 
   const handleAdd = () => {
+    if (unsellable) return
     // Cart only stores REFS — productId, variantId, quantity + display
     // fields. Price is intentionally NOT passed; the cart and checkout
     // pages always derive prices from /api/cart on the server. The
@@ -62,11 +71,11 @@ export function AddToCartButton({ product }: Props) {
     <div className="space-y-4">
       {hasVariants && (
         <div className="space-y-2">
-          <label className="text-xs uppercase tracking-[0.12em] text-white/45 font-semibold">
+          <p id="variant-label" className="text-xs uppercase tracking-[0.12em] text-white/45 font-semibold">
             Strength / size
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {product.variants.map((v) => {
+          </p>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="variant-label">
+            {variants.map((v) => {
               // ProductVariant.inventory is a display-only signal here — checkout
               // doesn't gate on it (drop-ship model). inventory>0 = "In Stock"
               // badge (green), inventory===0 = "Pre-order" badge (amber). Customers
@@ -77,6 +86,7 @@ export function AddToCartButton({ product }: Props) {
                   key={v.id}
                   type="button"
                   onClick={() => setVariantId(v.id)}
+                  aria-pressed={v.id === variantId}
                   className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
                     v.id === variantId
                       ? 'border-brand bg-brand/10 text-white'
@@ -125,8 +135,10 @@ export function AddToCartButton({ product }: Props) {
           </button>
         </div>
 
-        <Button onClick={handleAdd} size="lg" className="flex-1">
-          {added ? (
+        <Button onClick={handleAdd} size="lg" className="flex-1" disabled={unsellable}>
+          {unsellable ? (
+            <>Currently unavailable</>
+          ) : added ? (
             <>
               <Check className="w-5 h-5" />
               Added — ${((unitPrice * qty) / 100).toFixed(2)}

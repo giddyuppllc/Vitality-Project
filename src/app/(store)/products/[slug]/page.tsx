@@ -14,6 +14,8 @@ import { getRelatedProducts } from '@/lib/recommendations'
 import { PairWithAntiInflammatory } from '@/components/store/pair-with-anti-inflammatory'
 import { NoRefundsNotice } from '@/components/store/no-refunds-notice'
 import { ProductCoaSection } from '@/components/store/product-coa-section'
+import { displayPrice, highestPrice, hasPriceRange, discountPercent, sellableVariants } from '@/lib/display-price'
+import { productImage, isFallbackImage } from '@/lib/product-image'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global'
 
@@ -27,7 +29,7 @@ async function getProduct(slug: string) {
     include: {
       images: { orderBy: { position: 'asc' } },
       category: true,
-      variants: true,
+      variants: { orderBy: { price: 'asc' } },
       reviews: {
         where: { approved: true },
         include: { user: { select: { name: true } } },
@@ -78,10 +80,17 @@ export default async function ProductPage({ params }: Props) {
   if (!product) notFound()
 
   const mainImage = product.images[0]
-  const inStock = product.inventory > 0 || product.variants.some((v) => v.inventory > 0)
-  const discountPct = product.comparePrice
-    ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
-    : null
+  // Price shown = price charged (see lib/display-price). null → nothing sellable.
+  const price = displayPrice(product)
+  const maxPrice = highestPrice(product)
+  const priceRange = hasPriceRange(product)
+  const sellable = price !== null
+  const inStock =
+    sellable &&
+    (product.variants.length > 0
+      ? sellableVariants(product.variants).some((v) => v.inventory > 0)
+      : product.inventory > 0)
+  const discountPct = discountPercent(product.comparePrice, price)
 
   const related = await getRelatedProducts(product.id, 4)
   const coas = await getProductCoas(product.slug, product.name)
@@ -120,15 +129,28 @@ export default async function ProductPage({ params }: Props) {
       '@type': 'Brand',
       name: 'The Vitality Project',
     },
-    offers: {
-      '@type': 'Offer',
-      url: `${APP_URL}/products/${product.slug}`,
-      priceCurrency: 'USD',
-      price: (product.price / 100).toFixed(2),
-      availability: inStock
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/OutOfStock',
-    },
+    // Same figure the cart charges. A range of sizes is an AggregateOffer;
+    // a product with nothing sellable publishes no offer at all rather than
+    // advertising a price nobody can pay.
+    ...(price !== null && {
+      offers: priceRange
+        ? {
+            '@type': 'AggregateOffer',
+            url: `${APP_URL}/products/${product.slug}`,
+            priceCurrency: 'USD',
+            lowPrice: (price / 100).toFixed(2),
+            highPrice: ((maxPrice ?? price) / 100).toFixed(2),
+            offerCount: sellableVariants(product.variants).length,
+            availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
+          }
+        : {
+            '@type': 'Offer',
+            url: `${APP_URL}/products/${product.slug}`,
+            priceCurrency: 'USD',
+            price: (price / 100).toFixed(2),
+            availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
+          },
+    }),
     ...(product.reviews.length > 0 && {
       aggregateRating: {
         '@type': 'AggregateRating',
@@ -151,7 +173,7 @@ export default async function ProductPage({ params }: Props) {
         <div className="space-y-4">
           <div className="relative aspect-square rounded-2xl overflow-hidden glass">
             <Image
-              src={mainImage?.url ?? "/products/vial-default.png"}
+              src={productImage(product, true)}
               alt={mainImage?.alt ?? product.name}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
@@ -163,7 +185,7 @@ export default async function ProductPage({ params }: Props) {
             <div className="grid grid-cols-4 gap-3">
               {product.images.slice(0, 4).map((img, i) => (
                 <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden glass">
-                  <Image src={img.url} alt={img.alt ?? product.name} fill className="object-cover" />
+                  <Image src={img.url} alt={img.alt ?? product.name} fill sizes="(max-width: 1024px) 25vw, 12vw" className="object-cover" />
                 </div>
               ))}
             </div>
@@ -182,21 +204,25 @@ export default async function ProductPage({ params }: Props) {
           </div>
 
           {/* Price */}
-          <div className="flex items-baseline gap-3">
-            <span className="text-4xl font-bold">{formatPrice(product.price)}</span>
-            {product.comparePrice && (
-              <>
-                <span className="text-xl text-white/40 line-through">{formatPrice(product.comparePrice)}</span>
-                <Badge variant="success">-{discountPct}%</Badge>
-              </>
-            )}
-          </div>
+          {price !== null ? (
+            <div className="flex items-baseline gap-3">
+              {priceRange && <span className="text-sm text-white/40 uppercase tracking-wider">From</span>}
+              <span className="text-4xl font-bold">{formatPrice(price)}</span>
+              {discountPct !== null && product.comparePrice && (
+                <>
+                  <span className="text-xl text-white/40 line-through">{formatPrice(product.comparePrice)}</span>
+                  <Badge variant="success">-{discountPct}%</Badge>
+                </>
+              )}
+            </div>
+          ) : null}
 
-          {/* Availability */}
+          {/* Availability — matches the per-size badges: checkout does not gate
+              on stock (drop-ship), so zero stock is a pre-order, not "out". */}
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${inStock ? 'bg-emerald-400' : 'bg-red-400'}`} />
-            <span className={`text-sm ${inStock ? 'text-emerald-400' : 'text-red-400'}`}>
-              {inStock ? 'In Stock' : 'Out of Stock'}
+            <div className={`w-2 h-2 rounded-full ${!sellable ? 'bg-red-400' : inStock ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className={`text-sm ${!sellable ? 'text-red-400' : inStock ? 'text-emerald-400' : 'text-amber-300'}`}>
+              {!sellable ? 'Currently unavailable' : inStock ? 'In Stock' : 'Available to pre-order'}
             </span>
           </div>
 
@@ -237,7 +263,7 @@ export default async function ProductPage({ params }: Props) {
                 id: product.id,
                 name: product.name,
                 slug: product.slug,
-                price: product.price,
+                price: price ?? product.price,
                 image: mainImage?.url,
               }}
               size="lg"
@@ -349,6 +375,7 @@ export default async function ProductPage({ params }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {related.map((p) => {
               const img = p.images?.[0]
+              const relPrice = displayPrice(p)
               return (
                 <Link
                   key={p.id}
@@ -356,18 +383,13 @@ export default async function ProductPage({ params }: Props) {
                   className="group glass rounded-2xl overflow-hidden card-hover"
                 >
                   <div className="relative aspect-square bg-dark-800">
-                    {img ? (
-                      <Image
-                        src={img.url}
-                        alt={img.alt ?? p.name}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white/10">
-                        <span className="text-3xl font-bold">VP</span>
-                      </div>
-                    )}
+                    <Image
+                      src={productImage(p)}
+                      alt={img?.alt ?? p.name}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      className={`${isFallbackImage(p) ? 'object-contain p-4' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
+                    />
                   </div>
                   <div className="p-4">
                     {p.category && (
@@ -377,8 +399,15 @@ export default async function ProductPage({ params }: Props) {
                     )}
                     <h3 className="font-semibold text-white text-sm mb-1 line-clamp-2">{p.name}</h3>
                     <div className="flex items-baseline gap-2">
-                      <span className="font-bold text-white">{formatPrice(p.price)}</span>
-                      {p.comparePrice && (
+                      {relPrice !== null ? (
+                        <span className="font-bold text-white">
+                          {hasPriceRange(p) && <span className="text-[11px] font-normal text-white/40 uppercase tracking-wider mr-1">from</span>}
+                          {formatPrice(relPrice)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-white/40">Currently unavailable</span>
+                      )}
+                      {relPrice !== null && discountPercent(p.comparePrice, relPrice) !== null && p.comparePrice && (
                         <span className="text-xs text-white/40 line-through">
                           {formatPrice(p.comparePrice)}
                         </span>

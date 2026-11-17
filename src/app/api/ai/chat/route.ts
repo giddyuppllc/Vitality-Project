@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { displayPrice, highestPrice } from '@/lib/display-price'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
               ...keywords.slice(1, 4).map((kw) => ({ name: { contains: kw, mode: 'insensitive' } as any })),
             ],
           },
-          select: { name: true, shortDesc: true, description: true, price: true, slug: true, tags: true },
+          select: { name: true, shortDesc: true, description: true, price: true, slug: true, tags: true, variants: { select: { price: true } } },
           take: 5,
         })
       : []
@@ -72,14 +73,19 @@ export async function POST(req: NextRequest) {
       ? relevantProducts
       : await prisma.product.findMany({
           where: { status: 'ACTIVE', featured: true },
-          select: { name: true, shortDesc: true, price: true, slug: true },
+          select: { name: true, shortDesc: true, price: true, slug: true, variants: { select: { price: true } } },
           take: 4,
         })
 
     const productContext = contextProducts.length > 0
-      ? `\n\nRelevant products for this conversation:\n${contextProducts.map((p) =>
-          `- **${p.name}** — ${p.shortDesc ?? 'Premium compound'} | $${(p.price / 100).toFixed(2)} | /products/${p.slug}`
-        ).join('\n')}`
+      ? `\n\nRelevant products for this conversation:\n${contextProducts.map((p) => {
+          // Quote what checkout charges (lib/display-price), not the stale
+          // Product.price — Vita was quoting e.g. Selank at $45 ($74 in the cart).
+          const lo = displayPrice(p)
+          const hi = highestPrice(p)
+          const price = lo === null ? 'currently unavailable' : hi && hi > lo ? `from $${(lo / 100).toFixed(2)}` : `$${(lo / 100).toFixed(2)}`
+          return `- **${p.name}** — ${p.shortDesc ?? 'Premium compound'} | ${price} | /products/${p.slug}`
+        }).join('\n')}`
       : ''
 
     const fullSystem = `${SYSTEM_PROMPT}${productContext}`

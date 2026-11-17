@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 import { formatPrice } from '@/lib/utils'
+import { displayPrice as priceFor } from '@/lib/display-price'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ShoppingBag } from 'lucide-react'
@@ -21,7 +22,10 @@ export default async function PathBasedKioskPage({
 
   const products = await prisma.product.findMany({
     where: { status: 'ACTIVE' },
-    include: { images: { orderBy: { position: 'asc' }, take: 1 } },
+    include: {
+      images: { orderBy: { position: 'asc' }, take: 1 },
+      variants: { select: { price: true } },
+    },
     orderBy: [{ featured: 'desc' }, { name: 'asc' }],
   })
 
@@ -35,11 +39,13 @@ export default async function PathBasedKioskPage({
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
         {products.map((product) => {
           const image = product.images[0]?.url
-          const displayPrice = product.salePrice ?? product.price
+          // Same price the cart charges (lib/display-price); salePrice is not
+          // used by checkout, so showing it here quoted a price nobody paid.
+          const displayPrice = priceFor(product)
           return (
             <Link
               key={product.id}
-              href={`/shop/${product.slug}?via=k:${slug}`}
+              href={`/products/${product.slug}?via=k:${slug}`}
               className="glass rounded-2xl overflow-hidden hover:ring-2 hover:ring-brand-500/40 transition-all"
             >
               <div className="aspect-square bg-dark-800 relative">
@@ -59,7 +65,9 @@ export default async function PathBasedKioskPage({
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-white mb-1 line-clamp-1">{product.name}</h3>
-                <p className="text-brand-400 font-bold text-lg">{formatPrice(displayPrice)}</p>
+                <p className="text-brand-400 font-bold text-lg">
+                  {displayPrice !== null ? formatPrice(displayPrice) : 'Currently unavailable'}
+                </p>
               </div>
             </Link>
           )
