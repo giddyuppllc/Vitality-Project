@@ -211,6 +211,25 @@ Pre-existing on master (not from this branch): `/membership` throws React hydrat
 - **Events.** Moving an event's start time re-arms the 24h and 1h reminders.
 - **UI.** Signed-in non-members now have a Sign out button. Axe (WCAG 2.1 AA) reports no violations at 390px or 1440px: small-print contrast and accessible names were fixed.
 
+## Rewards points economy + partner network (branch `vip/rewards`, 11-17)
+
+One balance per member (`LoyaltyAccount.points`, 100 points = $1); every movement goes through `lib/vip/points.ts`.
+
+- **Earning** (`lib/vip/earning.ts`, admin: `/admin/vip/rewards/earning`, `site_settings` keys `vip.points.*`): .global purchases pay active members a 5% base × Club 1 / Plus 1.5 / Premium Stacks 2 (never below the store's 1 pt/$1; non-members unchanged), exactly once per order (`purchase:<orderId>`). Engagement amounts (lesson 50, course 500, first post 100, event 100, monthly streak 100) are settings the other clubhouse features should read with `getEarningRule()` when they call `awardPoints`. Referral 2,500 (see below). Optional checkout cap `vip.points.redeemCapPct` (default **0 = off**, the plan suggests 50): `maxRedeemablePoints()` in both checkouts.
+- **Referral:** member number = referral code; `.global/membership?ref=<number>` → subscribe records a `VipReferral`; mark-paid's first activation pays the referrer once.
+- **Catalog** (`lib/vip/catalog.ts`): STORE_CREDIT (instant, `LOYALTY_REDEEM` credit), TRAINING (instant `VipCourseGrant` via `grantTrainingAccess(userId, courseId)`; classroom honours grants), PRODUCT / MERCH / EXPERIENCE (requests; queue at `/admin/vip/rewards/redemptions`, requested → approved → fulfilled / cancelled with points returned exactly once). PRODUCT is a fulfilment request, not a discount code; stock is taken with `decrementStock` when fulfilled.
+- **Expiry:** whole balance after `vip.points.expiryMonths` (12) without any points activity. Cron `/api/cron/vip-points-expiry` (daily, `dryRun=1`). **This applies to every loyalty account, including .global non-members — run the dry run and read it before scheduling.**
+- **Partners:** `/admin/vip/partners` (partner, staff by email → `VipPartnerStaff`, earn pts/$1, redemption on/off, network fee). Staff use `vitalityproject.vip/partners/portal`. Statements per UTC month at `/admin/vip/partners/statements`; cron `/api/cron/vip-partner-statements` (daily, acts on the 1st, `dryRun=1`, `period=YYYY-MM`). CSV export via `lib/csv`.
+- **Badges/leaderboard:** `VipUserBadge`; monthly points-earned leaderboard honours `VipProfile.hideFromLeaderboards`.
+
+Crontab additions (dry-run first):
+```
+20 0 * * *  curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://vitalityproject.global/api/cron/vip-points-expiry >/dev/null
+30 0 * * *  curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://vitalityproject.global/api/cron/vip-partner-statements >/dev/null
+```
+
+**Partner-model assumptions (confirm with Kevin):** (1) net settlement = network fee − value of points spent at the partner; points issued at a partner are shown as the network's liability but not billed to the partner. (2) Partner earn is a flat per-partner rate (default 5 pts/$1), not tier-scaled. (3) Only ACTIVE members earn or spend at partners. (4) Partners record purchases with a receipt number (one award per receipt); voids within 24 h at the counter, later via the team; no voids once the month's statement is issued. (5) Spending requires the member's 6-digit code bound to partner + amount (10 min, single use, 5 wrong tries). (6) Default network fee 5% of member turnover. (7) Statements are UTC calendar months and are only recorded — settlement is Zelle outside the app.
+
 ## Quality (09-29)
 
 `npx tsc --noEmit` exit 0 · `npm test` exit 0 (11 files, 105 tests, own throwaway PGlite DB) · `npm run verify:vip-migration` exit 0 · `npm run build` exit 0 · 20 hand-written mutants (credit spend/restore, unpaid expiry, reward eligibility/timing/defaults/idempotency, expiry replay, email claims, preference tokens, insert-only seed, copy guard) — all killed. Screenshots (desktop 1440 + 390 mobile) in `Downloads/VIP_Clubhouse_screens/`.
