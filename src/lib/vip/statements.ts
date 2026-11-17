@@ -189,7 +189,9 @@ export async function settleStatement(id: string, adminId: string, zelleRef: str
   return out
 }
 
-const dollars = (c: number) => (c / 100).toFixed(2)
+// Numbers, not strings: the CSV escaper only neutralises text, and a negative
+// amount must stay a number (not become the text "'-12.50").
+const dollars = (c: number) => Number((c / 100).toFixed(2))
 
 /** CSV of statements (formula-injection-safe via lib/csv escapeCsvCell). */
 export async function statementsCsv(where: { period?: string; id?: string }): Promise<string> {

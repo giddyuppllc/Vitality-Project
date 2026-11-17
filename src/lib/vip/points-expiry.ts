@@ -36,7 +36,7 @@ async function lastActivity(accountId: string) {
 export async function runPointsExpiry(opts: { now?: Date; dryRun?: boolean } = {}) {
   const now = opts.now ?? new Date()
   const months = await getEarningRule('vip.points.expiryMonths')
-  if (!months) return { ok: true, months, dryRun: !!opts.dryRun, examined: 0, expiredAccounts: 0, expiredPoints: 0, decisions: [] as ExpiryDecision[] }
+  if (!months) return { ok: true, months, dryRun: !!opts.dryRun, examined: 0, expiredAccounts: 0, expiredPoints: 0, wouldExpirePoints: 0, decisions: [] as ExpiryDecision[] }
   const cutoff = addUtcMonths(now, -months)
 
   const candidates = await prisma.$queryRaw<{ id: string; userId: string; points: number; last: Date | null; createdAt: Date }[]>`

@@ -58,7 +58,9 @@ export async function requireStaffFor(userId: string, partnerId: string | null |
 
 function shortName(u: { name: string | null; username: string | null; vipProfile: { displayName: string | null } | null }) {
   const full = (u.vipProfile?.displayName || u.name || u.username || 'Member').trim()
-  const parts = full.split(/\s+/)
+  // Words that start with a letter only ("Maya R. (fake)" → Maya R.).
+  const words = full.split(/\s+/).filter((w) => /^\p{L}/u.test(w))
+  const parts = words.length ? words : [full]
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]
 }
 
