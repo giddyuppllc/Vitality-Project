@@ -1477,24 +1477,26 @@ model Post {
 // Per-member community profile + community-only suspension (independent of
 // the paid membership status).
 model VipProfile {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  displayName     String?
-  bio             String?   @db.Text
-  avatarUrl       String?
-  suspendedAt     DateTime?
-  suspendedReason String?
-  suspendedById   String?
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  displayName          String?
+  bio                  String?   @db.Text
+  avatarUrl            String?
+  suspendedAt          DateTime?
+  suspendedReason      String?
+  suspendedById        String?
   // Clubhouse email preferences (per member; every clubhouse email links here).
-  emailDigest     Boolean   @default(true) // daily reply/mention digest
-  emailEvents     Boolean   @default(true) // 24h + 1h reminders for RSVP'd events
-  emailRewards    Boolean   @default(true) // "your monthly reward landed"
-  welcomeEmailAt  DateTime? // welcome-to-the-clubhouse sent (once)
-  digestSentAt    DateTime? // last digest sent
-  onboardedAt     DateTime? // "Start here" checklist dismissed
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailDigest          Boolean   @default(true) // daily reply/mention digest
+  emailEvents          Boolean   @default(true) // 24h + 1h reminders for RSVP'd events
+  emailRewards         Boolean   @default(true) // "your monthly reward landed"
+  welcomeEmailAt       DateTime? // welcome-to-the-clubhouse sent (once)
+  digestSentAt         DateTime? // last digest sent
+  onboardedAt          DateTime? // "Start here" checklist dismissed
+  // Rewards leaderboards: true = never listed (the member still earns).
+  hideFromLeaderboards Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("vip_profiles")
 }
@@ -1770,4 +1772,282 @@ model VipSsoConsumedToken {
 
   @@index([expiresAt])
   @@map("vip_sso_consumed_tokens")
+}
+
+// ─── Rewards points economy + partner network (branch vip/rewards) ──────────
+// Points live in the shared LoyaltyAccount / LoyaltyTransaction ledger and
+// move ONLY through src/lib/vip/points.ts (exactly-once keys, never
+// overdraws). These tables hold what points buy (catalog + redemptions), the
+// partner businesses in the network, and their monthly statements.
+// userId columns here are plain indexed strings (no relation on User): these
+// rows are financial history and must outlive an account deletion.
+
+enum VipRewardKind {
+  STORE_CREDIT // points → .global store credit (StoreCredit ledger)
+  PRODUCT // a .global product/variant, shipped by the team
+  MERCH // clubhouse merch (sizes + stock), shipped by the team
+  TRAINING // unlocks a classroom course (VipCourseGrant)
+  EXPERIENCE // e.g. a 1:1 coaching session, scheduled by the team
+}
+
+enum VipRedemptionStatus {
+  REQUESTED
+  APPROVED
+  FULFILLED
+  CANCELLED // points returned (REVERSAL) exactly once
+}
+
+// One member number per member: printed on the member card / QR and typed or
+// scanned at partner businesses. "VP" + 8 digits, the last a Luhn check digit.
+model VipMemberCard {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  memberNumber String   @unique
+  createdAt    DateTime @default(now())
+
+  @@map("vip_member_cards")
+}
+
+model VipRewardItem {
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  kind           VipRewardKind
+  title          String
+  description    String            @default("") @db.Text
+  imageUrl       String?
+  pointsCost     Int
+  creditCents    Int? // STORE_CREDIT: credit deposited per redemption
+  productId      String? // PRODUCT: the .global product
+  variantId      String? // PRODUCT: optional size/variant
+  courseId       String? // TRAINING: the classroom course unlocked
+  stock          Int? // items without options; null = unlimited
+  perMemberLimit Int? // non-cancelled redemptions per member; null = no limit
+  minTier        MembershipTier    @default(CLUB)
+  active         Boolean           @default(false)
+  sortOrder      Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  options        VipRewardOption[]
+  redemptions    VipRedemption[]
+
+  @@index([active, sortOrder])
+  @@map("vip_reward_items")
+}
+
+// Sizes (merch) — each with its own stock.
+model VipRewardOption {
+  id        String        @id @default(cuid())
+  itemId    String
+  label     String
+  stock     Int? // null = unlimited
+  sortOrder Int           @default(0)
+  item      VipRewardItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, label])
+  @@map("vip_reward_options")
+}
+
+model VipRedemption {
+  id               String              @id @default(cuid())
+  userId           String
+  itemId           String
+  optionId         String?
+  // Snapshots at the moment of redemption.
+  kind             VipRewardKind
+  title            String
+  optionLabel      String?
+  pointsSpent      Int
+  status           VipRedemptionStatus @default(REQUESTED)
+  // "redeem:<userId>:<click key>" — a double click is one redemption.
+  idempotencyKey   String              @unique
+  spendTxnId       String?             @unique
+  refundTxnId      String?             @unique
+  storeCreditTxnId String?
+  // JSON {name,line1,line2,city,state,zip,country,phone} for shipped kinds.
+  shippingAddress  String?             @db.Text
+  memberNote       String?             @db.Text
+  adminNote        String?             @db.Text
+  trackingNumber   String?
+  approvedAt       DateTime?
+  fulfilledAt      DateTime?
+  cancelledAt      DateTime?
+  cancelledBy      String? // "member" | "admin"
+  handledById      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  item             VipRewardItem       @relation(fields: [itemId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([itemId, userId])
+  @@map("vip_redemptions")
+}
+
+// Course access granted outside the tier rule (a TRAINING reward, an admin
+// grant). Classroom access = the tier allows it OR a grant exists.
+model VipCourseGrant {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  source    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@map("vip_course_grants")
+}
+
+// Shared badge table (rewards, fitness and social award into it).
+model VipUserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeKey  String
+  label     String
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeKey])
+  @@map("vip_user_badges")
+}
+
+// Member-gets-member: recorded when the referred person starts a membership
+// with ?ref=<member number>; points go to the referrer once, when the
+// referred person's FIRST membership invoice is paid (mark-paid).
+model VipReferral {
+  id             String    @id @default(cuid())
+  referrerUserId String
+  referredUserId String    @unique
+  code           String
+  awardedAt      DateTime?
+  awardTxnId     String?
+  createdAt      DateTime  @default(now())
+
+  @@index([referrerUserId])
+  @@map("vip_referrals")
+}
+
+model VipPartner {
+  id                  String                @id @default(cuid())
+  slug                String                @unique
+  name                String
+  logoUrl             String?
+  description         String                @default("") @db.Text
+  website             String?
+  address             String?
+  category            String?
+  active              Boolean               @default(true)
+  // Points a member earns per $1 spent at this partner.
+  earnPointsPerDollar Int                   @default(5)
+  allowRedemption     Boolean               @default(true)
+  // Network fee on member turnover, in basis points (500 = 5%).
+  networkFeeBps       Int                   @default(500)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  staff               VipPartnerStaff[]
+  txns                VipPartnerTxn[]
+  statements          VipPartnerStatement[]
+
+  @@map("vip_partners")
+}
+
+// Partner staff: existing users linked to a partner. Additive — no new
+// UserRole value; a person may work for more than one partner.
+model VipPartnerStaff {
+  id        String     @id @default(cuid())
+  partnerId String
+  userId    String
+  role      String     @default("STAFF") // STAFF | MANAGER
+  active    Boolean    @default(true)
+  addedById String?
+  createdAt DateTime   @default(now())
+  partner   VipPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, userId])
+  @@index([userId])
+  @@map("vip_partner_staff")
+}
+
+enum VipPartnerTxnKind {
+  EARN // member purchase recorded at the partner → points awarded
+  REDEEM // member points spent at the partner
+}
+
+model VipPartnerTxn {
+  id              String            @id @default(cuid())
+  partnerId       String
+  memberUserId    String
+  staffUserId     String
+  kind            VipPartnerTxnKind
+  // EARN: purchase amount. REDEEM: the points' value (100 points = $1).
+  amountCents     Int
+  points          Int
+  // EARN: the partner's receipt number — one award per receipt per partner.
+  receiptRef      String?
+  ledgerTxnId     String            @unique
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  voidLedgerTxnId String?           @unique
+  createdAt       DateTime          @default(now())
+  partner         VipPartner        @relation(fields: [partnerId], references: [id])
+
+  @@unique([partnerId, receiptRef])
+  @@index([partnerId, createdAt])
+  @@index([memberUserId, createdAt])
+  @@map("vip_partner_txns")
+}
+
+// One-time code a member shows at the counter to approve spending points at
+// a partner (staff cannot spend a balance without it). Bound to the partner
+// and the amount; 10 minutes; single use; 5 wrong tries burn it.
+model VipPartnerRedeemCode {
+  id             String    @id @default(cuid())
+  userId         String
+  partnerId      String
+  points         Int
+  codeHash       String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  failedAttempts Int       @default(0)
+  partnerTxnId   String?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, partnerId, expiresAt])
+  @@map("vip_partner_redeem_codes")
+}
+
+enum VipStatementStatus {
+  DRAFT
+  ISSUED
+  SETTLED
+}
+
+// Monthly settlement per partner. netCents > 0: the partner owes the network;
+// < 0: the network owes the partner. Recorded only — paid by Zelle outside
+// the app; settlementRef is the Zelle reference.
+model VipPartnerStatement {
+  id                  String             @id @default(cuid())
+  partnerId           String
+  period              String // "YYYY-MM" (UTC)
+  status              VipStatementStatus @default(DRAFT)
+  turnoverCents       Int                @default(0)
+  feeBps              Int                @default(0)
+  feeCents            Int                @default(0)
+  pointsIssued        Int                @default(0)
+  pointsIssuedCents   Int                @default(0)
+  pointsRedeemed      Int                @default(0)
+  pointsRedeemedCents Int                @default(0)
+  netCents            Int                @default(0)
+  earnCount           Int                @default(0)
+  redeemCount         Int                @default(0)
+  generatedAt         DateTime           @default(now())
+  issuedAt            DateTime?
+  settledAt           DateTime?
+  settlementRef       String?
+  settledById         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  partner             VipPartner         @relation(fields: [partnerId], references: [id])
+
+  @@unique([partnerId, period])
+  @@index([period])
+  @@map("vip_partner_statements")
 }
