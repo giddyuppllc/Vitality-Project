@@ -28,10 +28,16 @@ export const metadata: Metadata = {
   description:
     'Premium quality peptides and performance compounds. Private label, direct to you.',
   keywords: ['peptides', 'BPC-157', 'TB-500', 'performance', 'vitality', 'health'],
+  // './' resolves against each route's own path, so every page gets its own
+  // canonical and og:url. Before, there was no canonical anywhere and og:url
+  // was the homepage on every page — a shared product link was attributed to
+  // the homepage by Facebook/LinkedIn, and ?query variants of a page competed
+  // with it in search.
+  alternates: { canonical: './' },
   openGraph: {
     type: 'website',
     siteName: 'The Vitality Project',
-    url: APP_URL,
+    url: './',
   },
   twitter: {
     card: 'summary_large_image',
