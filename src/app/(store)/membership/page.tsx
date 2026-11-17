@@ -215,10 +215,12 @@ function MembershipPageInner() {
       </div>
 
       {/* Plans */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-20">
+      <div id="plans" className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-20 scroll-mt-24">
         {plans.map((plan) => (
           <button
             key={plan.id}
+            type="button"
+            aria-pressed={selectedPlan === plan.id}
             onClick={() => setSelectedPlan(plan.id)}
             className={`glass rounded-2xl p-6 text-left transition-all relative ${
               selectedPlan === plan.id
@@ -309,12 +311,18 @@ function MembershipPageInner() {
         <p className="text-white/40 mb-6 max-w-md mx-auto">
           Discounts on every order. Free bac water + syringes on Plus. 1–3 free peptides each cycle on Plus / Premium. Cancel anytime.
         </p>
-        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <Button size="lg">
-            <Sparkles className="w-5 h-5" />
-            Choose a plan
-          </Button>
-        </button>
+        {/* One <button>, not a <button> wrapping <Button>: nested buttons are
+            invalid HTML, the browser re-parents them, and React threw
+            hydration error #418 on every load of this page. */}
+        <Button
+          size="lg"
+          onClick={() =>
+            document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        >
+          <Sparkles className="w-5 h-5" />
+          Choose a plan
+        </Button>
       </div>
 
       {/* Membership terms & rules */}
