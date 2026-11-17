@@ -27,6 +27,7 @@ async function activateMembershipFromOrder(order: {
   id: string
   notes: string | null
   email: string
+  subtotal: number
   user: { name: string | null } | null
 }) {
   if (!order.notes?.startsWith(MEMBERSHIP_NOTE_PREFIX)) return
@@ -53,6 +54,12 @@ async function activateMembershipFromOrder(order: {
   await prisma.membership.update({
     where: { id: membershipId },
     data: {
+      // The tier is the one THIS invoice was for. It was left as whatever the
+      // row said, so with two open invoices (signed up for Club, then clicked
+      // Premium) paying the $25 Club invoice activated Premium Stacks.
+      ...(tierKey && tierKey !== membership.tier
+        ? { tier: tierKey, monthlyPriceCents: order.subtotal }
+        : {}),
       status: 'ACTIVE',
       paymentConfirmedAt: membership.paymentConfirmedAt ?? now,
       renewsAt,

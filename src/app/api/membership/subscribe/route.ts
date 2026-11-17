@@ -109,18 +109,19 @@ export async function POST(req: NextRequest) {
         membership: existing,
       })
     }
-    // Already PENDING_PAYMENT on this tier with an open invoice?
-    if (
-      existing &&
-      existing.tier === tier &&
-      existing.status === 'PENDING_PAYMENT' &&
-      existing.pendingInvoiceOrderId
-    ) {
+    // Already holding an open invoice for this tier? (A first signup, or an
+    // active member's pending tier change.)
+    if (existing?.pendingInvoiceOrderId) {
       const openInvoice = await prisma.order.findUnique({
         where: { id: existing.pendingInvoiceOrderId },
-        select: { id: true, orderNumber: true, paymentStatus: true, total: true },
+        select: { id: true, orderNumber: true, paymentStatus: true, status: true, total: true, notes: true },
       })
-      if (openInvoice && openInvoice.paymentStatus === 'UNPAID') {
+      if (
+        openInvoice &&
+        openInvoice.paymentStatus === 'UNPAID' &&
+        openInvoice.status !== 'CANCELLED' &&
+        openInvoice.notes === `MEMBERSHIP:${existing.id}:${tier}`
+      ) {
         return NextResponse.json({
           ok: true,
           alreadyPending: true,
@@ -133,24 +134,43 @@ export async function POST(req: NextRequest) {
     const benefits = TIER_BENEFITS[tier]
     const { product, variant } = await ensureMembershipVariant(tier)
 
-    // Upsert the Membership row in PENDING_PAYMENT.
-    const membership = await prisma.membership.upsert({
-      where: { userId: session.user.id },
-      update: {
-        tier,
-        status: 'PENDING_PAYMENT',
-        monthlyPriceCents: benefits.monthlyPriceCents,
-        paymentProvider: 'zelle',
-        cancelledAt: null,
-      },
-      create: {
-        userId: session.user.id,
-        tier,
-        status: 'PENDING_PAYMENT',
-        monthlyPriceCents: benefits.monthlyPriceCents,
-        paymentProvider: 'zelle',
-      },
-    })
+    // An ACTIVE member changing tier keeps the tier they have paid for until
+    // the new invoice is paid — mark-paid switches the tier then. (Previously
+    // the row was flipped to PENDING_PAYMENT on the new tier at once, so a
+    // paying Plus member lost every benefit the moment they clicked
+    // "upgrade", and stayed that way if they never paid the difference.)
+    // Everyone else gets the row in PENDING_PAYMENT on the requested tier.
+    const keepActive = !!existing && existing.status === 'ACTIVE' && existing.tier !== 'NONE'
+    const membership = keepActive
+      ? existing
+      : await prisma.membership.upsert({
+          where: { userId: session.user.id },
+          update: {
+            tier,
+            status: 'PENDING_PAYMENT',
+            monthlyPriceCents: benefits.monthlyPriceCents,
+            paymentProvider: 'zelle',
+            cancelledAt: null,
+          },
+          create: {
+            userId: session.user.id,
+            tier,
+            status: 'PENDING_PAYMENT',
+            monthlyPriceCents: benefits.monthlyPriceCents,
+            paymentProvider: 'zelle',
+          },
+        })
+
+    // The invoice this one replaces (another tier) is closed, so only one
+    // membership invoice is ever open and the lifecycle crons chase the right
+    // one. Its MEMBERSHIP: note is untouched: if the customer had already sent
+    // that Zelle, mark-paid still activates exactly the tier it was for.
+    if (existing?.pendingInvoiceOrderId) {
+      await prisma.order.updateMany({
+        where: { id: existing.pendingInvoiceOrderId, paymentStatus: 'UNPAID', status: 'PENDING' },
+        data: { status: 'CANCELLED' },
+      })
+    }
 
     // Create the first Zelle invoice Order. Tag it via notes so mark-paid
     // can route it to membership activation.
