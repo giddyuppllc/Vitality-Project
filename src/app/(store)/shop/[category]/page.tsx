@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props) {
   const cat = await prisma.category.findUnique({ where: { slug } });
   if (!cat) return { title: "Category not found" };
   return {
-    title: `${cat.name} — Vitality Project`,
+    title: `${cat.name}`,
     description: cat.description ?? `${cat.name} research compounds.`,
   };
 }

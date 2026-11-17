@@ -3,7 +3,7 @@ import { CheckCircle2 } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Subscription Confirmed — The Vitality Project',
+  title: 'Subscription Confirmed',
   description: 'Your newsletter subscription is confirmed.',
 }
 

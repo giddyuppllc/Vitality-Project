@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { MIN_STACK_COMPONENTS } from "@/lib/stack-availability";
 import { prisma } from "@/lib/prisma";
 import { getStackBySlug } from "@/lib/stacks";
 import { StackBuilder } from "@/components/store/stack-builder";
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: Props) {
   const s = getStackBySlug(slug);
   if (!s) return { title: "Stack not found" };
   return {
-    title: `${s.name} — Vitality Project`,
+    title: `${s.name}`,
     description: s.shortDesc,
   };
 }
@@ -31,7 +32,8 @@ async function loadStack(slug: string) {
       status: "ACTIVE",
     },
     include: {
-      variants: { orderBy: { price: "asc" } },
+      // $0 sizes are refused by the cart (pricing 'price-unset'); never offer them.
+      variants: { where: { price: { gt: 0 } }, orderBy: { price: "asc" } },
       category: { select: { slug: true, name: true } },
     },
   });
@@ -41,6 +43,7 @@ async function loadStack(slug: string) {
     .map((c) => {
       const product = products.find((p) => p.slug === c.productSlug);
       if (!product) return null;
+      if (product.variants.length === 0 && !(product.price > 0)) return null;
       const variants = product.variants.map((v) => ({
         id: v.id,
         name: v.name,
@@ -61,6 +64,10 @@ async function loadStack(slug: string) {
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  // Fewer than two buyable components is not a stack (and cannot earn the
+  // bundle discount its card promised) — see lib/stack-availability.
+  if (components.length < MIN_STACK_COMPONENTS) return null;
 
   return { def, components };
 }
@@ -86,7 +93,7 @@ export default async function StackDetailPage({ params }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-8 items-center">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-emerald-300/80 font-semibold">
-                {def.components.length}-peptide stack
+                {components.length}-peptide stack
               </p>
               <h1 className="mt-2 text-3xl md:text-4xl font-semibold">{def.name}</h1>
               <p className="mt-3 text-white/65 leading-relaxed">{def.description}</p>

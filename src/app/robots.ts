@@ -7,7 +7,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        // The partner application is public; the rest of /business is the
+        // signed-in partner dashboard.
+        allow: ['/', '/business/apply'],
         disallow: ['/admin', '/account', '/business', '/kiosk', '/api'],
       },
     ],

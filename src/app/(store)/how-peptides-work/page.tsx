@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { FlaskConical } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'How Peptides Work — Receptor Binding & Signaling — The Vitality Project',
+  title: 'How Peptides Work — Receptor Binding & Signaling',
   description:
     'Learn how peptides interact with biological receptors to initiate signaling cascades. Explore receptor binding, signal transduction, and pathway specificity in peptide research.',
 }

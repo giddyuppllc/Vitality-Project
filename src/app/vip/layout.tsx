@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   keywords: null,
   manifest: null,
   openGraph: null,
+  // The store layout sets canonical './'; here that would name the internal
+  // rewritten /vip/… path. The clubhouse is noindex — no canonical at all.
+  alternates: null,
   twitter: null,
   appleWebApp: null,
   robots: {

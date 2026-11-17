@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Peptide Safety & Quality Standards — The Vitality Project',
+  title: 'Peptide Safety & Quality Standards',
   description:
     'Learn about peptide safety, purity testing, third-party Certificates of Analysis, SPPS manufacturing, storage protocols, and quality standards for research-grade compounds.',
 }

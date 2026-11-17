@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { FlaskConical } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Peptide Legality & Regulatory Landscape — The Vitality Project',
+  title: 'Peptide Legality & Regulatory Landscape',
   description:
     'Understand the legal status of research peptides in the United States, including RUO classification, FDA status, buyer responsibility, and how regulation is shaping the industry.',
 }

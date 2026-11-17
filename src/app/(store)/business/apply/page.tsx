@@ -97,8 +97,9 @@ export default function BusinessApplyPage() {
               required
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-white/70">Business Type</label>
+              <label htmlFor="apply-select-1" className="text-sm font-medium text-white/70">Business Type</label>
               <select
+              id="apply-select-1"
                 name="type"
                 required
                 className="w-full px-4 py-2.5 rounded-xl bg-dark-700 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all duration-200"
@@ -144,10 +145,11 @@ export default function BusinessApplyPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-white/70">
+            <label htmlFor="apply-textarea-2" className="text-sm font-medium text-white/70">
               Why do you want to partner with us?
             </label>
             <textarea
+              id="apply-textarea-2"
               name="reason"
               rows={4}
               required

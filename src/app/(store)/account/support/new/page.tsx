@@ -23,7 +23,7 @@ export default function NewTicketPage() {
 
   useEffect(() => {
     // Best-effort: grab orders so customer can tag the ticket
-    fetch('/api/orders')
+    fetch('/api/account/orders')
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (Array.isArray(data)) setOrders(data)
@@ -87,10 +87,11 @@ export default function NewTicketPage() {
 
           {orders.length > 0 && (
             <div>
-              <label className="text-sm font-medium text-white/70 mb-1.5 block">
+              <label htmlFor="ticket-select-1" className="text-sm font-medium text-white/70 mb-1.5 block">
                 Related order (optional)
               </label>
               <select
+              id="ticket-select-1"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl bg-dark-700 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -106,10 +107,11 @@ export default function NewTicketPage() {
           )}
 
           <div>
-            <label className="text-sm font-medium text-white/70 mb-1.5 block">
+            <label htmlFor="ticket-textarea-2" className="text-sm font-medium text-white/70 mb-1.5 block">
               Message *
             </label>
             <textarea
+              id="ticket-textarea-2"
               required
               rows={8}
               value={message}

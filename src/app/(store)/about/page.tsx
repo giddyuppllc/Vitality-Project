@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'About — The Vitality Project',
+  title: 'About',
   description: 'Our mission, values, and commitment to research-grade quality.',
 }
 

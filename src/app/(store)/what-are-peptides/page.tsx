@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { FlaskConical, ChevronDown } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'What Are Peptides? The Biological Blueprint — The Vitality Project',
+  title: 'What Are Peptides? The Biological Blueprint',
   description:
     'What are peptides and how do they work? Explore the biological blueprint of peptides, including structure, function, safety, legality, and research applications.',
 }

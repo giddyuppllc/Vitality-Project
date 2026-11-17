@@ -28,9 +28,9 @@ export function Footer() {
           </div>
           <div>
             <h4 className="font-semibold text-white/80 mb-3 text-sm">Shop</h4>
-            <ul className="space-y-2 text-sm text-white/40">
+            <ul className="space-y-2 text-sm text-white/55">
               <li><Link href="/products" className="hover:text-white transition-colors">All Products</Link></li>
-              <li><Link href="/products?category=stacks" className="hover:text-white transition-colors">Stacks</Link></li>
+              <li><Link href="/stacks" className="hover:text-white transition-colors">Stacks</Link></li>
               <li><Link href="/products?category=repair-recovery" className="hover:text-white transition-colors">Repair & Recovery</Link></li>
               <li><Link href="/products?category=body-composition" className="hover:text-white transition-colors">Body Composition</Link></li>
               <li><Link href="/products?category=longevity-aesthetics" className="hover:text-white transition-colors">Longevity & Aesthetics</Link></li>
@@ -39,7 +39,7 @@ export function Footer() {
           </div>
           <div>
             <h4 className="font-semibold text-white/80 mb-3 text-sm">Learn</h4>
-            <ul className="space-y-2 text-sm text-white/40">
+            <ul className="space-y-2 text-sm text-white/55">
               <li><Link href="/what-are-peptides" className="hover:text-white transition-colors">What Are Peptides</Link></li>
               <li><Link href="/how-peptides-work" className="hover:text-white transition-colors">How They Work</Link></li>
               <li><Link href="/peptides-safety" className="hover:text-white transition-colors">Safety & Quality</Link></li>
@@ -48,7 +48,7 @@ export function Footer() {
           </div>
           <div>
             <h4 className="font-semibold text-white/80 mb-3 text-sm">Company</h4>
-            <ul className="space-y-2 text-sm text-white/40">
+            <ul className="space-y-2 text-sm text-white/55">
               <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
               <li><Link href="/research" className="hover:text-white transition-colors">Research</Link></li>
               <li><Link href="/coa" className="hover:text-white transition-colors">Certificates of Analysis</Link></li>
@@ -65,14 +65,14 @@ export function Footer() {
         {/* RUO Legal Block */}
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="glass rounded-xl p-5 mb-6">
-            <p className="text-white/30 text-xs leading-relaxed">
+            <p className="text-white/50 text-xs leading-relaxed">
               <strong className="text-white/50">Research Use Only Disclaimer:</strong> All products sold by The Vitality Project are intended strictly for in vitro laboratory research and scientific study. They are not intended for human or animal consumption, diagnostic use, or therapeutic application. These products have not been evaluated by the Food and Drug Administration (FDA) and are not approved to diagnose, treat, cure, or prevent any disease or medical condition. By purchasing from this site you confirm you are a qualified researcher and agree to our{' '}
               <Link href="/terms" className="text-brand-400 hover:text-brand-300">Terms of Service</Link>.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-white/20 text-xs">© {new Date().getFullYear()} The Vitality Project. All rights reserved.</p>
-            <p className="text-white/20 text-xs">Private infrastructure. No third-party data sharing.</p>
+            <p className="text-white/45 text-xs">© {new Date().getFullYear()} The Vitality Project. All rights reserved.</p>
+            <p className="text-white/45 text-xs">Private infrastructure. No third-party data sharing.</p>
           </div>
         </div>
       </div>

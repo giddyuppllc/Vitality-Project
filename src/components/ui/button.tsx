@@ -22,6 +22,21 @@ const sizes = {
   lg: 'px-8 py-3.5 text-base rounded-xl',
 }
 
+/** Button styling for non-<button> elements (e.g. a Next <Link>). */
+export function buttonClasses({
+  variant = 'primary',
+  size = 'md',
+  className,
+}: { variant?: keyof typeof variants; size?: keyof typeof sizes; className?: string } = {}) {
+  return cn(
+    'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+    variants[variant],
+    sizes[size],
+    className,
+  )
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, children, disabled, ...props }, ref) => {
     return (

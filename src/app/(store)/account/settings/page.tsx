@@ -34,6 +34,15 @@ export default function SettingsPage() {
   })
   const [commSaved, setCommSaved] = useState(false)
 
+  // useState only reads its initial value once, and on a direct load the
+  // session is still 'loading' then — Name and Email rendered empty. Fill
+  // them when the session arrives, without overwriting anything typed.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    setName((v) => v || session?.user?.name || '')
+    setEmail((v) => v || session?.user?.email || '')
+  }, [status, session?.user?.name, session?.user?.email])
+
   useEffect(() => {
     if (status !== 'authenticated') return
     fetch('/api/account/communication')
@@ -277,12 +286,14 @@ function PrefRow({
       <label className="relative inline-flex items-center cursor-pointer shrink-0">
         <input
           type="checkbox"
+          role="switch"
+          aria-label={label}
           checked={checked}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
           className="sr-only peer"
         />
-        <div className="w-10 h-5 bg-white/10 peer-checked:bg-brand-500 rounded-full transition-colors peer-disabled:opacity-50 relative after:content-[''] after:absolute after:left-0.5 after:top-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
+        <div className="w-10 h-5 bg-white/10 peer-checked:bg-brand-500 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-400 rounded-full transition-colors peer-disabled:opacity-50 relative after:content-[''] after:absolute after:left-0.5 after:top-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
       </label>
     </div>
   )

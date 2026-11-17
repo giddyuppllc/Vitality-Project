@@ -7,10 +7,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Check, Zap, Sparkles, ArrowRight, ShoppingCart } from "lucide-react";
-import { STACKS } from "@/lib/stacks";
+import { availableStacks } from "@/lib/stack-availability";
+
+// Availability comes from the live catalog on every request.
+export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Stacks — Vitality Project",
+  title: "Stacks",
   description:
     "Curated multi-peptide stacks. Pick the strength of each component. Automatic bundle discount at checkout — 2 peptides 5% off, 3 → 10%, 4+ → 15%.",
 };
@@ -21,7 +24,8 @@ const TIERS = [
   { count: 4, pct: 15, label: "15% off" },
 ];
 
-export default function StacksIndexPage() {
+export default async function StacksIndexPage() {
+  const stacks = await availableStacks();
   return (
     <main className="min-h-screen bg-[#0a0d12] text-white">
       <div className="mx-auto max-w-6xl px-6 py-16">
@@ -78,8 +82,8 @@ export default function StacksIndexPage() {
 
         {/* ── Stack cards ─────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {STACKS.map((s) => {
-            const tier = TIERS.slice().reverse().find((t) => s.components.length >= t.count);
+          {stacks.map(({ stack: s, count }) => {
+            const tier = TIERS.slice().reverse().find((t) => count >= t.count);
             return (
               <Link
                 key={s.slug}
@@ -99,7 +103,7 @@ export default function StacksIndexPage() {
                   </div>
                   {/* Component count chip */}
                   <div className="absolute top-3 left-3 rounded-md bg-black/55 backdrop-blur-sm px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/90 font-semibold">
-                    {s.components.length} peptides
+                    {count} peptides
                   </div>
                   {/* Tier chip */}
                   {tier && (

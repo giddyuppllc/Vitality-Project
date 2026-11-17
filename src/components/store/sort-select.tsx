@@ -16,6 +16,7 @@ export function SortSelect({ current }: { current: string }) {
 
   return (
     <select
+      aria-label="Sort products"
       className="bg-dark-700 border border-white/12 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
       value={current}
       onChange={(e) => onChange(e.target.value)}

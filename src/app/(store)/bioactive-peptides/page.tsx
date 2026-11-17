@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Bioactive Peptides — The Vitality Project',
+  title: 'Bioactive Peptides',
   description:
     'Learn what makes a peptide bioactive, including classification, natural and synthetic sources, mechanisms of bioactivity, and research applications across biological systems.',
 }

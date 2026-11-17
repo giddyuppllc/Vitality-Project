@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { buttonClasses } from '@/components/ui/button'
 import { Plus, MessageSquare } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -34,11 +34,9 @@ export default async function SupportPage() {
           <h1 className="text-2xl font-bold">Support</h1>
           <p className="text-white/40 mt-1">{tickets.length} tickets</p>
         </div>
-        <Link href="/account/support/new">
-          <Button>
+        <Link href="/account/support/new" className={buttonClasses()}>
             <Plus className="w-4 h-4" /> New Ticket
-          </Button>
-        </Link>
+          </Link>
       </div>
 
       {tickets.length === 0 ? (
@@ -49,9 +47,7 @@ export default async function SupportPage() {
             Need help with an order or have a question? Open a ticket and a real
             person will reply within one business day.
           </p>
-          <Link href="/account/support/new">
-            <Button>Create your first ticket</Button>
-          </Link>
+          <Link href="/account/support/new" className={buttonClasses()}>Create your first ticket</Link>
         </div>
       ) : (
         <div className="glass rounded-2xl overflow-hidden">

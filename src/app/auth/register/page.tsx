@@ -25,6 +25,7 @@ function RegisterInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     if (form.password !== form.confirm) {
       setError('Passwords do not match')
       return
@@ -64,10 +65,17 @@ function RegisterInner() {
         </div>
         <div className="glass rounded-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Full Name" required value={form.name}
+            {/* Errors are about the whole form (password mismatch, short
+                password, email taken) — they used to print under Email. */}
+            {error && (
+              <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {error}
+              </div>
+            )}
+            <Input label="Full Name" required value={form.name} autoComplete="name"
               onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input label="Email" type="email" required value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })} error={error} />
+            <Input label="Email" type="email" required value={form.email} autoComplete="email"
+              onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <Input
               label="Username (optional)"
               type="text"
@@ -77,9 +85,11 @@ function RegisterInner() {
               hint="3-24 chars · letters, numbers, _ . -"
               autoComplete="username"
             />
-            <Input label="Password" type="password" required value={form.password}
+            <Input label="Password" type="password" required minLength={8} value={form.password}
+              autoComplete="new-password" hint="At least 8 characters"
               onChange={(e) => setForm({ ...form, password: e.target.value })} />
             <Input label="Confirm Password" type="password" required value={form.confirm}
+              autoComplete="new-password"
               onChange={(e) => setForm({ ...form, confirm: e.target.value })} />
             <Button type="submit" loading={loading} className="w-full" size="lg">
               Create Account

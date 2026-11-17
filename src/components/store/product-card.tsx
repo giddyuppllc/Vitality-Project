@@ -6,6 +6,7 @@ import { ShoppingCart } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import type { ProductWithImages } from '@/types'
+import { displayPrice, discountPercent, sellableVariants } from '@/lib/display-price'
 
 interface ProductCardProps {
   product: ProductWithImages
@@ -15,19 +16,15 @@ export function ProductCard({ product }: ProductCardProps) {
   // Card displays the lowest variant price as the "from" price so removing
   // a variant in admin automatically corrects the card without a separate
   // Product.price recompute. Falls back to Product.price if no variants.
-  const variantPrices = product.variants?.map((v) => v.price).filter((n) => n > 0) ?? []
-  const fromPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : product.price
+  // Shared rule (lib/display-price): a product whose only variants are $0 is
+  // not sellable — it used to fall back to the stale Product.price here.
+  const fromPrice = displayPrice(product)
 
-  const discountPct = product.comparePrice && product.comparePrice > fromPrice
-    ? Math.round(((product.comparePrice - fromPrice) / product.comparePrice) * 100)
-    : null
+  const discountPct = discountPercent(product.comparePrice, fromPrice)
 
   // Variant labels (e.g. "5 mg, 10 mg, 30 mg") so customers can see sizes
   // on the listing page without clicking through. Sorted by price ascending.
-  const variantLabels = (product.variants ?? [])
-    .slice()
-    .sort((a, b) => a.price - b.price)
-    .map((v) => v.name)
+  const variantLabels = sellableVariants(product.variants).map((v) => v.name)
 
   // Use the product's own primary image (first by position) when one has been
   // uploaded in admin; otherwise fall back to the shared default vial so
@@ -67,7 +64,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.category && (
               <p className="text-xs text-brand-400 uppercase tracking-wider">{product.category.name}</p>
             )}
-            <span className="text-[10px] text-white/25 font-medium tracking-wide">RUO</span>
+            <span className="text-[10px] text-white/50 font-medium tracking-wide">RUO</span>
           </div>
           <h3 className="font-semibold text-white mb-1.5 line-clamp-2">{product.name}</h3>
           {variantLabels.length > 0 && (
@@ -87,8 +84,12 @@ export function ProductCard({ product }: ProductCardProps) {
               {variantLabels.length > 1 && (
                 <span className="text-[11px] text-white/40 uppercase tracking-wider">from</span>
               )}
-              <span className="font-bold text-white">{formatPrice(fromPrice)}</span>
-              {product.comparePrice && product.comparePrice > fromPrice && (
+              {fromPrice !== null ? (
+                <span className="font-bold text-white">{formatPrice(fromPrice)}</span>
+              ) : (
+                <span className="text-sm text-white/40">Currently unavailable</span>
+              )}
+              {discountPct !== null && product.comparePrice && (
                 <span className="text-sm text-white/40 line-through">{formatPrice(product.comparePrice)}</span>
               )}
             </div>

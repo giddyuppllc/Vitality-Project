@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { PUBLIC_PRODUCT_SELECT, parseLimit } from '@/lib/public-product'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const q = (searchParams.get('q') ?? '').trim()
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20'), 50)
+  const limit = parseLimit(searchParams.get('limit'), 20, 50)
 
   if (!q) return NextResponse.json([])
 
@@ -24,10 +25,7 @@ export async function GET(req: NextRequest) {
 
   const products = await prisma.product.findMany({
     where,
-    include: {
-      images: { orderBy: { position: 'asc' }, take: 1 },
-      category: { select: { name: true, slug: true } },
-    },
+    select: PUBLIC_PRODUCT_SELECT,
     take: limit,
     orderBy: [{ featured: 'desc' }, { name: 'asc' }],
   })

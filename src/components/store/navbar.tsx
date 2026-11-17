@@ -6,12 +6,12 @@ import { ShoppingCart, User, Menu, X, ChevronDown, Search } from 'lucide-react'
 import { useCart, useCartItemCount, useCartHydrated } from '@/hooks/useCart'
 import { useSession, signOut } from 'next-auth/react'
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { buttonClasses } from '@/components/ui/button'
 import { SearchBar } from '@/components/store/search-bar'
 
 const shopCategories = [
   { href: '/products', label: 'All Products' },
-  { href: '/products?category=stacks', label: 'Stacks' },
+  { href: '/stacks', label: 'Stacks' },
   { href: '/products?category=repair-recovery', label: 'Repair & Recovery' },
   { href: '/products?category=body-composition', label: 'Body Composition' },
   { href: '/products?category=longevity-aesthetics', label: 'Longevity & Aesthetics' },
@@ -57,10 +57,10 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-6">
             {/* Shop dropdown */}
             <div className="relative group">
-              <button className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors py-2">
+              <button type="button" aria-haspopup="true" className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors py-2">
                 Shop <ChevronDown className="w-3.5 h-3.5 mt-0.5" />
               </button>
-              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
+              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible group-focus-within:visible opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-150">
                 <div className="glass rounded-xl py-1.5 w-52 shadow-xl">
                   {shopCategories.map((cat) => (
                     <Link
@@ -81,10 +81,10 @@ export function Navbar() {
 
             {/* Learn dropdown */}
             <div className="relative group">
-              <button className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors py-2">
+              <button type="button" aria-haspopup="true" className="flex items-center gap-1 text-sm text-white/60 hover:text-white transition-colors py-2">
                 Learn <ChevronDown className="w-3.5 h-3.5 mt-0.5" />
               </button>
-              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
+              <div className="absolute left-0 top-full pt-2 invisible group-hover:visible group-focus-within:visible opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-150">
                 <div className="glass rounded-xl py-1.5 w-56 shadow-xl">
                   {learnLinks.map((link) => (
                     <Link
@@ -133,7 +133,11 @@ export function Navbar() {
             </button>
 
             {/* Cart */}
-            <Link href="/cart" className="relative p-2 text-white/60 hover:text-white transition-colors">
+            <Link
+              href="/cart"
+              aria-label={hydrated && itemCount > 0 ? `Cart, ${itemCount} item${itemCount === 1 ? '' : 's'}` : 'Cart'}
+              className="relative p-2 text-white/60 hover:text-white transition-colors"
+            >
               <ShoppingCart className="w-5 h-5" />
               {hydrated && itemCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
@@ -145,10 +149,10 @@ export function Navbar() {
             {/* Account */}
             {session ? (
               <div className="relative group">
-                <button className="flex items-center gap-2 p-2 text-white/60 hover:text-white transition-colors">
+                <button type="button" aria-label="Account menu" aria-haspopup="true" className="flex items-center gap-2 p-2 text-white/60 hover:text-white transition-colors">
                   <User className="w-5 h-5" />
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-48 glass rounded-xl p-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all">
+                <div className="absolute right-0 top-full mt-2 w-48 glass rounded-xl p-2 invisible group-hover:visible group-focus-within:visible opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
                   <Link href="/account" className="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 rounded-lg">My Account</Link>
                   <Link href="/account/orders" className="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 rounded-lg">Orders</Link>
                   {session.user.role === 'ADMIN' && (
@@ -163,15 +167,18 @@ export function Navbar() {
                 </div>
               </div>
             ) : (
-              <Link href="/auth/login">
-                <Button size="sm" variant="outline">Sign In</Button>
+              <Link href="/auth/login" className={buttonClasses({ size: 'sm', variant: 'outline' })}>
+                Sign In
               </Link>
             )}
 
             {/* Mobile toggle */}
             <button
+              type="button"
               className="md:hidden p-2 text-white/60 hover:text-white"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -236,6 +243,32 @@ export function Navbar() {
           >
             About
           </Link>
+          {session && (
+            <>
+              <div className="border-t border-white/10 pt-2 mt-2" />
+              <Link
+                href="/account"
+                onClick={() => setMobileOpen(false)}
+                className="block px-3 py-2 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              >
+                My Account
+              </Link>
+              <Link
+                href="/account/orders"
+                onClick={() => setMobileOpen(false)}
+                className="block px-3 py-2 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              >
+                Orders
+              </Link>
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className="block w-full text-left px-3 py-2 text-red-400 hover:text-red-300 transition-colors rounded-lg hover:bg-white/5"
+              >
+                Sign Out
+              </button>
+            </>
+          )}
         </div>
       )}
     </nav>

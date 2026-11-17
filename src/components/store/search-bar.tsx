@@ -7,12 +7,14 @@ import { useRouter } from 'next/navigation'
 import { Search, X, Loader2 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { productImage, isFallbackImage } from '@/lib/product-image'
+import { displayPrice } from '@/lib/display-price'
 
 interface Suggestion {
   id: string
   name: string
   slug: string
   price: number
+  variants?: { price: number }[]
   images: { url: string }[]
   category?: { name: string } | null
 }
@@ -144,7 +146,7 @@ export function SearchBar({
                       )}
                     </div>
                     <span className="text-sm font-semibold text-white">
-                      {formatPrice(p.price)}
+                      {displayPrice(p) !== null ? formatPrice(displayPrice(p)!) : '—'}
                     </span>
                   </Link>
                 </li>

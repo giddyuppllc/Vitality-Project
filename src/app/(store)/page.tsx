@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
+import { buttonClasses } from '@/components/ui/button'
 import { ArrowRight, Shield, Zap, Lock, Package, FlaskConical, Dna, Brain, Sparkles, Star } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { ProductCard } from '@/components/store/product-card'
@@ -45,6 +45,7 @@ export default async function HomePage() {
             src="/images/lifestyle/hero-athlete-sunrise.png"
             alt="Active lifestyle"
             fill
+            sizes="100vw"
             className="object-cover object-center"
             priority
           />
@@ -66,17 +67,13 @@ export default async function HomePage() {
               Members get first access + exclusive pricing.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/membership">
-                <Button size="lg">
+              <Link href="/membership" className={buttonClasses({ size: 'lg' })}>
                   <Sparkles className="w-5 h-5" />
                   Join The Membership
-                </Button>
-              </Link>
-              <Link href="/products">
-                <Button size="lg" variant="secondary">
+                </Link>
+              <Link href="/products" className={buttonClasses({ variant: 'secondary', size: 'lg' })}>
                   Browse Catalog
-                </Button>
-              </Link>
+                </Link>
             </div>
           </div>
         </div>
@@ -110,6 +107,7 @@ export default async function HomePage() {
                 src="/images/lifestyle/wellness-morning.png"
                 alt="Morning routine"
                 fill
+                sizes="(max-width: 1024px) 100vw, 640px"
                 className="object-cover"
               />
             </div>
@@ -119,11 +117,9 @@ export default async function HomePage() {
               <p className="text-white/60 leading-relaxed mb-6">
                 Every compound in our catalog is sourced from verified synthesis labs, tested independently for purity, and shipped on private infrastructure with zero third-party data exposure. No middlemen. No gray market. No compromises.
               </p>
-              <Link href="/about">
-                <Button variant="secondary">
+              <Link href="/about" className={buttonClasses({ variant: 'secondary' })}>
                   Our Standards <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
+                </Link>
             </div>
           </div>
         </div>
@@ -145,6 +141,7 @@ export default async function HomePage() {
                       src={cat.image}
                       alt={cat.title}
                       fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -195,6 +192,7 @@ export default async function HomePage() {
               src="/images/lifestyle/lab-quality.png"
               alt="Pharmaceutical grade vials"
               fill
+              sizes="(max-width: 1280px) 100vw, 1280px"
               className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
@@ -205,11 +203,9 @@ export default async function HomePage() {
                 <p className="text-white/60 text-sm leading-relaxed mb-4">
                   Every vial is third-party tested. Certificate of Analysis available on request. No exceptions.
                 </p>
-                <Link href="/peptides-safety">
-                  <Button variant="secondary" size="sm">
+                <Link href="/peptides-safety" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
                     Our Standards <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
+                  </Link>
               </div>
             </div>
           </div>
@@ -227,15 +223,11 @@ export default async function HomePage() {
             </p>
             <p className="text-sm text-brand-300/60 mb-8">Pay by Zelle — your membership activates as soon as funds clear.</p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/membership">
-                <Button size="lg">
+              <Link href="/membership" className={buttonClasses({ size: 'lg' })}>
                   <Sparkles className="w-5 h-5" />
                   Join The Membership
-                </Button>
-              </Link>
-              <Link href="/affiliate">
-                <Button size="lg" variant="outline">Become an Affiliate</Button>
-              </Link>
+                </Link>
+              <Link href="/affiliate" className={buttonClasses({ variant: 'outline', size: 'lg' })}>Become an Affiliate</Link>
             </div>
           </div>
         </div>

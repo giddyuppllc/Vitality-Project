@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { displayPrice, hasPriceRange } from '@/lib/display-price'
 import Image from 'next/image'
 import { prisma } from '@/lib/prisma'
 import { formatPrice } from '@/lib/utils'
@@ -27,7 +28,10 @@ export async function PairWithAntiInflammatory({ currentSlug, currentCategorySlu
 
   const products = await prisma.product.findMany({
     where: { slug: { in: ANTI_INFLAMMATORY_SLUGS }, status: 'ACTIVE' },
-    include: { images: { orderBy: { position: 'asc' }, take: 1 } },
+    include: {
+      images: { orderBy: { position: 'asc' }, take: 1 },
+      variants: { select: { price: true } },
+    },
   })
 
   if (products.length === 0) return null
@@ -57,13 +61,19 @@ export async function PairWithAntiInflammatory({ currentSlug, currentCategorySlu
                   src={productImage(p)}
                   alt={p.name}
                   fill
+                  sizes="64px"
                   className={isFallbackImage(p) ? 'object-contain p-2' : 'object-cover'}
                 />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-white text-sm line-clamp-1 group-hover:text-brand-300 transition-colors">{p.name}</p>
                 <p className="text-xs text-white/40 line-clamp-1">{p.shortDesc}</p>
-                <p className="text-sm font-bold text-brand-300 mt-1">{formatPrice(p.price)}</p>
+                {displayPrice(p) !== null && (
+                  <p className="text-sm font-bold text-brand-300 mt-1">
+                    {hasPriceRange(p) && <span className="text-[11px] font-normal text-white/40 mr-1">from</span>}
+                    {formatPrice(displayPrice(p)!)}
+                  </p>
+                )}
               </div>
             </Link>
           )

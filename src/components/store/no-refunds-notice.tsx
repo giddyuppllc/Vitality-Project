@@ -19,7 +19,7 @@ interface Props {
 export function NoRefundsNotice({ variant = 'default', className }: Props) {
   if (variant === 'compact') {
     return (
-      <p className={`text-xs text-white/40 ${className ?? ''}`}>
+      <p className={`text-xs text-white/55 ${className ?? ''}`}>
         <AlertTriangle className="inline w-3 h-3 mr-1 -mt-0.5 text-amber-400/70" />
         All sales are final — no refunds.{' '}
         <Link href="/shipping" className="text-brand-400/70 hover:text-brand-300 underline">

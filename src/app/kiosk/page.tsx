@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
 import { getTenantFromRequest } from '@/lib/tenant'
 import { formatPrice } from '@/lib/utils'
+import { displayPrice as priceFor } from '@/lib/display-price'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ShoppingBag } from 'lucide-react'
@@ -30,6 +31,7 @@ export default async function KioskPage() {
     where: { status: 'ACTIVE' },
     include: {
       images: { orderBy: { position: 'asc' }, take: 1 },
+      variants: { select: { price: true } },
     },
     orderBy: [{ featured: 'desc' }, { name: 'asc' }],
   })
@@ -46,7 +48,9 @@ export default async function KioskPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
         {products.map((product) => {
           const image = product.images[0]?.url
-          const displayPrice = product.salePrice ?? product.price
+          // Same price the cart charges (lib/display-price). salePrice is not
+          // read by checkout, so a SALE badge here promised a price nobody paid.
+          const displayPrice = priceFor(product)
 
           return (
             <Link
@@ -69,11 +73,6 @@ export default async function KioskPage() {
                     <ShoppingBag className="w-12 h-12" />
                   </div>
                 )}
-                {product.salePrice && (
-                  <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                    SALE
-                  </div>
-                )}
               </div>
 
               {/* Info */}
@@ -83,13 +82,8 @@ export default async function KioskPage() {
                 </h3>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-bold text-brand-400">
-                    {formatPrice(displayPrice)}
+                    {displayPrice !== null ? formatPrice(displayPrice) : 'Currently unavailable'}
                   </span>
-                  {product.salePrice && (
-                    <span className="text-sm text-white/30 line-through">
-                      {formatPrice(product.price)}
-                    </span>
-                  )}
                 </div>
 
                 {/* Large touch-friendly Add button */}

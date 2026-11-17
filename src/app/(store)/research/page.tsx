@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { FlaskConical, Dna, Brain, Sparkles, Zap } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Research — The Vitality Project',
+  title: 'Research',
   description: 'An overview of the research landscape surrounding peptides and performance compounds.',
 }
 

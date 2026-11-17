@@ -5,6 +5,13 @@ import type { ProductWithImages } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
+// Internal search results are not landing pages (and every ?q= was a new
+// indexable URL under the homepage's title).
+export const metadata = {
+  title: 'Search',
+  robots: { index: false, follow: true },
+}
+
 interface Props {
   searchParams: Promise<{ q?: string }>
 }

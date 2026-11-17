@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Peptide Signaling Explained — The Vitality Project',
+  title: 'Peptide Signaling Explained',
   description:
     'Deep dive into peptide signaling at the cellular level. Explore GPCRs, receptor tyrosine kinases, intracellular cascades, and why peptide signaling matters for precision research.',
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — The Vitality Project',
+  title: 'Privacy Policy',
 }
 
 export default function PrivacyPage() {
