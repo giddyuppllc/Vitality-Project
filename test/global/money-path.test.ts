@@ -136,6 +136,22 @@ describe('card checkout: store credit and points cannot be double-spent', () => 
   })
 })
 
+describe('variants are priced from the variant the customer chose', () => {
+  it('an unknown / other-product variantId is refused, not sold at the base price', async () => {
+    const m = await makeUser({ tag: 'mp-variant' })
+    const a = await product(1000, { variants: { create: [{ name: 'ZZ 10mg', price: 9000, sku: `ZZ-V-${Date.now()}` }] } })
+    const b = await product(500, { variants: { create: [{ name: 'ZZ 50mg', price: 50000, sku: `ZZ-W-${Date.now()}` }] } })
+    const bVariant = await prisma.productVariant.findFirstOrThrow({ where: { productId: b.id } })
+    setSession(m)
+    const z = await zellePOST(zelleReq(m, [{ productId: a.id, variantId: bVariant.id, quantity: 1 }]))
+    expect(z.status).toBe(400)
+    setSession(m)
+    const c = await cardPOST(cardReq(m, [{ productId: a.id, variantId: 'zz-no-such-variant', quantity: 1 }]))
+    expect(c.status).toBe(400)
+    expect(await prisma.order.count({ where: { userId: m.id } })).toBe(0)
+  })
+})
+
 describe('Zelle checkout: loyalty points cannot be double-spent', () => {
   it('two simultaneous Zelle orders redeeming the same points: the discount is only given once', async () => {
     const m = await makeUser({ tag: 'mp-zelle-pts' })

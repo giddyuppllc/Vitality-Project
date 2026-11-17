@@ -14,7 +14,7 @@ import {
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
-import { computeCartTotal } from '@/lib/pricing'
+import { computeCartTotal, UnorderableLineError } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
 import {
   InsufficientCreditError,
@@ -168,11 +168,18 @@ export async function POST(req: NextRequest) {
     const orderItems = data.items.map((item) => {
       const product = products.find((p) => p.id === item.productId)
       if (!product) {
-        throw new Error(`Product ${item.productId} not found or inactive`)
+        throw new UnorderableLineError(`Product ${item.productId} not found or inactive`)
       }
       const variant = item.variantId
         ? product.variants.find((v) => v.id === item.variantId)
         : null
+      // A variantId that isn't one of this product's variants used to fall
+      // back to the product's base price and store the foreign variantId on
+      // the line (wrong price, and mark-paid then took stock from that other
+      // variant). Refuse it.
+      if (item.variantId && !variant) {
+        throw new UnorderableLineError(`The selected option for ${product.name} is no longer available`)
+      }
       const price = variant?.price ?? product.price
       // `??` falls back on null/undefined but NOT on 0, so a variant saved
       // without a price resolves to 0 and this line would be sold for nothing.
@@ -180,7 +187,7 @@ export async function POST(req: NextRequest) {
       // product price, which nobody set for this variant. Member freebies are
       // appended after this loop and are unaffected.
       if (!Number.isFinite(price) || price <= 0) {
-        throw new Error(
+        throw new UnorderableLineError(
           `No price set for ${product.name}${variant ? ` — ${variant.name}` : ''}`,
         )
       }
@@ -610,7 +617,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (error instanceof DiscountCodeError) {
+    if (error instanceof DiscountCodeError || error instanceof UnorderableLineError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {

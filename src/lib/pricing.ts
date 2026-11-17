@@ -18,6 +18,18 @@ import { calculateBundleDiscount } from '@/lib/bundle-discount'
 import { getUserMembership, calculateMemberDiscount } from '@/lib/membership'
 import type { MembershipTier } from '@prisma/client'
 
+/**
+ * A cart line the checkouts refuse to sell (product missing/inactive, a
+ * variant that isn't one of the product's variants, no price set). The
+ * checkouts answer 400 with this message.
+ */
+export class UnorderableLineError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UnorderableLineError'
+  }
+}
+
 export interface CartRef {
   productId: string
   variantId?: string | null
