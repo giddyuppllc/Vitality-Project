@@ -15,9 +15,9 @@ import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 const USERNAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,23}$/
 
 const schema = z.object({
-  name: z.string().min(2).max(100),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z.string().trim().min(2, 'Please enter your full name').max(100, 'Name is too long'),
+  email: z.string().trim().email('Enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   // Optional — accounts that don't pick one stay email-only
   username: z
     .string()
