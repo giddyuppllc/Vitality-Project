@@ -64,19 +64,19 @@ export default async function CertificatePage({ params }: { params: Promise<{ co
                 <path d={MONOGRAM_PATHS.v} fill="none" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d={MONOGRAM_PATHS.p} fill="none" stroke="#d4b26a" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <p className="mt-[1.5%] text-[clamp(8px,1.3vw,12px)] font-bold uppercase tracking-[0.3em] text-[#5b6577]">The Vitality Project Clubhouse</p>
+              <p className="mt-[1.5%] text-[clamp(8px,1.3vw,12px)] font-bold uppercase tracking-[0.3em] text-[#3f4757]">The Vitality Project Clubhouse</p>
             </div>
             <div>
-              <p className="text-[clamp(10px,1.6vw,15px)] font-semibold uppercase tracking-[0.35em] text-[#8a6d2f]">Certificate of completion</p>
-              <p className="mt-[3%] text-[clamp(10px,1.5vw,14px)] text-[#5b6577]">This certifies that</p>
+              <p className="text-[clamp(10px,1.6vw,15px)] font-semibold uppercase tracking-[0.35em] text-[#6b5320]">Certificate of completion</p>
+              <p className="mt-[3%] text-[clamp(10px,1.5vw,14px)] text-[#3f4757]">This certifies that</p>
               <h1 className="mt-[1.5%] font-serif text-[clamp(22px,4.6vw,46px)] font-semibold leading-tight tracking-tight" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
                 {cert.recipientName}
               </h1>
               <div className="mx-auto mt-[2%] h-px w-2/3 bg-[#b8964f]/60" aria-hidden="true" />
-              <p className="mt-[2%] text-[clamp(10px,1.5vw,14px)] text-[#5b6577]">has completed every lesson and module check of</p>
+              <p className="mt-[2%] text-[clamp(10px,1.5vw,14px)] text-[#3f4757]">has completed every lesson and module check of</p>
               <p className="mt-[1%] text-[clamp(15px,2.6vw,26px)] font-bold tracking-tight">{cert.courseTitle}</p>
             </div>
-            <div className="grid w-full grid-cols-3 items-end gap-4 text-[clamp(7px,1.1vw,11px)] text-[#5b6577]">
+            <div className="grid w-full grid-cols-3 items-end gap-4 text-[clamp(7px,1.1vw,11px)] text-[#3f4757]">
               <div className="text-left">
                 <p className="font-semibold uppercase tracking-wider text-[#0b1322]">{date}</p>
                 <p>Date completed</p>

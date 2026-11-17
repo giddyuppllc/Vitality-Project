@@ -167,3 +167,6 @@ body.vip-theme::after {
   body.vip-theme::before, body.vip-theme::after { display: none !important; }
   body.vip-theme { background: #fff !important; color: #0b1322 !important; }
 }
+
+/* Light certificate paper: no store text-shadow on dark ink. */
+.vip-cert, .vip-cert * { text-shadow: none !important; }
