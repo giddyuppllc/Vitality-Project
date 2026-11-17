@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, TierBadge, Wordmark } from './ui'
+import { MessagesNavLink } from './messages-nav-link'
 
 export interface ShellViewer {
   displayName: string
@@ -78,6 +79,7 @@ export function VipShell({
             </form>
           )}
           <div className="ml-auto flex items-center gap-1.5">
+            {!viewer.suspended && <MessagesNavLink />}
             {!viewer.suspended && (
               <Link
                 href="/notifications"
