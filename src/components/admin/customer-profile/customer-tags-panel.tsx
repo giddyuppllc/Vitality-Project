@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tag as TagIcon, Plus, X } from 'lucide-react'
@@ -21,18 +22,21 @@ export function CustomerTagsPanel({ userId, assignedTags, allTags }: Props) {
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [newName, setNewName] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const assignedIds = new Set(assignedTags.map((t) => t.id))
   const available = allTags.filter((t) => !assignedIds.has(t.id))
 
   const assign = async (tagId: string) => {
     setBusy(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/users/${userId}/tags`, {
+      const r = await adminFetch(`/api/admin/users/${userId}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tagId }),
       })
+      if (!r.ok) return setError(r.error)
       setAdding(false)
       router.refresh()
     } finally {
@@ -42,12 +46,14 @@ export function CustomerTagsPanel({ userId, assignedTags, allTags }: Props) {
 
   const remove = async (tagId: string) => {
     setBusy(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/users/${userId}/tags`, {
+      const r = await adminFetch(`/api/admin/users/${userId}/tags`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tagId }),
       })
+      if (!r.ok) return setError(r.error)
       router.refresh()
     } finally {
       setBusy(false)
@@ -59,22 +65,26 @@ export function CustomerTagsPanel({ userId, assignedTags, allTags }: Props) {
     const name = newName.trim()
     if (!name) return
     setBusy(true)
+    setError(null)
     try {
-      const res = await fetch(`/api/admin/tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      if (!res.ok) {
-        setBusy(false)
-        return
+      // Typing the name of a tag that already exists used to 409 and do
+      // nothing at all. Reuse the existing tag instead.
+      let tagId = allTags.find((t) => t.name.toLowerCase() === name.toLowerCase())?.id
+      if (!tagId) {
+        const created = await adminFetch<{ id: string }>(`/api/admin/tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+        if (!created.ok) return setError(created.error)
+        tagId = created.data.id
       }
-      const tag = await res.json()
-      await fetch(`/api/admin/users/${userId}/tags`, {
+      const r = await adminFetch(`/api/admin/users/${userId}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagId: tag.id }),
+        body: JSON.stringify({ tagId }),
       })
+      if (!r.ok) return setError(r.error)
       setNewName('')
       setAdding(false)
       router.refresh()
@@ -127,6 +137,7 @@ export function CustomerTagsPanel({ userId, assignedTags, allTags }: Props) {
         ))}
       </div>
 
+      {error && <p role="alert" className="text-xs text-red-400 mb-2">{error}</p>}
       {adding && (
         <div className="border-t border-white/5 pt-3 mt-3 space-y-2">
           {available.length > 0 && (

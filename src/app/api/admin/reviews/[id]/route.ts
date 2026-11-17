@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const patchSchema = z.object({
   approved: z.boolean().optional(),
@@ -39,7 +40,7 @@ export async function PATCH(
     return NextResponse.json(review)
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error), issues: error.issues }, { status: 400 })
     console.error('Review update error:', error)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }

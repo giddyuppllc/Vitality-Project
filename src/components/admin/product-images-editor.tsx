@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Loader2, Trash2, Star, ImagePlus } from 'lucide-react'
@@ -65,11 +66,12 @@ export function ProductImagesEditor({ productId }: { productId: string }) {
     setBusyId(imageId)
     setError('')
     try {
-      await fetch(`/api/admin/products/${productId}/images/${imageId}`, {
+      const r = await adminFetch(`/api/admin/products/${productId}/images/${imageId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ makePrimary: true }),
       })
+      if (!r.ok) setError(r.error)
       await load()
     } finally {
       setBusyId(null)
@@ -81,9 +83,10 @@ export function ProductImagesEditor({ productId }: { productId: string }) {
     setBusyId(imageId)
     setError('')
     try {
-      await fetch(`/api/admin/products/${productId}/images/${imageId}`, {
+      const r = await adminFetch(`/api/admin/products/${productId}/images/${imageId}`, {
         method: 'DELETE',
       })
+      if (!r.ok) setError(r.error)
       await load()
     } finally {
       setBusyId(null)

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const patchSchema = z.object({
   name: z.string().min(1).max(160).optional(),
@@ -95,7 +96,7 @@ export async function PATCH(
     return NextResponse.json(updated)
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(err), issues: err.issues }, { status: 400 })
     }
     console.error('[campaigns] update error', err)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })

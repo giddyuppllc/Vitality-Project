@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { adminFetch } from '@/lib/admin-fetch'
 import { Check, Trash2, Loader2 } from 'lucide-react'
 
 export function ReviewModerationRow({
@@ -17,11 +18,12 @@ export function ReviewModerationRow({
   const toggle = async () => {
     setLoading(true)
     try {
-      await fetch(`/api/admin/reviews/${id}`, {
+      const r = await adminFetch(`/api/admin/reviews/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved: !approved }),
       })
+      if (!r.ok) alert(r.error)
       router.refresh()
     } finally {
       setLoading(false)
@@ -32,7 +34,8 @@ export function ReviewModerationRow({
     if (!confirm('Delete this review?')) return
     setLoading(true)
     try {
-      await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
+      const r = await adminFetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
+      if (!r.ok) alert(r.error)
       router.refresh()
     } finally {
       setLoading(false)

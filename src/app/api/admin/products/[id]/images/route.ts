@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { resyncProductImages } from '@/lib/product-images'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 // URL is the relative /uploads/... path returned by POST /api/admin/upload.
 const createSchema = z.object({
@@ -65,7 +66,7 @@ export async function POST(
     return NextResponse.json(image, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error), issues: error.issues }, { status: 400 })
     console.error('Product image create error:', error)
     return NextResponse.json({ error: 'Failed to add image' }, { status: 500 })
   }

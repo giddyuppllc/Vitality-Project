@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -29,6 +30,7 @@ export function ProductsTable({ products }: { products: Product[] }) {
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState('')
   const [payload, setPayload] = useState('ACTIVE')
+  const [bulkError, setBulkError] = useState('')
 
   /**
    * Search + filters. The catalog outgrew a plain list — finding one variant of
@@ -96,16 +98,19 @@ export function ProductsTable({ products }: { products: Product[] }) {
     const body: any = { ids: Array.from(selected), action }
     if (action === 'status') body.payload = { status: payload }
     setLoading(true)
+    setBulkError('')
     try {
-      const res = await fetch('/api/admin/products/bulk', {
+      const r = await adminFetch('/api/admin/products/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (res.ok) {
+      if (r.ok) {
         setSelected(new Set())
         setAction('')
         router.refresh()
+      } else {
+        setBulkError(r.error)
       }
     } finally {
       setLoading(false)
@@ -148,6 +153,7 @@ export function ProductsTable({ products }: { products: Product[] }) {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             Apply ({selected.size})
           </Button>
+          {bulkError && <span role="alert" className="text-xs text-red-400">{bulkError}</span>}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <a

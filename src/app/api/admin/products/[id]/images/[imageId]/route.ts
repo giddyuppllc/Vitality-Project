@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { resyncProductImages } from '@/lib/product-images'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const patchSchema = z.object({
   // Move this image to the front so it becomes the product-card image.
@@ -58,7 +59,7 @@ export async function PATCH(
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error), issues: error.issues }, { status: 400 })
     console.error('Product image update error:', error)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }

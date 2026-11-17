@@ -4,8 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { setProductStatus } from '@/lib/products'
+import { purgeProductCache } from '@/lib/cloudflare-purge'
 import type { ProductStatus } from '@prisma/client'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const schema = z.object({
   ids: z.array(z.string()).min(1),
@@ -73,6 +75,12 @@ export async function POST(req: NextRequest) {
           where: { id: { in: ids } },
           data: { featured: action === 'feature' },
         })
+        // Same edge-cache refresh a single-product edit does, so the
+        // homepage's featured row updates now rather than at TTL expiry.
+        const slugs = await prisma.product.findMany({ where: { id: { in: ids } }, select: { slug: true } })
+        for (const { slug } of slugs) {
+          void purgeProductCache({ slug }).catch((err) => console.error('[products bulk] purge failed:', err))
+        }
         break
       }
     }
@@ -88,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, count: result.count })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error), issues: error.issues }, { status: 400 })
     console.error('Bulk action error:', error)
     return NextResponse.json({ error: 'Bulk action failed' }, { status: 500 })
   }
