@@ -49,6 +49,17 @@ export async function POST(
     // Validate refund-method preconditions BEFORE creating the canonical Refund
     // row, so a rejected request never leaves an orphan PENDING refund (which
     // would inflate the /admin P&L and shrink the future refundable cap).
+    // Only money that was actually received can be refunded. An UNPAID Zelle
+    // order has `total` = what is still due, so refunding it (to store credit
+    // especially) handed the customer credit for money they never sent. Cancel
+    // an unpaid order instead — that returns any store credit it spent.
+    if (order.paymentStatus !== 'PAID' && order.paymentStatus !== 'PARTIALLY_REFUNDED') {
+      return NextResponse.json(
+        { error: `This order's payment is ${order.paymentStatus} — only a paid order can be refunded. Cancel it instead.` },
+        { status: 400 },
+      )
+    }
+
     if (refundMethod === 'store_credit' && !order.userId) {
       return NextResponse.json(
         { error: 'Cannot issue store credit for a guest order' },
