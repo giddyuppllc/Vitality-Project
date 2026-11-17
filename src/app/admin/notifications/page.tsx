@@ -14,7 +14,7 @@ import {
   RefreshCw,
   Settings as SettingsIcon,
 } from 'lucide-react'
-import type { NotificationType } from '@prisma/client'
+import { NotificationType } from '@prisma/client'
 import { MarkAllReadButton, MarkOneReadLink } from './client-controls'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +42,10 @@ export default async function AdminNotificationsPage({ searchParams }: PageProps
 
   const sp = await searchParams
   const filter = sp.filter === 'unread' ? 'unread' : 'all'
-  const typeFilter = sp.type as NotificationType | undefined
+  // Only a real enum value reaches Prisma — ?type=junk used to 500 the page.
+  const typeFilter = (Object.values(NotificationType) as string[]).includes(sp.type ?? '')
+    ? (sp.type as NotificationType)
+    : undefined
 
   const userId = session.user.id
 

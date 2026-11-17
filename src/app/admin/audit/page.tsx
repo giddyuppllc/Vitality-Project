@@ -32,11 +32,16 @@ export default async function AuditLogPage({ searchParams }: Props) {
   }
   if (params.action) where.action = { contains: params.action }
   if (params.entityType) where.entityType = params.entityType
-  if (params.from || params.to) {
+  // An unparseable ?from=/?to= used to become Invalid Date and 500 the page.
+  const from = params.from ? new Date(params.from) : null
+  const to = params.to ? new Date(params.to) : null
+  const validFrom = from && !Number.isNaN(from.getTime()) ? from : null
+  const validTo = to && !Number.isNaN(to.getTime()) ? to : null
+  if (validFrom || validTo) {
     where.createdAt = {}
-    if (params.from) where.createdAt.gte = new Date(params.from)
-    if (params.to) {
-      const end = new Date(params.to)
+    if (validFrom) where.createdAt.gte = validFrom
+    if (validTo) {
+      const end = new Date(validTo)
       end.setDate(end.getDate() + 1)
       where.createdAt.lt = end
     }
