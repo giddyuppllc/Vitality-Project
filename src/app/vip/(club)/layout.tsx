@@ -4,6 +4,7 @@ import { listSpaces } from '@/lib/vip/feed'
 import { GLOBAL_LINKS, globalUrl } from '@/lib/vip/links'
 import { VipShell } from '@/components/vip/shell'
 import { sendClubhouseWelcome } from '@/lib/vip/mailer'
+import { unreadConversationCount } from '@/lib/vip/messages'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,10 +20,11 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
   if (!viewer.welcomed && !viewer.isAdmin) {
     void sendClubhouseWelcome(viewer.userId).catch(() => {})
   }
-  const [unread, spaces] = await Promise.all([
+  const [unread, messages, spaces] = await Promise.all([
     viewer.suspended
       ? Promise.resolve(0)
       : prisma.vipNotification.count({ where: { userId: viewer.userId, readAt: null } }),
+    viewer.suspended ? Promise.resolve(0) : unreadConversationCount(viewer.userId),
     viewer.suspended ? Promise.resolve([]) : listSpaces(),
   ])
   return (
@@ -34,9 +36,9 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
         isAdmin: viewer.isAdmin,
         suspended: viewer.suspended,
       }}
-      // One counter per nav badge (lib/vip/nav.ts). `messages` is filled by
-      // the messaging feature when it lands; 0 renders no badge.
-      badges={{ notifications: unread, messages: 0 }}
+      // One counter per nav badge (lib/vip/nav.ts). The shell keeps the
+      // messages count live (polls /api/vip/messages/unread).
+      badges={{ notifications: unread, messages }}
       spaces={spaces.map((s) => ({ slug: s.slug, name: s.name }))}
       shopUrl={GLOBAL_LINKS.shop()}
       adminUrl={viewer.isAdmin ? globalUrl('/admin/vip') : null}
