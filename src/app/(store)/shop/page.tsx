@@ -8,7 +8,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = {
-  title: "Shop — Vitality Project",
+  title: "Shop",
   description: "Research-grade peptides, oral capsules, topicals, and supplies.",
 };
 

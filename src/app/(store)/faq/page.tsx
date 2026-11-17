@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'FAQ — The Vitality Project',
+  title: 'FAQ',
   description: 'Frequently asked questions about ordering, shipping, and our research compounds.',
 }
 

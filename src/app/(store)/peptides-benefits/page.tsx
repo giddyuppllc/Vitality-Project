@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { FlaskConical, Zap, Dna, Sparkles, Brain, ShieldCheck } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Research Applications of Peptides — The Vitality Project',
+  title: 'Research Applications of Peptides',
   description:
     'Explore the key research areas where peptides are being studied, including tissue repair, metabolic research, cellular longevity, neuromodulation, and immune modulation.',
 }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { getPublishedPosts } from '@/lib/posts'
 
 export const metadata: Metadata = {
-  title: 'Blog — The Vitality Project',
+  title: 'Blog',
   description:
     'News, analysis, and perspectives on the peptide research landscape.',
 }

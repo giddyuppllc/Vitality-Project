@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Synthetic vs Natural Peptides — The Vitality Project',
+  title: 'Synthetic vs Natural Peptides',
   description:
     'Compare synthetic and natural peptides: endogenous production vs SPPS manufacturing, consistency, purity control, and why research relies on synthetic forms for reproducibility.',
 }

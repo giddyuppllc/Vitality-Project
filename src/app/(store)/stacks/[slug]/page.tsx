@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props) {
   const s = getStackBySlug(slug);
   if (!s) return { title: "Stack not found" };
   return {
-    title: `${s.name} — Vitality Project`,
+    title: `${s.name}`,
     description: s.shortDesc,
   };
 }

@@ -10,7 +10,7 @@ import { Check, Zap, Sparkles, ArrowRight, ShoppingCart } from "lucide-react";
 import { STACKS } from "@/lib/stacks";
 
 export const metadata = {
-  title: "Stacks — Vitality Project",
+  title: "Stacks",
   description:
     "Curated multi-peptide stacks. Pick the strength of each component. Automatic bundle discount at checkout — 2 peptides 5% off, 3 → 10%, 4+ → 15%.",
 };

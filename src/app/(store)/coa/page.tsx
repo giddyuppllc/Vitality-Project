@@ -6,7 +6,7 @@ import { CoaPublicSearchBar } from '@/components/store/coa-public-search-bar'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Certificates of Analysis — The Vitality Project',
+  title: 'Certificates of Analysis',
   description:
     'Look up a Certificate of Analysis (CoA) for any compound by name, lot number, or strength. Third-party verified purity for every batch.',
 }

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Unsubscribed — The Vitality Project',
+  title: 'Unsubscribed',
   description: 'You have been unsubscribed.',
 }
 

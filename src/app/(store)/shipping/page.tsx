@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Shipping Policy — The Vitality Project',
+  title: 'Shipping Policy',
 }
 
 export default function ShippingPage() {
