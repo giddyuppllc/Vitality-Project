@@ -29,6 +29,15 @@ import * as adminModeration from '@/app/api/admin/vip/moderation/route'
 import * as adminClassroom from '@/app/api/admin/vip/classroom/route'
 import * as adminEvents from '@/app/api/admin/vip/events/route'
 import * as adminRewards from '@/app/api/admin/vip/rewards/route'
+// Academy / Library / Events upgrade (vip/academy)
+import * as lessonNote from '@/app/api/vip/lessons/[id]/note/route'
+import * as quizAttempts from '@/app/api/vip/quizzes/[id]/attempts/route'
+import * as trainingRedeem from '@/app/api/vip/trainings/[id]/redeem/route'
+import * as trainingInvoice from '@/app/api/vip/trainings/[id]/invoice/route'
+import * as vipFiles from '@/app/api/vip/files/[id]/route'
+import * as eventIcs from '@/app/api/vip/events/[id]/ics/route'
+import * as adminFiles from '@/app/api/admin/vip/files/route'
+import * as adminLibrary from '@/app/api/admin/vip/library/route'
 
 type Handler = (r: NextRequest, ctx: { params: Promise<Record<string, unknown>> }) => Promise<Response>
 type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response> }
@@ -63,6 +72,12 @@ const CASES: Case[] = [
   { name: 'GET /email-prefs', gate: 'member', run: () => h(emailPrefs.GET)(req('/api/vip/email-prefs'), ctx({})) },
   { name: 'PATCH /email-prefs', gate: 'member', run: () => h(emailPrefs.PATCH)(req('/api/vip/email-prefs', { method: 'PATCH', body: { emailDigest: true } }), ctx({})) },
   { name: 'POST /onboarding', gate: 'member', run: () => h(onboarding.POST)(req('/api/vip/onboarding', { method: 'POST' }), ctx({})) },
+  { name: 'PUT /lessons/:id/note', gate: 'member', run: () => h(lessonNote.PUT)(req('/api/vip/lessons/missing/note', { method: 'PUT', body: { body: 'x' } }), ctx({ id: 'missing' })) },
+  { name: 'POST /quizzes/:id/attempts', gate: 'member', run: () => h(quizAttempts.POST)(req('/api/vip/quizzes/missing/attempts', { body: { answers: {} } }), ctx({ id: 'missing' })) },
+  { name: 'POST /trainings/:id/redeem', gate: 'member', run: () => h(trainingRedeem.POST)(req('/api/vip/trainings/missing/redeem', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'POST /trainings/:id/invoice', gate: 'member', run: () => h(trainingInvoice.POST)(req('/api/vip/trainings/missing/invoice', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'GET /files/:id', gate: 'member', run: () => h(vipFiles.GET)(req('/api/vip/files/missingfile00'), ctx({ id: 'missingfile00' })) },
+  { name: 'GET /events/:id/ics', gate: 'member', run: () => h(eventIcs.GET)(req('/api/vip/events/missing/ics'), ctx({ id: 'missing' })) },
 ]
 
 const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
@@ -76,6 +91,8 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'PUT rewards', run: () => h(adminRewards.PUT)(req('/api/admin/vip/rewards', { method: 'PUT', body: { CLUB: 1, PLUS: 1, PREMIUM: 1 } }), ctx({})) },
   { name: 'GET settings', run: () => h(adminSettings.GET)(req('/api/admin/vip/settings'), ctx({})) },
   { name: 'PUT settings', run: () => h(adminSettings.PUT)(req('/api/admin/vip/settings', { method: 'PUT', body: { 'vip.digestHourUtc': 13 } }), ctx({})) },
+  { name: 'POST files', run: () => h(adminFiles.POST)(req('/api/admin/vip/files', { body: {} }), ctx({})) },
+  { name: 'POST library', run: () => h(adminLibrary.POST)(req('/api/admin/vip/library', { body: { op: 'delete', id: 'x' } }), ctx({})) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -115,6 +132,8 @@ describe('members-only gating — every clubhouse API', () => {
         'members/route.ts', 'notifications/route.ts', 'posts/[id]/comments/route.ts', 'posts/[id]/route.ts', 'posts/route.ts',
         'profile/route.ts', 'reactions/route.ts', 'reports/route.ts', 'rewards/route.ts', 'uploads/route.ts',
         'email-prefs/route.ts', 'onboarding/route.ts',
+        'lessons/[id]/note/route.ts', 'quizzes/[id]/attempts/route.ts', 'trainings/[id]/redeem/route.ts',
+        'trainings/[id]/invoice/route.ts', 'files/[id]/route.ts', 'events/[id]/ics/route.ts',
       ].sort(),
     )
   })
