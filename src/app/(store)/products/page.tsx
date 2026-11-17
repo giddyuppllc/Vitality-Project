@@ -70,7 +70,13 @@ async function getProducts(searchParams: Awaited<Props['searchParams']>) {
 }
 
 async function getCategories() {
-  return prisma.category.findMany({ orderBy: { name: 'asc' } })
+  // Only categories with something on sale. Five live categories (Stacks,
+  // Metabolism, Oral Capsules, Topicals & Serums, Weight Loss) had no ACTIVE
+  // products and led to "No products found."
+  return prisma.category.findMany({
+    where: { products: { some: { status: 'ACTIVE' } } },
+    orderBy: { name: 'asc' },
+  })
 }
 
 export default async function ProductsPage({ searchParams }: Props) {

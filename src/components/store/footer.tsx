@@ -30,7 +30,7 @@ export function Footer() {
             <h4 className="font-semibold text-white/80 mb-3 text-sm">Shop</h4>
             <ul className="space-y-2 text-sm text-white/40">
               <li><Link href="/products" className="hover:text-white transition-colors">All Products</Link></li>
-              <li><Link href="/products?category=stacks" className="hover:text-white transition-colors">Stacks</Link></li>
+              <li><Link href="/stacks" className="hover:text-white transition-colors">Stacks</Link></li>
               <li><Link href="/products?category=repair-recovery" className="hover:text-white transition-colors">Repair & Recovery</Link></li>
               <li><Link href="/products?category=body-composition" className="hover:text-white transition-colors">Body Composition</Link></li>
               <li><Link href="/products?category=longevity-aesthetics" className="hover:text-white transition-colors">Longevity & Aesthetics</Link></li>

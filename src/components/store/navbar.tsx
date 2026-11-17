@@ -11,7 +11,7 @@ import { SearchBar } from '@/components/store/search-bar'
 
 const shopCategories = [
   { href: '/products', label: 'All Products' },
-  { href: '/products?category=stacks', label: 'Stacks' },
+  { href: '/stacks', label: 'Stacks' },
   { href: '/products?category=repair-recovery', label: 'Repair & Recovery' },
   { href: '/products?category=body-composition', label: 'Body Composition' },
   { href: '/products?category=longevity-aesthetics', label: 'Longevity & Aesthetics' },
