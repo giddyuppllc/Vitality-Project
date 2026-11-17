@@ -5,17 +5,22 @@ import { Loader2 } from 'lucide-react'
 import type { PostView } from '@/lib/vip/feed'
 import { PostCard } from './post-card'
 
-/** Server renders the first page; this appends later pages from /api/vip/posts. */
+/**
+ * Server renders the first page; this appends later pages from the JSON API
+ * (/api/vip/posts by default, /api/vip/bookmarks for saved posts).
+ */
 export function FeedList({
   initial,
   initialCursor,
   query,
   viewerId,
+  endpoint = '/api/vip/posts',
 }: {
   initial: PostView[]
   initialCursor: string | null
-  query: { space?: string; q?: string }
+  query: { space?: string; q?: string; tab?: string; tag?: string }
   viewerId: string
+  endpoint?: string
 }) {
   const [posts, setPosts] = useState(initial)
   const [cursor, setCursor] = useState(initialCursor)
@@ -25,12 +30,11 @@ export function FeedList({
     if (!cursor) return
     setBusy(true)
     const sp = new URLSearchParams({ cursor })
-    if (query.space) sp.set('space', query.space)
-    if (query.q) sp.set('q', query.q)
-    const res = await fetch(`/api/vip/posts?${sp}`)
+    for (const [k, v] of Object.entries(query)) if (v) sp.set(k, v)
+    const res = await fetch(`${endpoint}?${sp}`)
     if (res.ok) {
       const data = await res.json()
-      setPosts((p) => [...p, ...data.posts])
+      setPosts((p) => [...p, ...data.posts.filter((n: PostView) => !p.some((o) => o.id === n.id))])
       setCursor(data.nextCursor)
     }
     setBusy(false)

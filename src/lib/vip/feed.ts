@@ -1,11 +1,13 @@
 import type { MembershipTier, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { VipViewer } from './access'
+import { blockedIdSet } from './blocks'
 
 /**
  * Read models for the community, shared by the server pages and the JSON
  * APIs so both apply the same visibility rules:
  *  - hidden posts/comments never reach members (admins see them flagged)
+ *  - posts and comments by anyone blocked either way never reach the viewer
  *  - everything is behind requireVipPage/requireVipApi — these helpers do
  *    NOT check access themselves, callers must.
  */
@@ -49,6 +51,9 @@ export interface PostView {
   id: string
   body: string
   imageUrl: string | null
+  /** Every image on the post, in order (older posts: just imageUrl). */
+  images: string[]
+  videoUrl: string | null
   pinned: boolean
   isAnnouncement: boolean
   hidden: boolean
@@ -59,6 +64,7 @@ export interface PostView {
   likeCount: number
   commentCount: number
   likedByMe: boolean
+  bookmarkedByMe: boolean
 }
 
 const postInclude = (viewerId: string) =>
@@ -66,16 +72,21 @@ const postInclude = (viewerId: string) =>
     author: { select: authorSelect },
     space: { select: { slug: true, name: true } },
     reactions: { where: { userId: viewerId, kind: 'LIKE' }, select: { id: true } },
+    images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
+    bookmarks: { where: { userId: viewerId }, select: { id: true } },
     _count: { select: { reactions: true, comments: { where: { hiddenAt: null } } } },
   }) satisfies Prisma.VipPostInclude
 
 type PostRow = Prisma.VipPostGetPayload<{ include: ReturnType<typeof postInclude> }>
 
 function toPost(p: PostRow): PostView {
+  const images = p.images.length ? p.images.map((i) => i.url) : p.imageUrl ? [p.imageUrl] : []
   return {
     id: p.id,
     body: p.body,
     imageUrl: p.imageUrl,
+    images,
+    videoUrl: p.videoUrl,
     pinned: p.pinned,
     isAnnouncement: p.isAnnouncement,
     hidden: !!p.hiddenAt,
@@ -86,6 +97,7 @@ function toPost(p: PostRow): PostView {
     likeCount: p._count.reactions,
     commentCount: p._count.comments,
     likedByMe: p.reactions.length > 0,
+    bookmarkedByMe: p.bookmarks.length > 0,
   }
 }
 
@@ -94,15 +106,36 @@ export async function listFeed(args: {
   space?: string | null
   q?: string | null
   cursor?: string | null
+  /** Only posts by people the viewer follows (no pinned block). */
+  following?: boolean
+  /** Only posts carrying this #hashtag (normalised, no '#'). */
+  tag?: string | null
+  /** Only this member's posts (profile grid). */
+  authorId?: string | null
 }): Promise<{ pinned: PostView[]; posts: PostView[]; nextCursor: string | null }> {
   const q = args.q?.trim().slice(0, 100) || null
   const where: Prisma.VipPostWhereInput = { hiddenAt: null }
   if (args.space) where.space = { slug: args.space, archived: false }
   if (q) where.body = { contains: q, mode: 'insensitive' }
+  if (args.tag) where.hashtags = { some: { tag: args.tag } }
 
+  const hidden = await blockedIdSet(args.viewer.userId)
+  const authorFilter: Prisma.StringFilter = {}
+  if (hidden.size) authorFilter.notIn = [...hidden]
+  if (args.following) {
+    const rows = await prisma.vipFollow.findMany({
+      where: { followerId: args.viewer.userId },
+      select: { followingId: true },
+    })
+    authorFilter.in = rows.map((r) => r.followingId).filter((id) => !hidden.has(id))
+  }
+  if (args.authorId) authorFilter.equals = args.authorId
+  if (Object.keys(authorFilter).length) where.authorId = authorFilter
+
+  const special = !!(q || args.following || args.tag || args.authorId)
   const include = postInclude(args.viewer.userId)
   const pinned =
-    !args.cursor && !q
+    !args.cursor && !special
       ? await prisma.vipPost.findMany({
           where: { ...where, pinned: true },
           include,
@@ -112,7 +145,7 @@ export async function listFeed(args: {
       : []
 
   const rows = await prisma.vipPost.findMany({
-    where: q ? where : { ...where, pinned: false },
+    where: special ? where : { ...where, pinned: false },
     include,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: FEED_PAGE_SIZE + 1,
@@ -125,6 +158,35 @@ export async function listFeed(args: {
     posts: page.map(toPost),
     nextCursor: hasMore ? page[page.length - 1].id : null,
   }
+}
+
+/** The viewer's saved posts, newest save first. Cursor = bookmark id. */
+export async function listBookmarks(args: {
+  viewer: VipViewer
+  cursor?: string | null
+}): Promise<{ posts: PostView[]; nextCursor: string | null }> {
+  const hidden = await blockedIdSet(args.viewer.userId)
+  const rows = await prisma.vipBookmark.findMany({
+    where: {
+      userId: args.viewer.userId,
+      post: { hiddenAt: null, ...(hidden.size ? { authorId: { notIn: [...hidden] } } : {}) },
+    },
+    include: { post: { include: postInclude(args.viewer.userId) } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: FEED_PAGE_SIZE + 1,
+    ...(args.cursor ? { cursor: { id: args.cursor }, skip: 1 } : {}),
+  })
+  const hasMore = rows.length > FEED_PAGE_SIZE
+  const page = rows.slice(0, FEED_PAGE_SIZE)
+  return { posts: page.map((b) => toPost(b.post)), nextCursor: hasMore ? page[page.length - 1].id : null }
+}
+
+/** One post as a card, or null when the viewer may not see it (hidden or blocked). */
+export async function getPostView(viewer: VipViewer, postId: string): Promise<PostView | null> {
+  const p = await prisma.vipPost.findUnique({ where: { id: postId }, include: postInclude(viewer.userId) })
+  if (!p || p.hiddenAt) return null
+  if ((await blockedIdSet(viewer.userId)).has(p.authorId)) return null
+  return toPost(p)
 }
 
 export interface CommentView {
@@ -148,9 +210,15 @@ export async function getThread(
   const post = await prisma.vipPost.findUnique({ where: { id: postId }, include })
   if (!post) return null
   if (post.hiddenAt && !viewer.isAdmin) return null
+  const hidden = await blockedIdSet(viewer.userId)
+  if (hidden.has(post.authorId)) return null
 
   const rows = await prisma.vipComment.findMany({
-    where: { postId, ...(viewer.isAdmin ? {} : { hiddenAt: null }) },
+    where: {
+      postId,
+      ...(viewer.isAdmin ? {} : { hiddenAt: null }),
+      ...(hidden.size ? { authorId: { notIn: [...hidden] } } : {}),
+    },
     include: {
       author: { select: authorSelect },
       reactions: { where: { userId: viewer.userId, kind: 'LIKE' }, select: { id: true } },

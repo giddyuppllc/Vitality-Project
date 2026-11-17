@@ -15,11 +15,18 @@ export const LIMITS = {
   report: { limit: 10, windowMs: 60 * 60_000 },
   upload: { limit: 10, windowMs: 60 * 60_000 },
   profile: { limit: 20, windowMs: 60 * 60_000 },
+  message: { limit: 40, windowMs: 60_000 },
+  conversation: { limit: 20, windowMs: 60 * 60_000 },
+  follow: { limit: 60, windowMs: 60 * 60_000 },
+  block: { limit: 30, windowMs: 60 * 60_000 },
+  bookmark: { limit: 120, windowMs: 60_000 },
 } as const
 
 export const MAX_POST_CHARS = 5000
 export const MAX_COMMENT_CHARS = 2000
 export const MAX_LINKS = 5
+export const MAX_MESSAGE_CHARS = 2000
+export const MAX_POST_IMAGES = 6
 const DUPLICATE_WINDOW_MS = 10 * 60_000
 
 export type LimitKind = keyof typeof LIMITS
@@ -43,6 +50,8 @@ export async function spamCheck(args: {
   kind: 'post' | 'comment'
   userId: string
   body: string
+  /** Editing: the post itself is not a duplicate of itself. */
+  excludeId?: string
 }): Promise<string | null> {
   const body = args.body.trim()
   const max = args.kind === 'post' ? MAX_POST_CHARS : MAX_COMMENT_CHARS
@@ -53,7 +62,7 @@ export async function spamCheck(args: {
   const dup =
     args.kind === 'post'
       ? await prisma.vipPost.findFirst({
-          where: { authorId: args.userId, body, createdAt: { gte: since } },
+          where: { authorId: args.userId, body, createdAt: { gte: since }, ...(args.excludeId ? { id: { not: args.excludeId } } : {}) },
           select: { id: true },
         })
       : await prisma.vipComment.findFirst({
