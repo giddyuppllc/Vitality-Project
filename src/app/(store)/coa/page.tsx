@@ -50,6 +50,21 @@ export default async function PublicCoaPage({ searchParams }: Props) {
     take: 200,
   })
 
+  // "View product" only for products actually on sale. CoAs are kept for
+  // compounds no longer stocked; on live, 10 of these links (GHRP-2,
+  // Melanotan-2, Sermorelin, L-Carnitine ...) went to 404 pages.
+  const linkedSlugs = [...new Set(records.map((r) => r.productSlug).filter((s): s is string => !!s))]
+  const activeSlugs = new Set(
+    linkedSlugs.length
+      ? (
+          await prisma.product.findMany({
+            where: { slug: { in: linkedSlugs }, status: 'ACTIVE' },
+            select: { slug: true },
+          })
+        ).map((p) => p.slug)
+      : [],
+  )
+
   // Group by productName for clean per-compound history
   const groups = new Map<string, typeof records>()
   for (const r of records) {
@@ -126,7 +141,7 @@ export default async function PublicCoaPage({ searchParams }: Props) {
                   {items.length} certificate{items.length === 1 ? '' : 's'} on file
                 </p>
               </div>
-              {items[0].productSlug && (
+              {items[0].productSlug && activeSlugs.has(items[0].productSlug) && (
                 <a
                   href={`/products/${items[0].productSlug}`}
                   className="text-[11px] text-brand-300 hover:text-brand-200 inline-flex items-center gap-1"
