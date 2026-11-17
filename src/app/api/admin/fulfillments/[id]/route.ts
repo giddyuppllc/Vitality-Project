@@ -7,6 +7,7 @@ import {
   updateFulfillmentStatus,
 } from '@/lib/fulfillment'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 import type { FulfillmentStatus } from '@prisma/client'
 
 const patchSchema = z.object({
@@ -28,9 +29,37 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  let data: z.infer<typeof patchSchema>
   try {
-    const body = await req.json()
-    const data = patchSchema.parse(body)
+    data = patchSchema.parse(await req.json())
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  }
+  if (!(await prisma.fulfillment.findUnique({ where: { id }, select: { id: true } }))) {
+    return NextResponse.json({ error: 'Fulfillment not found' }, { status: 404 })
+  }
+
+  const res = await applyPatch(id, data)
+  // Ship / cancel / deliver / tracking edits move the order and email the
+  // customer — they belong on the audit trail.
+  if (res.ok) {
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: data.action === 'ship' ? 'fulfillment.ship' : data.status ? `fulfillment.status.${data.status.toLowerCase()}` : 'fulfillment.update',
+      entityType: 'Fulfillment',
+      entityId: id,
+      metadata: data,
+    })
+  }
+  return res
+}
+
+async function applyPatch(id: string, data: z.infer<typeof patchSchema>): Promise<Response> {
+  try {
 
     // Special "ship" action goes through helper that cascades to order + email
     if (data.action === 'ship') {

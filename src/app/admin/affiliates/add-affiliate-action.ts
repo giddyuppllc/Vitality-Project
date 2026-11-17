@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { logAudit } from '@/lib/audit'
 
 export type AddAffiliateState = { ok: boolean; message: string } | null
 
@@ -61,8 +62,16 @@ export async function addAffiliateManually(
   }
 
   try {
-    await prisma.affiliate.create({
+    const created = await prisma.affiliate.create({
       data: { userId: user.id, code, paypalEmail, status: 'ACTIVE' },
+    })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'affiliate.create',
+      entityType: 'Affiliate',
+      entityId: created.id,
+      metadata: { email, code, status: 'ACTIVE', source: 'admin add' },
     })
   } catch (err) {
     return {

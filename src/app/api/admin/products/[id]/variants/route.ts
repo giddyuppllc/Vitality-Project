@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
+import { purgeProductCache } from '@/lib/cloudflare-purge'
+import { zodMessage } from '@/lib/zod-message'
 import { syncProductInventory, hasVariants } from '@/lib/product-stock'
 
 const schema = z.object({
@@ -38,7 +41,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await guard()))
+  const session = await guard()
+  if (!session)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   try {
@@ -54,11 +58,27 @@ export async function POST(
     })
     // Keep the derived product total in step — see src/lib/product-stock.ts
     await syncProductInventory(id)
+    // Variant prices are what checkout charges — audit them like product edits
+    // and refresh the storefront cache.
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'product.variant.create',
+      entityType: 'Product',
+      entityId: id,
+      metadata: { variantId: variant.id, name: variant.name, price: variant.price, inventory: variant.inventory },
+    })
+    void purgeSlug(id)
     return NextResponse.json(variant, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error) }, { status: 400 })
     console.error('Variant create error:', error)
     return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
   }
+}
+
+async function purgeSlug(productId: string) {
+  const p = await prisma.product.findUnique({ where: { id: productId }, select: { slug: true } })
+  if (p) await purgeProductCache({ slug: p.slug }).catch((err) => console.error('[variants] purge failed:', err))
 }

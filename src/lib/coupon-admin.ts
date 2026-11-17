@@ -1,5 +1,3 @@
-import type { z } from 'zod'
-
 /**
  * The coupon form's "Expires" box is a plain date (YYYY-MM-DD). `new Date()`
  * of that is UTC MIDNIGHT at the start of the day, and the validator rejects
@@ -15,7 +13,4 @@ export function couponExpiryFromInput(v: string | null | undefined): Date | null
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-/** One readable line from a zod error (the forms render `error` as text). */
-export function zodMessage(error: z.ZodError): string {
-  return error.issues.map((i) => `${i.path.join('.') || 'value'}: ${i.message}`).join('; ')
-}
+export { zodMessage } from './zod-message'

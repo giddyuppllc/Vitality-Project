@@ -36,9 +36,12 @@ export function RateEditor({ mode, zoneId, initial }: Props) {
 
   const submit = async () => {
     setError(null)
-    const priceN = (parseMoneyToCents(price) ?? 0)
+    // A blank/unreadable price used to save as $0.00 (free shipping) silently.
+    const priceN = parseMoneyToCents(price)
     if (!name.trim()) return setError('Name required')
-    if (!Number.isFinite(priceN) || priceN < 0) return setError('Valid price required')
+    if (priceN === null || priceN < 0) return setError('Enter a price, e.g. 9.95 (or 0 for free)')
+    const minOrderN = minOrderValue ? parseMoneyToCents(minOrderValue) : null
+    if (minOrderValue && minOrderN === null) return setError('Enter a valid minimum order, e.g. 150')
     const url =
       mode === 'create'
         ? '/api/admin/shipping/rates'
@@ -51,9 +54,7 @@ export function RateEditor({ mode, zoneId, initial }: Props) {
     if (mode === 'create') body.zoneId = zoneId
     body.minWeight = minWeight ? parseFloat(minWeight) : null
     body.maxWeight = maxWeight ? parseFloat(maxWeight) : null
-    body.minOrderValue = minOrderValue
-      ? (parseMoneyToCents(minOrderValue) ?? 0)
-      : null
+    body.minOrderValue = minOrderN
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },

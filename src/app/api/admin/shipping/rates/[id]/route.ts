@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -36,6 +37,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         ...(data.minOrderValue !== undefined ? { minOrderValue: data.minOrderValue } : {}),
       },
     })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.rate.update',
+      entityType: 'ShippingRate',
+      entityId: id,
+      metadata: data,
+    })
     return NextResponse.json(updated)
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -51,7 +60,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { id } = await params
   try {
-    await prisma.shippingRate.delete({ where: { id } })
+    const gone = await prisma.shippingRate.delete({ where: { id } })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.rate.delete',
+      entityType: 'ShippingRate',
+      entityId: id,
+      metadata: { name: gone.name, price: gone.price, zoneId: gone.zoneId },
+    })
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[admin/shipping/rates DELETE]', err)
