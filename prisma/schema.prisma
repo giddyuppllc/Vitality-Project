@@ -26,32 +26,32 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  orders        Order[]
-  addresses     Address[]
-  reviews       Review[]
-  affiliate     Affiliate?
-  sessions      Session[]
-  accounts      Account[]
-  cartItems     CartItem[]
+  orders         Order[]
+  addresses      Address[]
+  reviews        Review[]
+  affiliate      Affiliate?
+  sessions       Session[]
+  accounts       Account[]
+  cartItems      CartItem[]
   orgMemberships OrgMember[]
   orgClients     OrgClient[]
-  loyalty       LoyaltyAccount?
-  storeCredit   StoreCredit?
+  loyalty        LoyaltyAccount?
+  storeCredit    StoreCredit?
   supportTickets SupportTicket[]
-  membership    Membership?
-  refundsCreated Refund[]    @relation("RefundCreatedBy")
-  wishlistItems WishlistItem[]
+  membership     Membership?
+  refundsCreated Refund[]        @relation("RefundCreatedBy")
+  wishlistItems  WishlistItem[]
 
   // VIP clubhouse (vitalityproject.vip) — relation fields only, no columns.
-  vipProfile       VipProfile?
-  vipPosts         VipPost[]
-  vipComments      VipComment[]
-  vipReports       VipReport[]       @relation("VipReportReporter")
-  vipNotifications VipNotification[] @relation("VipNotificationRecipient")
-  vipRewardGrants  VipRewardGrant[]
-  vipReactions     VipReaction[]
+  vipProfile        VipProfile?
+  vipPosts          VipPost[]
+  vipComments       VipComment[]
+  vipReports        VipReport[]         @relation("VipReportReporter")
+  vipNotifications  VipNotification[]   @relation("VipNotificationRecipient")
+  vipRewardGrants   VipRewardGrant[]
+  vipReactions      VipReaction[]
   vipLessonProgress VipLessonProgress[]
-  vipEventRsvps    VipEventRsvp[]
+  vipEventRsvps     VipEventRsvp[]
 
   verifyToken      String?   @unique
   resetToken       String?   @unique
@@ -86,17 +86,17 @@ model Organization {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  locations     Location[]
-  members       OrgMember[]
-  clients       OrgClient[]
-  pricingPlans  PricingPlan[]
-  orders        Order[]
+  locations    Location[]
+  members      OrgMember[]
+  clients      OrgClient[]
+  pricingPlans PricingPlan[]
+  orders       Order[]
 
   @@map("organizations")
 }
 
 model Location {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   name           String
   slug           String
@@ -106,23 +106,23 @@ model Location {
   state          String?
   zip            String?
   phone          String?
-  commissionRate Float    @default(0.10)
+  commissionRate Float   @default(0.10)
   pricingPlanId  String?
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  pricingPlan    PricingPlan? @relation(fields: [pricingPlanId], references: [id])
-  devices        LocationDevice[]
-  orders         Order[]
-  clients        OrgClient[]
-  members        OrgMember[]
-  commissions    OrderCommission[]
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pricingPlan  PricingPlan?      @relation(fields: [pricingPlanId], references: [id])
+  devices      LocationDevice[]
+  orders       Order[]
+  clients      OrgClient[]
+  members      OrgMember[]
+  commissions  OrderCommission[]
 
   @@unique([organizationId, slug])
   @@map("locations")
 }
 
 model OrgMember {
-  id             String         @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
   userId         String
   role           OrgMemberRole
@@ -131,11 +131,11 @@ model OrgMember {
   // Personal trainer/coach referral code — used by /join?t=<code> to attribute
   // new customer signups to this trainer. Optional because OWNER/ADMIN don't
   // typically need one; auto-generated for STAFF/COACH/DOCTOR on creation.
-  referralCode   String?      @unique
+  referralCode String? @unique
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location       Location?    @relation(fields: [locationId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [id])
 
   attributedClients OrgClient[] @relation("TrainerAttributedClients")
 
@@ -156,10 +156,10 @@ model OrgClient {
   trainerOrgMemberId String?
   trainer            OrgMember? @relation("TrainerAttributedClients", fields: [trainerOrgMemberId], references: [id], onDelete: SetNull)
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location       Location?    @relation(fields: [locationId], references: [id])
-  orders         Order[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [id])
+  orders       Order[]
 
   @@unique([organizationId, userId])
   @@index([trainerOrgMemberId])
@@ -167,53 +167,53 @@ model OrgClient {
 }
 
 model LocationDevice {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   locationId String
   name       String
-  apiKey     String   @unique
+  apiKey     String    @unique
   lastSeenAt DateTime?
 
-  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@map("location_devices")
 }
 
 model PricingPlan {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
+  id              String @id @default(cuid())
+  organizationId  String
+  name            String
   baseDiscountPct Float?
 
-  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  overrides      ProductPriceOverride[]
-  locations      Location[]
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  overrides    ProductPriceOverride[]
+  locations    Location[]
 
   @@unique([organizationId, name])
   @@map("pricing_plans")
 }
 
 model ProductPriceOverride {
-  id            String   @id @default(cuid())
+  id            String @id @default(cuid())
   pricingPlanId String
   productId     String
   price         Int
 
-  pricingPlan   PricingPlan @relation(fields: [pricingPlanId], references: [id], onDelete: Cascade)
-  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  pricingPlan PricingPlan @relation(fields: [pricingPlanId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([pricingPlanId, productId])
   @@map("product_price_overrides")
 }
 
 model OrderCommission {
-  id          String            @id @default(cuid())
-  orderId     String
-  locationId  String
-  amount      Int
-  status      CommissionStatus @default(PENDING)
+  id         String           @id @default(cuid())
+  orderId    String
+  locationId String
+  amount     Int
+  status     CommissionStatus @default(PENDING)
 
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@unique([orderId, locationId])
   @@map("order_commissions")
@@ -285,52 +285,52 @@ model VerificationToken {
 // ─── Products ────────────────────────────────────────────────────────────────
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
   description String?
   image       String?
   parentId    String?
-  parent      Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children    Category[] @relation("CategoryTree")
   products    Product[]
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
 
   @@map("categories")
 }
 
 model Product {
-  id            String        @id @default(cuid())
-  name          String
-  slug          String        @unique
-  description   String        @db.Text
-  shortDesc     String?
-  price         Int           // in cents
-  comparePrice  Int?          // original/strikethrough price
-  salePrice     Int?          // overrides price when set (sale event)
-  cost          Int?          // cost of goods
-  sku           String?       @unique
-  barcode       String?
-  categoryId    String?
-  category      Category?     @relation(fields: [categoryId], references: [id])
-  images        ProductImage[]
-  variants      ProductVariant[]
-  inventory     Int           @default(0)
-  trackInventory Boolean      @default(false)
-  weight        Float?        // in grams
-  status        ProductStatus @default(DRAFT)
-  featured      Boolean       @default(false)
-  seoTitle      String?
-  seoDesc       String?
-  tags          String[]
-  orderItems    OrderItem[]
-  cartItems     CartItem[]
-  reviews       Review[]
+  id             String                 @id @default(cuid())
+  name           String
+  slug           String                 @unique
+  description    String                 @db.Text
+  shortDesc      String?
+  price          Int // in cents
+  comparePrice   Int? // original/strikethrough price
+  salePrice      Int? // overrides price when set (sale event)
+  cost           Int? // cost of goods
+  sku            String?                @unique
+  barcode        String?
+  categoryId     String?
+  category       Category?              @relation(fields: [categoryId], references: [id])
+  images         ProductImage[]
+  variants       ProductVariant[]
+  inventory      Int                    @default(0)
+  trackInventory Boolean                @default(false)
+  weight         Float? // in grams
+  status         ProductStatus          @default(DRAFT)
+  featured       Boolean                @default(false)
+  seoTitle       String?
+  seoDesc        String?
+  tags           String[]
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+  reviews        Review[]
   priceOverrides ProductPriceOverride[]
-  facilities    ProductFacility[]
-  wishlistedBy  WishlistItem[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  facilities     ProductFacility[]
+  wishlistedBy   WishlistItem[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@map("products")
 }
@@ -355,9 +355,9 @@ model ProductImage {
 model ProductVariant {
   id        String  @id @default(cuid())
   productId String
-  name      String  // e.g. "10mg / 30 vials"
+  name      String // e.g. "10mg / 30 vials"
   sku       String?
-  price     Int     // in cents
+  price     Int // in cents
   inventory Int     @default(0)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -367,14 +367,14 @@ model ProductVariant {
 // ─── Cart ────────────────────────────────────────────────────────────────────
 
 model CartItem {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String?
   sessionId String? // for guest carts
   productId String
   variantId String?
-  quantity  Int     @default(1)
-  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -384,50 +384,50 @@ model CartItem {
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
 model Order {
-  id              String      @id @default(cuid())
-  orderNumber     String      @unique
-  userId          String?
-  user            User?       @relation(fields: [userId], references: [id])
-  email           String
-  status          OrderStatus @default(PENDING)
-  paymentStatus   PaymentStatus @default(UNPAID)
-  paymentMethod   String?     // stripe | crypto
-  paymentId       String?     // stripe payment intent or crypto charge id
-  subtotal        Int         // in cents
-  discount        Int         @default(0)
-  shipping        Int         @default(0)
-  tax             Int         @default(0)
-  total           Int         // in cents
-  discountCode    String?
-  notes           String?
-  items           OrderItem[]
-  shippingAddress Address?    @relation(fields: [shippingAddressId], references: [id])
+  id                String        @id @default(cuid())
+  orderNumber       String        @unique
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id])
+  email             String
+  status            OrderStatus   @default(PENDING)
+  paymentStatus     PaymentStatus @default(UNPAID)
+  paymentMethod     String? // stripe | crypto
+  paymentId         String? // stripe payment intent or crypto charge id
+  subtotal          Int // in cents
+  discount          Int           @default(0)
+  shipping          Int           @default(0)
+  tax               Int           @default(0)
+  total             Int // in cents
+  discountCode      String?
+  notes             String?
+  items             OrderItem[]
+  shippingAddress   Address?      @relation(fields: [shippingAddressId], references: [id])
   shippingAddressId String?
-  trackingNumber  String?
-  trackingUrl     String?
-  affiliateCode   String?
-  affiliateId     String?
-  organizationId String?
-  locationId     String?
-  clientId       String?
-  salesChannel   OrderChannel @default(DIRECT)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  trackingNumber    String?
+  trackingUrl       String?
+  affiliateCode     String?
+  affiliateId       String?
+  organizationId    String?
+  locationId        String?
+  clientId          String?
+  salesChannel      OrderChannel  @default(DIRECT)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  location       Location?     @relation(fields: [locationId], references: [id])
-  client         OrgClient?    @relation(fields: [clientId], references: [id])
-  commissions    OrderCommission[]
-  fulfillments   Fulfillment[]
-  refunds        Refund[]
-  storeCreditUsed Int          @default(0)
-  loyaltyPointsUsed Int        @default(0)
-  loyaltyPointsEarned Int      @default(0)
+  organization        Organization?     @relation(fields: [organizationId], references: [id])
+  location            Location?         @relation(fields: [locationId], references: [id])
+  client              OrgClient?        @relation(fields: [clientId], references: [id])
+  commissions         OrderCommission[]
+  fulfillments        Fulfillment[]
+  refunds             Refund[]
+  storeCreditUsed     Int               @default(0)
+  loyaltyPointsUsed   Int               @default(0)
+  loyaltyPointsEarned Int               @default(0)
 
-  @@map("orders")
   @@index([organizationId])
   @@index([locationId])
   @@index([clientId])
+  @@map("orders")
 }
 
 enum OrderStatus {
@@ -455,17 +455,17 @@ enum OrderChannel {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String
-  variantId String?
-  name      String  // snapshot at time of purchase
-  sku       String?
-  price     Int     // in cents, snapshot
-  quantity  Int
-  total     Int     // in cents
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
+  id               String            @id @default(cuid())
+  orderId          String
+  productId        String
+  variantId        String?
+  name             String // snapshot at time of purchase
+  sku              String?
+  price            Int // in cents, snapshot
+  quantity         Int
+  total            Int // in cents
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id])
   fulfillmentItems FulfillmentItem[]
 
   @@map("order_items")
@@ -480,7 +480,7 @@ model Refund {
   id          String       @id @default(cuid())
   orderId     String
   order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  amount      Int          // in cents — always positive
+  amount      Int // in cents — always positive
   method      RefundMethod @default(STORE_CREDIT)
   reason      String?      @db.Text
   // External processor reference (Chase orbital ID / Stripe refund ID / store
@@ -499,9 +499,9 @@ model Refund {
 }
 
 enum RefundMethod {
-  CASH           // back to original payment method (card)
-  STORE_CREDIT   // issued as store credit
-  MANUAL         // recorded out-of-band (check, ACH, etc.)
+  CASH // back to original payment method (card)
+  STORE_CREDIT // issued as store credit
+  MANUAL // recorded out-of-band (check, ACH, etc.)
 }
 
 enum RefundStatus {
@@ -513,19 +513,19 @@ enum RefundStatus {
 // ─── Addresses ───────────────────────────────────────────────────────────────
 
 model Address {
-  id         String  @id @default(cuid())
-  userId     String
-  name       String
-  line1      String
-  line2      String?
-  city       String
-  state      String
-  zip        String
-  country    String  @default("US")
-  phone      String?
-  isDefault  Boolean @default(false)
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders     Order[]
+  id        String  @id @default(cuid())
+  userId    String
+  name      String
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  zip       String
+  country   String  @default("US")
+  phone     String?
+  isDefault Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders    Order[]
 
   @@map("addresses")
 }
@@ -533,17 +533,17 @@ model Address {
 // ─── Discount Codes ──────────────────────────────────────────────────────────
 
 model DiscountCode {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  type        DiscountType @default(PERCENTAGE)
-  value       Int          // percentage (1-100) or cents
-  minOrder    Int?         // minimum order in cents
-  maxUses     Int?
-  usedCount   Int          @default(0)
-  active      Boolean      @default(true)
-  expiresAt   DateTime?
-  rule        CouponRule?
-  createdAt   DateTime     @default(now())
+  id        String       @id @default(cuid())
+  code      String       @unique
+  type      DiscountType @default(PERCENTAGE)
+  value     Int // percentage (1-100) or cents
+  minOrder  Int? // minimum order in cents
+  maxUses   Int?
+  usedCount Int          @default(0)
+  active    Boolean      @default(true)
+  expiresAt DateTime?
+  rule      CouponRule?
+  createdAt DateTime     @default(now())
 
   @@map("discount_codes")
 }
@@ -561,7 +561,7 @@ model Review {
   id        String   @id @default(cuid())
   productId String
   userId    String
-  rating    Int      // 1-5
+  rating    Int // 1-5
   title     String?
   body      String?  @db.Text
   approved  Boolean  @default(false)
@@ -575,22 +575,22 @@ model Review {
 // ─── Affiliate System (Package C) ────────────────────────────────────────────
 
 model Affiliate {
-  id            String          @id @default(cuid())
-  userId        String          @unique
-  code          String          @unique
-  commissionRate Float          @default(0.10) // 10%
-  status        AffiliateStatus @default(PENDING)
-  paypalEmail   String?
-  bankInfo      String?         @db.Text // encrypted
-  totalEarned   Int             @default(0) // in cents
-  totalPaid     Int             @default(0) // in cents
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clicks        AffiliateClick[]
-  commissions   AffiliateCommission[]
-  links         AffiliateLink[]
-  payouts       AffiliatePayout[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String                @id @default(cuid())
+  userId         String                @unique
+  code           String                @unique
+  commissionRate Float                 @default(0.10) // 10%
+  status         AffiliateStatus       @default(PENDING)
+  paypalEmail    String?
+  bankInfo       String?               @db.Text // encrypted
+  totalEarned    Int                   @default(0) // in cents
+  totalPaid      Int                   @default(0) // in cents
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks         AffiliateClick[]
+  commissions    AffiliateCommission[]
+  links          AffiliateLink[]
+  payouts        AffiliatePayout[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   @@map("affiliates")
 }
@@ -606,7 +606,7 @@ model AffiliateLink {
   affiliateId String
   name        String
   slug        String    @unique
-  url         String    // destination URL
+  url         String // destination URL
   active      Boolean   @default(true)
   clicks      Int       @default(0)
   affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
@@ -630,13 +630,13 @@ model AffiliateClick {
 }
 
 model AffiliateCommission {
-  id          String             @id @default(cuid())
+  id          String           @id @default(cuid())
   affiliateId String
   orderId     String
-  amount      Int                // in cents
-  status      CommissionStatus   @default(PENDING)
-  affiliate   Affiliate          @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  createdAt   DateTime           @default(now())
+  amount      Int // in cents
+  status      CommissionStatus @default(PENDING)
+  affiliate   Affiliate        @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
 
   @@map("affiliate_commissions")
 }
@@ -651,8 +651,8 @@ enum CommissionStatus {
 model AffiliatePayout {
   id          String    @id @default(cuid())
   affiliateId String
-  amount      Int       // in cents
-  method      String    // paypal | wire
+  amount      Int // in cents
+  method      String // paypal | wire
   reference   String?
   notes       String?
   affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
@@ -677,7 +677,7 @@ model ChatSession {
 model ChatMessage {
   id        String      @id @default(cuid())
   sessionId String
-  role      String      // user | assistant
+  role      String // user | assistant
   content   String      @db.Text
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   createdAt DateTime    @default(now())
@@ -688,11 +688,11 @@ model ChatMessage {
 // ─── Shipping Rules ───────────────────────────────────────────────────────────
 
 model ShippingZone {
-  id          String         @id @default(cuid())
-  name        String
-  countries   String[]
-  rates       ShippingRate[]
-  active      Boolean        @default(true)
+  id        String         @id @default(cuid())
+  name      String
+  countries String[]
+  rates     ShippingRate[]
+  active    Boolean        @default(true)
 
   @@map("shipping_zones")
 }
@@ -700,11 +700,11 @@ model ShippingZone {
 model ShippingRate {
   id            String       @id @default(cuid())
   zoneId        String
-  name          String       // e.g. "Standard", "Express"
-  price         Int          // in cents
+  name          String // e.g. "Standard", "Express"
+  price         Int // in cents
   minWeight     Float?
   maxWeight     Float?
-  minOrderValue Int?         // free shipping threshold
+  minOrderValue Int? // free shipping threshold
   zone          ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@map("shipping_rates")
@@ -727,7 +727,7 @@ model MembershipSignup {
   email     String   @unique
   name      String?
   plan      String   @default("monthly") // monthly, quarterly, annual
-  source    String?  // where they signed up from (hero, product, nav, etc)
+  source    String? // where they signed up from (hero, product, nav, etc)
   createdAt DateTime @default(now())
 
   @@map("membership_signups")
@@ -736,28 +736,28 @@ model MembershipSignup {
 // ─── Fulfillment Facilities (licensed Florida labs) ──────────────────────────
 
 model Facility {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  contactName String?
-  email       String
-  phone       String?
-  addressLine1 String
-  addressLine2 String?
-  city        String
-  state       String   @default("FL")
-  zip         String
-  country     String   @default("US")
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  contactName   String?
+  email         String
+  phone         String?
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  state         String            @default("FL")
+  zip           String
+  country       String            @default("US")
   licenseNumber String?
-  apiEndpoint String?  // supplier API base URL
-  apiKey      String?  // encrypted credentials
-  active      Boolean  @default(true)
-  slaHours    Int      @default(48) // fulfillment SLA
-  notes       String?  @db.Text
-  products    ProductFacility[]
-  fulfillments Fulfillment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  apiEndpoint   String? // supplier API base URL
+  apiKey        String? // encrypted credentials
+  active        Boolean           @default(true)
+  slaHours      Int               @default(48) // fulfillment SLA
+  notes         String?           @db.Text
+  products      ProductFacility[]
+  fulfillments  Fulfillment[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@map("facilities")
 }
@@ -767,8 +767,8 @@ model ProductFacility {
   productId  String
   facilityId String
   primary    Boolean  @default(false) // default facility for this product
-  cost       Int?     // wholesale cost in cents
-  inventory  Int      @default(0)     // facility-tracked inventory
+  cost       Int? // wholesale cost in cents
+  inventory  Int      @default(0) // facility-tracked inventory
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
@@ -777,27 +777,27 @@ model ProductFacility {
 }
 
 model Fulfillment {
-  id             String             @id @default(cuid())
+  id             String            @id @default(cuid())
   orderId        String
   facilityId     String
-  status         FulfillmentStatus  @default(PENDING)
-  externalId     String?            // supplier's order reference
+  status         FulfillmentStatus @default(PENDING)
+  externalId     String? // supplier's order reference
   trackingNumber String?
   trackingUrl    String?
   carrier        String?
   shippedAt      DateTime?
   deliveredAt    DateTime?
-  notes          String?            @db.Text
-  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  facility       Facility           @relation(fields: [facilityId], references: [id])
+  notes          String?           @db.Text
+  order          Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  facility       Facility          @relation(fields: [facilityId], references: [id])
   items          FulfillmentItem[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  @@map("fulfillments")
   @@index([orderId])
   @@index([facilityId])
   @@index([status])
+  @@map("fulfillments")
 }
 
 model FulfillmentItem {
@@ -824,36 +824,42 @@ enum FulfillmentStatus {
 // ─── Loyalty & Rewards ──────────────────────────────────────────────────────
 
 model LoyaltyAccount {
-  id          String              @id @default(cuid())
-  userId      String              @unique
-  tier        LoyaltyTier         @default(BRONZE)
-  points      Int                 @default(0)
-  lifetimeSpend Int               @default(0) // cents
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions LoyaltyTransaction[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id            String               @id @default(cuid())
+  userId        String               @unique
+  tier          LoyaltyTier          @default(BRONZE)
+  points        Int                  @default(0)
+  lifetimeSpend Int                  @default(0) // cents
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  LoyaltyTransaction[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   @@map("loyalty_accounts")
 }
 
 enum LoyaltyTier {
-  BRONZE    // default
-  SILVER    // $500+ lifetime
-  GOLD      // $2000+ lifetime
-  PLATINUM  // $5000+ lifetime
+  BRONZE // default
+  SILVER // $500+ lifetime
+  GOLD // $2000+ lifetime
+  PLATINUM // $5000+ lifetime
 }
 
 model LoyaltyTransaction {
-  id          String         @id @default(cuid())
-  accountId   String
-  type        LoyaltyTxType
-  points      Int            // positive for earn, negative for redeem
-  description String
-  orderId     String?        // if tied to an order
-  account     LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
+  id             String         @id @default(cuid())
+  accountId      String
+  type           LoyaltyTxType
+  points         Int // positive for earn, negative for redeem
+  description    String
+  orderId        String? // if tied to an order
+  // Exactly-once key for engagement/partner/reward awards (e.g.
+  // "lesson:<id>:<userId>"). A second award with the same key is a no-op.
+  idempotencyKey String?        @unique
+  // Where the points came from or went: "vip", "global", "partner:<slug>".
+  source         String?
+  account        LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
 
+  @@index([accountId, createdAt])
   @@map("loyalty_transactions")
 }
 
@@ -862,34 +868,39 @@ enum LoyaltyTxType {
   EARN_REFERRAL
   EARN_REVIEW
   EARN_BIRTHDAY
-  EARN_ADMIN    // manual admin grant
+  EARN_ADMIN // manual admin grant
   REDEEM_DISCOUNT
   EXPIRE
-  ADJUST        // admin adjustment
+  ADJUST // admin adjustment
+  EARN_ENGAGEMENT // clubhouse activity: lessons, posts, events, streaks, workouts, challenges
+  EARN_PARTNER // spend at a partner business in the rewards network
+  REDEEM_REWARD // spent in the clubhouse rewards catalog (product, merch, training)
+  REDEEM_PARTNER // spent at a partner business
+  REVERSAL // undo of an earlier award or redemption
 }
 
 // ─── Store Credit ───────────────────────────────────────────────────────────
 
 model StoreCredit {
-  id          String             @id @default(cuid())
-  userId      String             @unique
-  balance     Int                @default(0) // cents
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  userId       String           @unique
+  balance      Int              @default(0) // cents
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions StoreCreditTxn[]
-  updatedAt   DateTime           @updatedAt
+  updatedAt    DateTime         @updatedAt
 
   @@map("store_credits")
 }
 
 model StoreCreditTxn {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   creditId    String
   type        CreditTxType
-  amount      Int         // positive for credit, negative for debit (cents)
+  amount      Int // positive for credit, negative for debit (cents)
   description String
   orderId     String?
-  credit      StoreCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
-  createdAt   DateTime    @default(now())
+  credit      StoreCredit  @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
 
   @@map("store_credit_txns")
 }
@@ -900,9 +911,9 @@ enum CreditTxType {
   ADMIN_GRANT
   BIRTHDAY
   LOYALTY_REDEEM
-  CHECKOUT_APPLY  // used at checkout
+  CHECKOUT_APPLY // used at checkout
   EXPIRE
-  MEMBER_REWARD   // monthly VIP clubhouse tier reward (api/cron/vip-member-rewards)
+  MEMBER_REWARD // monthly VIP clubhouse tier reward (api/cron/vip-member-rewards)
   CHECKOUT_RESTORE // credit returned when a Zelle order that spent it is cancelled / expires / is refunded (lib/order-credit.ts)
 }
 
@@ -912,29 +923,29 @@ enum CreditTxType {
 // ─── Support Tickets ────────────────────────────────────────────────────────
 
 model SupportTicket {
-  id          String          @id @default(cuid())
-  number      String          @unique // e.g. VP-TKT-000001
-  userId      String?
-  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  email       String
-  subject     String
-  status      TicketStatus    @default(OPEN)
-  priority    TicketPriority  @default(NORMAL)
-  orderId     String?         // if related to an order
-  assignedTo  String?         // admin user id
-  messages    TicketMessage[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id         String          @id @default(cuid())
+  number     String          @unique // e.g. VP-TKT-000001
+  userId     String?
+  user       User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email      String
+  subject    String
+  status     TicketStatus    @default(OPEN)
+  priority   TicketPriority  @default(NORMAL)
+  orderId    String? // if related to an order
+  assignedTo String? // admin user id
+  messages   TicketMessage[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 
-  @@map("support_tickets")
   @@index([status])
   @@index([userId])
+  @@map("support_tickets")
 }
 
 model TicketMessage {
   id         String        @id @default(cuid())
   ticketId   String
-  authorId   String?       // null = customer, set = admin
+  authorId   String? // null = customer, set = admin
   authorName String
   body       String        @db.Text
   internal   Boolean       @default(false) // admin notes not visible to customer
@@ -962,15 +973,15 @@ enum TicketPriority {
 // ─── Newsletter & Marketing ─────────────────────────────────────────────────
 
 model NewsletterSubscriber {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   name         String?
   source       String?
-  confirmed    Boolean   @default(false)
+  confirmed    Boolean  @default(false)
   confirmToken String?
-  unsubscribed Boolean   @default(false)
+  unsubscribed Boolean  @default(false)
   tags         String[]
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
   @@map("newsletter_subscribers")
 }
@@ -991,16 +1002,16 @@ model ShippingRegionInterest {
 }
 
 model CartAbandonment {
-  id         String   @id @default(cuid())
-  userId     String?
-  email      String?
-  cartJson   String   @db.Text
-  subtotal   Int
-  emailSent  Boolean  @default(false)
-  emailedAt  DateTime?
-  recovered  Boolean  @default(false)
+  id          String    @id @default(cuid())
+  userId      String?
+  email       String?
+  cartJson    String    @db.Text
+  subtotal    Int
+  emailSent   Boolean   @default(false)
+  emailedAt   DateTime?
+  recovered   Boolean   @default(false)
   recoveredAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@map("cart_abandonments")
 }
@@ -1011,35 +1022,35 @@ model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
   userEmail  String?
-  action     String   // e.g. "order.refund", "product.update", "user.login"
-  entityType String?  // e.g. "Order", "Product"
+  action     String // e.g. "order.refund", "product.update", "user.login"
+  entityType String? // e.g. "Order", "Product"
   entityId   String?
   metadata   String?  @db.Text // JSON
   ip         String?
   userAgent  String?
   createdAt  DateTime @default(now())
 
-  @@map("audit_logs")
   @@index([action])
   @@index([userId])
   @@index([entityType, entityId])
+  @@map("audit_logs")
 }
 
 // ─── Admin Notifications ────────────────────────────────────────────────────
 
 model AdminNotification {
-  id          String           @id @default(cuid())
-  type        NotificationType
-  title       String
-  body        String           @db.Text
-  link        String?          // admin path to view details
-  entityType  String?
-  entityId    String?
-  readBy      String[]         // admin user ids who've read
-  createdAt   DateTime         @default(now())
+  id         String           @id @default(cuid())
+  type       NotificationType
+  title      String
+  body       String           @db.Text
+  link       String? // admin path to view details
+  entityType String?
+  entityId   String?
+  readBy     String[] // admin user ids who've read
+  createdAt  DateTime         @default(now())
 
-  @@map("admin_notifications")
   @@index([createdAt])
+  @@map("admin_notifications")
 }
 
 enum NotificationType {
@@ -1074,18 +1085,18 @@ model WishlistItem {
 // (or throws). Drives /admin/cron-status so admin can spot stalls without
 // SSHing into the box.
 model CronRun {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   job        String
-  startedAt  DateTime @default(now())
+  startedAt  DateTime  @default(now())
   finishedAt DateTime?
   durationMs Int?
-  status     String   // OK | FAILED | RUNNING
-  result     String?  // free-form summary or error message
-  createdAt  DateTime @default(now())
+  status     String // OK | FAILED | RUNNING
+  result     String? // free-form summary or error message
+  createdAt  DateTime  @default(now())
 
-  @@map("cron_runs")
   @@index([job, startedAt])
   @@index([startedAt])
+  @@map("cron_runs")
 }
 
 // ─── Page Views / Analytics ─────────────────────────────────────────────────
@@ -1100,28 +1111,28 @@ model PageView {
   country   String?
   createdAt DateTime @default(now())
 
-  @@map("page_views")
   @@index([path, createdAt])
   @@index([sessionId])
+  @@map("page_views")
 }
 
 // ─── Enhanced Coupons (supplement DiscountCode) ─────────────────────────────
 
 model CouponRule {
-  id                 String       @id @default(cuid())
-  discountCodeId     String       @unique
-  minOrderCents      Int?
-  productIds         String[]     // specific products
-  categoryIds        String[]     // specific categories
-  customerIds        String[]     // specific customers
-  newCustomersOnly   Boolean      @default(false)
-  membersOnly        Boolean      @default(false)
-  tierRequired       LoyaltyTier?
-  stackable          Boolean      @default(false)
-  autoApply          Boolean      @default(false)
-  firstPurchaseOnly  Boolean      @default(false)
-  usesPerCustomer    Int?
-  discountCode       DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+  id                String       @id @default(cuid())
+  discountCodeId    String       @unique
+  minOrderCents     Int?
+  productIds        String[] // specific products
+  categoryIds       String[] // specific categories
+  customerIds       String[] // specific customers
+  newCustomersOnly  Boolean      @default(false)
+  membersOnly       Boolean      @default(false)
+  tierRequired      LoyaltyTier?
+  stackable         Boolean      @default(false)
+  autoApply         Boolean      @default(false)
+  firstPurchaseOnly Boolean      @default(false)
+  usesPerCustomer   Int?
+  discountCode      DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
 
   @@map("coupon_rules")
 }
@@ -1131,22 +1142,22 @@ model CouponRule {
 model CustomerNote {
   id         String   @id @default(cuid())
   userId     String
-  authorId   String   // admin user id
+  authorId   String // admin user id
   authorName String
   body       String   @db.Text
   pinned     Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@map("customer_notes")
   @@index([userId])
+  @@map("customer_notes")
 }
 
 model Tag {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  color     String   @default("#6270f2")
-  createdAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String    @default("#6270f2")
+  createdAt DateTime  @default(now())
   users     UserTag[]
 
   @@map("tags")
@@ -1155,36 +1166,36 @@ model Tag {
 model UserTag {
   userId    String
   tagId     String
-  taggedBy  String?  // admin user id
+  taggedBy  String? // admin user id
   createdAt DateTime @default(now())
   tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([userId, tagId])
-  @@map("user_tags")
   @@index([userId])
   @@index([tagId])
+  @@map("user_tags")
 }
 
 model AdminTask {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
-  description String?     @db.Text
-  status      TaskStatus  @default(PENDING)
+  description String?      @db.Text
+  status      TaskStatus   @default(PENDING)
   priority    TaskPriority @default(NORMAL)
   dueAt       DateTime?
-  assignedTo  String?     // admin user id
+  assignedTo  String? // admin user id
   createdBy   String
   // Related entity (optional)
-  entityType  String?     // "User" | "Order" | "Organization" | "Ticket"
+  entityType  String? // "User" | "Order" | "Organization" | "Ticket"
   entityId    String?
   completedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  @@map("admin_tasks")
   @@index([assignedTo])
   @@index([status])
   @@index([dueAt])
+  @@map("admin_tasks")
 }
 
 enum TaskStatus {
@@ -1204,32 +1215,32 @@ enum TaskPriority {
 // ─── CRM: Outbound Communications ───────────────────────────────────────────
 
 model OutboundMessage {
-  id          String           @id @default(cuid())
-  userId      String?          // customer
-  toEmail     String?
-  toPhone     String?
-  channel     MessageChannel
-  direction   String           @default("outbound")
-  subject     String?
-  body        String           @db.Text
-  sentById    String?          // admin user id (null = system)
-  sentByName  String?
-  status      MessageStatus    @default(SENT)
-  providerId  String?          // resend id / twilio sid
-  openedAt    DateTime?
-  clickedAt   DateTime?
-  bouncedAt   DateTime?
-  errorMsg    String?
+  id         String             @id @default(cuid())
+  userId     String? // customer
+  toEmail    String?
+  toPhone    String?
+  channel    MessageChannel
+  direction  String             @default("outbound")
+  subject    String?
+  body       String             @db.Text
+  sentById   String? // admin user id (null = system)
+  sentByName String?
+  status     MessageStatus      @default(SENT)
+  providerId String? // resend id / twilio sid
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  bouncedAt  DateTime?
+  errorMsg   String?
   // Optional linkage
-  campaignId  String?
-  campaign    MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  createdAt   DateTime         @default(now())
+  campaignId String?
+  campaign   MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdAt  DateTime           @default(now())
 
-  @@map("outbound_messages")
   @@index([userId])
   @@index([toEmail])
   @@index([campaignId])
   @@index([status])
+  @@map("outbound_messages")
 }
 
 enum MessageChannel {
@@ -1250,28 +1261,28 @@ enum MessageStatus {
 // ─── CRM: Marketing Campaigns ───────────────────────────────────────────────
 
 model MarketingCampaign {
-  id             String              @id @default(cuid())
+  id             String            @id @default(cuid())
   name           String
-  channel        MessageChannel      @default(EMAIL)
+  channel        MessageChannel    @default(EMAIL)
   subject        String?
-  body           String              @db.Text // HTML for email, plain for SMS
-  segmentId     String?
-  segment        SavedSegment?       @relation(fields: [segmentId], references: [id], onDelete: SetNull)
-  status         CampaignStatus      @default(DRAFT)
+  body           String            @db.Text // HTML for email, plain for SMS
+  segmentId      String?
+  segment        SavedSegment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  status         CampaignStatus    @default(DRAFT)
   scheduledAt    DateTime?
   sentAt         DateTime?
   // Stats
-  recipientCount Int                 @default(0)
-  deliveredCount Int                 @default(0)
-  openedCount    Int                 @default(0)
-  clickedCount   Int                 @default(0)
-  bouncedCount   Int                 @default(0)
-  conversions    Int                 @default(0)   // tied to orders
-  revenueCents   Int                 @default(0)
+  recipientCount Int               @default(0)
+  deliveredCount Int               @default(0)
+  openedCount    Int               @default(0)
+  clickedCount   Int               @default(0)
+  bouncedCount   Int               @default(0)
+  conversions    Int               @default(0) // tied to orders
+  revenueCents   Int               @default(0)
   messages       OutboundMessage[]
   createdBy      String
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@map("marketing_campaigns")
 }
@@ -1303,29 +1314,29 @@ model SavedSegment {
 // ─── CRM: Sales Leads (B2B Pipeline) ────────────────────────────────────────
 
 model SalesLead {
-  id             String     @id @default(cuid())
-  organizationId String?    @unique // once they apply it links to the org
+  id             String       @id @default(cuid())
+  organizationId String?      @unique // once they apply it links to the org
   businessName   String
   contactName    String
   contactEmail   String
   contactPhone   String?
-  source         String?    // "website", "tradeshow", "referral", "cold_outreach"
-  stage          LeadStage  @default(NEW)
+  source         String? // "website", "tradeshow", "referral", "cold_outreach"
+  stage          LeadStage    @default(NEW)
   priority       LeadPriority @default(NORMAL)
-  estimatedValue Int?       // cents — expected monthly revenue
-  probability    Int?       // 0-100
-  assignedTo     String?    // admin user id
-  notes          String?    @db.Text
+  estimatedValue Int? // cents — expected monthly revenue
+  probability    Int? // 0-100
+  assignedTo     String? // admin user id
+  notes          String?      @db.Text
   nextAction     String?
   nextActionDue  DateTime?
   closedAt       DateTime?
   closedReason   String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  @@map("sales_leads")
   @@index([stage])
   @@index([assignedTo])
+  @@map("sales_leads")
 }
 
 enum LeadStage {
@@ -1348,12 +1359,12 @@ enum LeadPriority {
 // ─── CRM: Communication Preferences ─────────────────────────────────────────
 
 model CommunicationPreference {
-  userId          String   @id
-  transactionalEmail Boolean @default(true)
-  marketingEmail  Boolean  @default(true)
-  sms             Boolean  @default(false)
-  phoneContact    Boolean  @default(true)
-  updatedAt       DateTime @updatedAt
+  userId             String   @id
+  transactionalEmail Boolean  @default(true)
+  marketingEmail     Boolean  @default(true)
+  sms                Boolean  @default(false)
+  phoneContact       Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
 
   @@map("communication_preferences")
 }
@@ -1381,7 +1392,7 @@ model Membership {
   freeSuppliesClaimedThisPeriod Boolean        @default(false)
   // Stripe-style subscription tracking — Chase will go here when ready
   externalSubscriptionId        String?
-  paymentProvider               String?        // 'chase', 'stripe', etc.
+  paymentProvider               String? // 'chase', 'stripe', etc.
   // Outstanding Zelle invoice Order awaiting admin mark-paid (if any).
   pendingInvoiceOrderId         String?
   // Rate-limit reminder emails to PENDING_PAYMENT signups.
@@ -1400,9 +1411,9 @@ model Membership {
 
 enum MembershipTier {
   NONE
-  CLUB     // $25/mo
-  PLUS     // $150/mo
-  PREMIUM  // $300/mo
+  CLUB // $25/mo
+  PLUS // $150/mo
+  PREMIUM // $300/mo
 }
 
 // ─── Certificates of Analysis ────────────────────────────────────────────────
@@ -1411,26 +1422,26 @@ enum MembershipTier {
 
 model CertificateOfAnalysis {
   id             String    @id @default(cuid())
-  productSlug    String?   // optional link to a Product
-  productName    String    // free-text — searchable (e.g. "BPC-157", "Retatrutide 5mg")
-  variant        String?   // e.g. "5mg", "lyophilized" — optional detail
+  productSlug    String? // optional link to a Product
+  productName    String // free-text — searchable (e.g. "BPC-157", "Retatrutide 5mg")
+  variant        String? // e.g. "5mg", "lyophilized" — optional detail
   lotNumber      String
-  documentUrl    String    // path to uploaded PDF or external URL
+  documentUrl    String // path to uploaded PDF or external URL
   fileName       String?
   testDate       DateTime?
   expiryDate     DateTime?
-  purity         String?   // e.g. "99.2%"
-  testingLab     String?   // e.g. "Janoshik Analytical"
+  purity         String? // e.g. "99.2%"
+  testingLab     String? // e.g. "Janoshik Analytical"
   notes          String?   @db.Text
   uploadedById   String?
   uploadedByName String?
   createdAt      DateTime  @default(now())
 
-  @@map("certificates_of_analysis")
   @@index([productName])
   @@index([productSlug])
   @@index([lotNumber])
   @@index([createdAt])
+  @@map("certificates_of_analysis")
 }
 
 // ─── Blog / Research content ─────────────────────────────────────────────────
@@ -1680,24 +1691,24 @@ model VipLessonProgress {
 
 // ─── Events / live Q&A ──────────────────────────────────────────────────────
 model VipEvent {
-  id          String         @id @default(cuid())
-  title       String
-  description String?        @db.Text
-  startsAt    DateTime
-  endsAt      DateTime?
+  id            String         @id @default(cuid())
+  title         String
+  description   String?        @db.Text
+  startsAt      DateTime
+  endsAt        DateTime?
   // Join link (video call etc.) — shown to eligible members only.
-  joinUrl     String?
-  minTier     MembershipTier @default(CLUB)
-  published   Boolean        @default(false)
-  cancelledAt DateTime?
-  createdById String?
+  joinUrl       String?
+  minTier       MembershipTier @default(CLUB)
+  published     Boolean        @default(false)
+  cancelledAt   DateTime?
+  createdById   String?
   // Monthly series: when the latest occurrence starts, the vip-notify cron
   // publishes the next one (same weekday-of-month, same time).
-  repeatMonthly Boolean      @default(false)
-  seriesId    String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  rsvps       VipEventRsvp[]
+  repeatMonthly Boolean        @default(false)
+  seriesId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  rsvps         VipEventRsvp[]
 
   @@index([startsAt])
   @@index([seriesId, startsAt])
@@ -1705,15 +1716,15 @@ model VipEvent {
 }
 
 model VipEventRsvp {
-  id        String   @id @default(cuid())
-  eventId   String
-  userId    String
+  id            String    @id @default(cuid())
+  eventId       String
+  userId        String
   // Reminder e-mails already sent (each at most once).
   reminded24hAt DateTime?
   reminded1hAt  DateTime?
-  createdAt DateTime @default(now())
-  event     VipEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  event         VipEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
   @@map("vip_event_rsvps")
