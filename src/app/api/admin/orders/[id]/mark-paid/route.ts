@@ -11,6 +11,7 @@ import { createAdminNotification } from '@/lib/notifications'
 import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit } from '@/lib/order-credit'
 import { sendClubhouseWelcome } from '@/lib/vip/mailer'
+import { awardReferralOnFirstPayment } from '@/lib/vip/referrals'
 import { logAudit } from '@/lib/audit'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
@@ -82,6 +83,11 @@ async function activateMembershipFromOrder(order: {
   if (isFirstActivation) {
     void sendClubhouseWelcome(membership.userId).catch((err) =>
       console.error('[mark-paid] clubhouse welcome failed:', err),
+    )
+    // Clubhouse referral points for whoever referred this member (exactly
+    // once per referred person; no-op when nobody did).
+    await awardReferralOnFirstPayment(membership.userId).catch((err) =>
+      console.error('[mark-paid] referral award failed:', err),
     )
   }
 
