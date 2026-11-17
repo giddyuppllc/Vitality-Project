@@ -33,8 +33,11 @@ async function getAnalytics() {
     prisma.order.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     prisma.order.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.user.count({ where: { role: 'CUSTOMER', createdAt: { gte: thirtyDaysAgo } } }),
+    // Paid orders only — unpaid, cancelled and expired Zelle orders were
+    // counted as sales here (the dashboard already filtered on PAID).
     prisma.orderItem.groupBy({
       by: ['productId', 'name'],
+      where: { order: { paymentStatus: 'PAID' } },
       _sum: { quantity: true, total: true },
       orderBy: { _sum: { total: 'desc' } },
       take: 5,

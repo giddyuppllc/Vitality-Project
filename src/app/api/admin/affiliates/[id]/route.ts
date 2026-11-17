@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/email'
 import { affiliateApproved } from '@/lib/email-templates'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const patchSchema = z.object({
   status: z.enum(['PENDING', 'ACTIVE', 'SUSPENDED']).optional(),
@@ -23,7 +24,17 @@ export async function PATCH(
   }
 
   const { id } = await params
-  const data = patchSchema.parse(await req.json())
+  // Parsed outside any try before — a bad body (e.g. rate 12 instead of
+  // 0.12) threw and came back as an unformatted 500.
+  let data: z.infer<typeof patchSchema>
+  try {
+    data = patchSchema.parse(await req.json())
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof z.ZodError ? zodMessage(err) : 'Invalid request' },
+      { status: 400 },
+    )
+  }
 
   const before = await prisma.affiliate.findUnique({
     where: { id },

@@ -18,7 +18,9 @@ type StatusFilter = 'all' | 'active' | 'pending' | 'cancelled'
 
 const STATUS_GROUPS: Record<Exclude<StatusFilter, 'all'>, string[]> = {
   active: ['ACTIVE'],
-  pending: ['PENDING_PAYMENT'],
+  // PAST_DUE (set by cron/membership-overdue) owes a payment too — it was in
+  // no tab except All.
+  pending: ['PENDING_PAYMENT', 'PAST_DUE'],
   cancelled: ['CANCELLED', 'PAUSED'],
 }
 
@@ -77,8 +79,9 @@ export default async function AdminMembersPage({ searchParams }: Props) {
       }),
       prisma.membership.count({ where: realMember }),
       prisma.membership.count({ where: { ...realMember, status: 'ACTIVE' } }),
-      prisma.membership.count({ where: { status: 'PENDING_PAYMENT' } }),
-      prisma.membership.count({ where: { status: { in: ['CANCELLED', 'PAUSED'] } } }),
+      // Same tier != NONE scope as the list, so a tab's count matches its rows.
+      prisma.membership.count({ where: { ...realMember, status: { in: STATUS_GROUPS.pending } } }),
+      prisma.membership.count({ where: { ...realMember, status: { in: STATUS_GROUPS.cancelled } } }),
       prisma.membership.aggregate({
         _sum: { monthlyPriceCents: true },
         where: { ...realMember, status: 'ACTIVE' },
