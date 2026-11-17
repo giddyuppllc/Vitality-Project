@@ -129,6 +129,44 @@ export async function getParticipation(viewer: VipViewer, conversationId: string
   })
 }
 
+/**
+ * Who may load a photo through the members' media route (/api/vip/media/…).
+ *
+ *   'public'  — not a direct-message attachment (post, avatar, cover…):
+ *               any member, as before;
+ *   'allowed' — a DM attachment and the viewer is a current participant
+ *               (not left) of a conversation it was sent in, and not
+ *               community-suspended;
+ *   'denied'  — a DM attachment and the viewer is anyone else. Admins too:
+ *               they review photos of REPORTED conversations only, through
+ *               /api/admin/vip/media (audit-logged with the conversation).
+ *
+ * A URL that appears in any message is a DM attachment, whatever else
+ * references it — so re-using the link in a post can't publish it. (sendMessage
+ * also refuses links already used anywhere else, so a DM can't capture a
+ * post's photo either.)
+ */
+export async function messageImageAccess(viewer: Pick<VipViewer, 'userId' | 'suspended'>, url: string): Promise<'public' | 'allowed' | 'denied'> {
+  const rows = await prisma.vipMessage.findMany({ where: { imageUrl: url }, select: { conversationId: true }, distinct: ['conversationId'], take: 50 })
+  if (rows.length === 0) return 'public'
+  if (viewer.suspended) return 'denied'
+  const mine = await prisma.vipConversationParticipant.count({
+    where: { userId: viewer.userId, leftAt: null, conversationId: { in: rows.map((r) => r.conversationId) } },
+  })
+  return mine > 0 ? 'allowed' : 'denied'
+}
+
+/** An uploaded photo link already used outside this conversation (post, profile, another chat)? */
+async function mediaUsedElsewhere(url: string, conversationId: string): Promise<boolean> {
+  const [posts, postImages, profiles, messages] = await Promise.all([
+    prisma.vipPost.count({ where: { imageUrl: url } }),
+    prisma.vipPostImage.count({ where: { url } }),
+    prisma.vipProfile.count({ where: { OR: [{ avatarUrl: url }, { coverUrl: url }] } }),
+    prisma.vipMessage.count({ where: { imageUrl: url, conversationId: { not: conversationId } } }),
+  ])
+  return posts + postImages + profiles + messages > 0
+}
+
 // ─── Read models ────────────────────────────────────────────────────────────
 
 export interface ParticipantView extends AuthorView {
@@ -392,6 +430,12 @@ export async function sendMessage(
   if (countLinks(body) > MAX_LINKS) return { ok: false, error: `Please include at most ${MAX_LINKS} links.`, status: 422 }
   if (imageUrl && !isVipMediaUrl(imageUrl)) {
     return { ok: false, error: 'Images must be uploaded through the clubhouse.', status: 400 }
+  }
+  // A DM photo is private to the conversation, so it must be a fresh upload:
+  // re-using a post's or profile's photo here would hide it from everyone
+  // else (lib/vip/messages.ts messageImageAccess).
+  if (imageUrl && (await mediaUsedElsewhere(imageUrl, conversationId))) {
+    return { ok: false, error: 'Upload the photo again to send it here.', status: 400 }
   }
   if (sharedPostId && !(await getPostView(viewer, sharedPostId))) {
     return { ok: false, error: 'That post isn’t available to share.', status: 404 }
