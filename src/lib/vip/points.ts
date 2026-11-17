@@ -9,7 +9,9 @@
 //
 //   • awards are exactly-once: pass an idempotencyKey ("lesson:<id>:<user>");
 //     a repeat with the same key returns the original award and changes
-//     nothing, even under concurrent requests (unique index on the key);
+//     nothing, even under concurrent requests (the key's row in
+//     loyalty_tx_keys is written in the same transaction — its primary key
+//     is the guard; see keyLedgerLine);
 //   • spends never overdraw: one conditional UPDATE … WHERE points >= n;
 //   • every movement is a LoyaltyTransaction row (the statement/history).
 // ──────────────────────────────────────────────────────────────────────────
@@ -49,6 +51,21 @@ function isUniqueViolation(e: unknown) {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
 }
 
+/** The ledger line already written under this key, if any. */
+export async function findKeyedTransaction(idempotencyKey: string, tx?: Tx) {
+  const guard = await (tx ?? prisma).loyaltyTxKey.findUnique({ where: { key: idempotencyKey }, select: { transaction: true } })
+  return guard?.transaction ?? null
+}
+
+/**
+ * Claim `key` for the ledger line just written, inside the same transaction.
+ * A second claim of the same key violates loyalty_tx_keys' primary key
+ * (P2002) and rolls that whole award or spend back.
+ */
+export async function keyLedgerLine(tx: Tx, key: string, transactionId: string) {
+  await tx.loyaltyTxKey.create({ data: { key, transactionId } })
+}
+
 /**
  * Award points. Exactly-once per idempotencyKey. Returns the transaction and
  * the new balance; `duplicate: true` when the key was already used (nothing
@@ -68,7 +85,7 @@ export async function awardPoints(args: {
   if (!EARN_TYPES.includes(type)) throw new Error(`awardPoints: ${type} is not an earn type`)
   if (!idempotencyKey) throw new Error('awardPoints: idempotencyKey is required')
 
-  const existing = await (args.tx ?? prisma).loyaltyTransaction.findUnique({ where: { idempotencyKey } })
+  const existing = await findKeyedTransaction(idempotencyKey, args.tx)
   if (existing) return duplicateResult(existing.id, existing.points, userId, args.tx)
 
   const run = async (tx: Tx) => {
@@ -76,6 +93,7 @@ export async function awardPoints(args: {
     const row = await tx.loyaltyTransaction.create({
       data: { accountId: account.id, type, points, description, idempotencyKey, source },
     })
+    await keyLedgerLine(tx, idempotencyKey, row.id)
     const updated = await tx.loyaltyAccount.update({
       where: { id: account.id },
       data: { points: { increment: points } },
@@ -89,7 +107,7 @@ export async function awardPoints(args: {
   } catch (e) {
     // Lost a race on the same key: the other request's award stands.
     if (isUniqueViolation(e) && !args.tx) {
-      const row = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey } })
+      const row = await findKeyedTransaction(idempotencyKey)
       if (row) return duplicateResult(row.id, row.points, userId)
     }
     throw e
@@ -116,7 +134,7 @@ export async function spendPoints(args: {
   if (!SPEND_TYPES.includes(type)) throw new Error(`spendPoints: ${type} is not a spend type`)
 
   if (idempotencyKey) {
-    const existing = await (args.tx ?? prisma).loyaltyTransaction.findUnique({ where: { idempotencyKey } })
+    const existing = await findKeyedTransaction(idempotencyKey, args.tx)
     if (existing) return duplicateResult(existing.id, existing.points, userId, args.tx)
   }
 
@@ -130,6 +148,7 @@ export async function spendPoints(args: {
     const row = await tx.loyaltyTransaction.create({
       data: { accountId: account.id, type, points: -points, description, idempotencyKey, source, orderId },
     })
+    if (idempotencyKey) await keyLedgerLine(tx, idempotencyKey, row.id)
     return { transactionId: row.id, points: -points, balance: account.points, duplicate: false }
   }
 
@@ -137,7 +156,7 @@ export async function spendPoints(args: {
     return args.tx ? await run(args.tx) : await prisma.$transaction((tx) => run(tx))
   } catch (e) {
     if (idempotencyKey && isUniqueViolation(e) && !args.tx) {
-      const row = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey } })
+      const row = await findKeyedTransaction(idempotencyKey)
       if (row) return duplicateResult(row.id, row.points, userId)
     }
     throw e

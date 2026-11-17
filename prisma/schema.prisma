@@ -872,14 +872,32 @@ model LoyaltyTransaction {
   orderId        String? // if tied to an order
   // Exactly-once key for engagement/partner/reward awards (e.g.
   // "lesson:<id>:<userId>"). A second award with the same key is a no-op.
-  idempotencyKey String?        @unique
+  // Uniqueness is enforced by LoyaltyTxKey (a NEW table), not by a unique
+  // index here: adding a unique constraint to this existing, populated table
+  // makes the deploy's `prisma db push` stop for --accept-data-loss.
+  idempotencyKey String?
   // Where the points came from or went: "vip", "global", "partner:<slug>".
   source         String?
   account        LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   createdAt      DateTime       @default(now())
+  keyGuard       LoyaltyTxKey?
 
   @@index([accountId, createdAt])
+  @@index([idempotencyKey])
   @@map("loyalty_transactions")
+}
+
+// Exactly-once guard for the shared points ledger (lib/vip/points.ts,
+// lib/loyalty.ts): one row per idempotency key, written in the SAME
+// transaction as the ledger line it guards — a second award with the key
+// hits the primary key and rolls the whole award back.
+model LoyaltyTxKey {
+  key           String             @id
+  transactionId String             @unique
+  createdAt     DateTime           @default(now())
+  transaction   LoyaltyTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_tx_keys")
 }
 
 enum LoyaltyTxType {

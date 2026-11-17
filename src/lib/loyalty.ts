@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma, type LoyaltyTier } from '@prisma/client'
 import { getUserMembership } from '@/lib/membership'
 import { getEarningRule, getEarningRules, purchasePoints } from '@/lib/vip/earning'
+import { findKeyedTransaction, keyLedgerLine } from '@/lib/vip/points'
 
 export const POINTS_PER_DOLLAR = 1
 export const REDEMPTION_RATE_CENTS = 1 // 1 point = 1 cent of discount (100 pts = $1)
@@ -60,7 +61,7 @@ export async function awardPointsForOrder(args: {
   const { userId, orderId, orderTotal } = args
   const key = purchaseAwardKey(orderId)
 
-  const already = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } })
+  const already = await findKeyedTransaction(key)
   if (already) return alreadyAwarded(userId, already.points)
 
   const [{ tier: membershipTier }, rules] = await Promise.all([getUserMembership(userId), getEarningRules()])
@@ -82,9 +83,10 @@ export async function awardPointsForOrder(args: {
   try {
     return await prisma.$transaction(async (tx) => {
       const account = await tx.loyaltyAccount.upsert({ where: { userId }, update: {}, create: { userId }, select: { id: true } })
-      // The keyed line first: a second award for this order fails here and
-      // rolls the whole transaction back before any balance moves.
-      await tx.loyaltyTransaction.create({
+      // The keyed line first: a second award for this order fails on its key
+      // (loyalty_tx_keys) and rolls the whole transaction back before any
+      // balance moves.
+      const line = await tx.loyaltyTransaction.create({
         data: {
           accountId: account.id,
           type: 'EARN_PURCHASE',
@@ -95,6 +97,7 @@ export async function awardPointsForOrder(args: {
           source: 'global',
         },
       })
+      await keyLedgerLine(tx, key, line.id)
       const updated = await tx.loyaltyAccount.update({
         where: { id: account.id },
         data: { points: { increment: pointsEarned }, lifetimeSpend: { increment: orderTotal } },
@@ -106,7 +109,7 @@ export async function awardPointsForOrder(args: {
     })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      const row = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } })
+      const row = await findKeyedTransaction(key)
       if (row) return alreadyAwarded(userId, row.points)
     }
     throw e

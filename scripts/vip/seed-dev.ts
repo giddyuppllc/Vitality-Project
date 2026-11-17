@@ -179,11 +179,9 @@ Focus: caffeine cut-off at 1 pm, no exceptions
     await issueCertificate(dre.id, orientation.id)
   }
   for (const [u, pts, key] of [[maya, 1375, 'zz:dev:maya'], [dre, 2650, 'zz:dev:dre']] as const) {
-    if (!(await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } }))) {
-      const acct = await prisma.loyaltyAccount.upsert({ where: { userId: u.id }, update: {}, create: { userId: u.id } })
-      await prisma.loyaltyTransaction.create({ data: { accountId: acct.id, type: 'EARN_ADMIN', points: pts, description: 'ZZ fake dev balance', idempotencyKey: key, source: 'vip' } })
-      await prisma.loyaltyAccount.update({ where: { id: acct.id }, data: { points: { increment: pts } } })
-    }
+    // Through the shared ledger (exactly once per key; re-running the seed is a no-op).
+    const { awardPoints } = await import('../../src/lib/vip/points')
+    await awardPoints({ userId: u.id, points: pts, type: 'EARN_ADMIN', description: 'ZZ fake dev balance', idempotencyKey: key, source: 'vip' })
   }
 
   // A purchase-only training (fake) for the unlock screenshots.

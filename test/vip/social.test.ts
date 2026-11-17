@@ -38,7 +38,7 @@ async function feed(as: U, qs = '') {
   const d = await (await call(posts.GET, req(`/api/vip/posts${qs}`))).json()
   return [...d.pinned, ...d.posts] as { id: string; author: { id: string }; images: string[]; videoUrl: string | null; editedAt: string | null; bookmarkedByMe: boolean }[]
 }
-const pointsKey = (k: string) => prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: k } })
+const pointsKey = (k: string) => prisma.loyaltyTransaction.findFirst({ where: { idempotencyKey: k } })
 
 beforeEach(async () => {
   await prisma.siteSetting.deleteMany({ where: { key: { startsWith: 'vip.points.' } } })

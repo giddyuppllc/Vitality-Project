@@ -279,7 +279,7 @@ describe('health tracking (private)', () => {
     expect(again.points).toBe(0)
     expect(again.streakBonus).toBe(0)
     expect(await pointsBalance(u.id)).toBe(7 * 5 + 100)
-    expect(await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: `streak7:${u.id}:2026-03-01` } })).not.toBeNull()
+    expect(await prisma.loyaltyTransaction.findFirst({ where: { idempotencyKey: `streak7:${u.id}:2026-03-01` } })).not.toBeNull()
     // In UTC those same instants were Mar 2..Mar 8 — the member's calendar wins.
     expect(rows.some((r) => r.date === '2026-03-08')).toBe(false)
   })
