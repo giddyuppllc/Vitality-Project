@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { type InputHTMLAttributes, forwardRef, useState } from 'react'
+import { type InputHTMLAttributes, forwardRef, useId, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -16,11 +16,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const isPassword = type === 'password'
     const [revealed, setRevealed] = useState(false)
     const effectiveType = isPassword ? (revealed ? 'text' : 'password') : type
+    // Tie the visible label to the input (it wasn't: clicking the label did
+    // nothing and screen readers announced an unlabelled field).
+    const autoId = useId()
+    const inputId = props.id ?? autoId
 
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label className="text-sm font-medium text-white/70">{label}</label>
+          <label htmlFor={inputId} className="text-sm font-medium text-white/70">{label}</label>
         )}
         <div className="relative">
           <input
@@ -38,6 +42,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             {...props}
+            id={inputId}
           />
           {isPassword && (
             <button
