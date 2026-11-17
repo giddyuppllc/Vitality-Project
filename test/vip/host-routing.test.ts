@@ -116,6 +116,25 @@ describe('host routing — .vip serves the clubhouse', () => {
     }
   })
 
+  it("never serves the store's public files or store-only auth APIs on .vip", () => {
+    // public/ holds product photos, COA files, the store logo and hero video —
+    // none of it belongs to the clubhouse (whose own files live under /vip/).
+    const publicDir = path.resolve(__dirname, '../../public')
+    const storeFiles = readdirSync(publicDir, { recursive: true, withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => `/${path.relative(publicDir, path.join(d.parentPath, d.name)).split(path.sep).join('/')}`)
+    expect(storeFiles.length).toBeGreaterThan(5)
+    for (const p of [...storeFiles, '/uploads/2026-01/a.jpg', '/favicon.png']) {
+      expect(rewriteTarget(call('vitalityproject.vip', encodeURI(p))), p).toBe('/vip/__not-found')
+    }
+    for (const p of ['/api/auth/register', '/api/auth/post-login']) {
+      expect(call('vitalityproject.vip', p).status, p).toBe(404)
+    }
+    // the clubhouse's own files still load
+    expect(isPassthrough(call('vitalityproject.vip', '/vip/icon.svg'))).toBe(true)
+    expect(isPassthrough(call('vitalityproject.vip', '/_next/static/chunks/a.js'))).toBe(true)
+  })
+
   it("never serves the store's PWA files on .vip", () => {
     for (const p of ['/service-worker.js', '/manifest.json', '/sitemap.xml']) {
       expect(rewriteTarget(call('vitalityproject.vip', p)), p).toBe('/vip/__not-found')
