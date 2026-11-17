@@ -53,6 +53,17 @@ model User {
   vipLessonProgress VipLessonProgress[]
   vipEventRsvps     VipEventRsvp[]
 
+  // VIP fitness, health & lifestyle — relation fields only, no columns.
+  vipFitnessProfile     VipFitnessProfile?
+  vipProgramEnrollments VipProgramEnrollment[]
+  vipWorkoutLogs        VipWorkoutLog[]
+  vipPersonalRecords    VipPersonalRecord[]
+  vipCheckins           VipCheckin[]
+  vipBodyMetrics        VipBodyMetric[]
+  vipProgressPhotos     VipProgressPhoto[]
+  vipChallengeEntries   VipChallengeParticipant[]
+  vipUserBadges         VipUserBadge[]
+
   verifyToken      String?   @unique
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
@@ -1770,4 +1781,400 @@ model VipSsoConsumedToken {
 
   @@index([expiresAt])
   @@map("vip_sso_consumed_tokens")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// VIP clubhouse — FITNESS, HEALTH & LIFESTYLE (additive; new vip_* tables only)
+//
+// Units: everything is stored metric (kg, cm, ml) and converted for display
+// per member (VipFitnessProfile.units). Dates a member "lives in" (check-ins,
+// body metrics, the day a workout counts for) are local calendar dates
+// "YYYY-MM-DD" in the member's own time zone, computed on the server.
+// ════════════════════════════════════════════════════════════════════════════
+
+enum VipUnits {
+  IMPERIAL
+  METRIC
+}
+
+// How a set of this exercise is measured.
+enum VipExerciseMeasure {
+  WEIGHT_REPS // load × reps (barbell, dumbbell, machine)
+  REPS // bodyweight reps
+  TIME // held / timed (plank, carry, intervals)
+}
+
+enum VipEnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum VipChallengeMetric {
+  WORKOUTS // finished workouts in the date range
+  STEPS // steps from daily check-ins in the date range
+  CHECKIN_STREAK // longest run of consecutive daily check-ins in the range
+  CUSTOM_POINTS // scores the coaches enter by hand
+}
+
+enum VipArticleCategory {
+  NUTRITION
+  RECOVERY
+  SLEEP
+  MINDSET
+  RECIPES
+}
+
+// Per-member fitness preferences.
+model VipFitnessProfile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  units                VipUnits @default(IMPERIAL)
+  // IANA zone reported by the member's browser; null = clubhouse default.
+  timeZone             String?
+  hideFromLeaderboards Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vip_fitness_profiles")
+}
+
+// ─── Exercise library ───────────────────────────────────────────────────────
+model VipExercise {
+  id            String                   @id @default(cuid())
+  slug          String                   @unique
+  name          String
+  muscleGroups  String[]
+  equipment     String[]
+  measure       VipExerciseMeasure       @default(WEIGHT_REPS)
+  // Lightweight markdown, rendered escaped.
+  instructions  String                   @default("") @db.Text
+  videoUrl      String?
+  imageUrl      String?
+  published     Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  prescriptions VipProgramPrescription[]
+  sets          VipWorkoutSet[]
+  records       VipPersonalRecord[]
+
+  @@index([name])
+  @@map("vip_exercises")
+}
+
+// ─── Programs: program → weeks → days → workouts → prescriptions ────────────
+model VipProgram {
+  id          String                 @id @default(cuid())
+  slug        String                 @unique
+  title       String
+  summary     String?                @db.Text
+  description String                 @default("") @db.Text
+  coverImage  String?
+  level       String?
+  minTier     MembershipTier         @default(CLUB)
+  published   Boolean                @default(false)
+  sortOrder   Int                    @default(0)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  weeks       VipProgramWeek[]
+  enrollments VipProgramEnrollment[]
+
+  @@map("vip_programs")
+}
+
+model VipProgramWeek {
+  id         String          @id @default(cuid())
+  programId  String
+  weekNumber Int
+  title      String?
+  notes      String?         @db.Text
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  program    VipProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  days       VipProgramDay[]
+
+  @@unique([programId, weekNumber])
+  @@map("vip_program_weeks")
+}
+
+model VipProgramDay {
+  id          String                    @id @default(cuid())
+  weekId      String
+  dayNumber   Int
+  title       String
+  notes       String?                   @db.Text
+  isRest      Boolean                   @default(false)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  week        VipProgramWeek            @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  workouts    VipProgramWorkout[]
+  completions VipProgramDayCompletion[]
+  logs        VipWorkoutLog[]
+
+  @@unique([weekId, dayNumber])
+  @@map("vip_program_days")
+}
+
+model VipProgramWorkout {
+  id            String                   @id @default(cuid())
+  dayId         String
+  title         String
+  notes         String?                  @db.Text
+  sortOrder     Int                      @default(0)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  day           VipProgramDay            @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  prescriptions VipProgramPrescription[]
+
+  @@index([dayId, sortOrder])
+  @@map("vip_program_workouts")
+}
+
+model VipProgramPrescription {
+  id          String            @id @default(cuid())
+  workoutId   String
+  exerciseId  String
+  sortOrder   Int               @default(0)
+  sets        Int               @default(3)
+  // Free text so a coach can write "8-10", "AMRAP", "5 each side".
+  reps        String?
+  durationSec Int?
+  restSec     Int?
+  notes       String?           @db.Text
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workout     VipProgramWorkout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise    VipExercise       @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@index([workoutId, sortOrder])
+  @@map("vip_program_prescriptions")
+}
+
+model VipProgramEnrollment {
+  id          String                    @id @default(cuid())
+  userId      String
+  programId   String
+  status      VipEnrollmentStatus       @default(ACTIVE)
+  startedAt   DateTime                  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program     VipProgram                @relation(fields: [programId], references: [id], onDelete: Cascade)
+  completions VipProgramDayCompletion[]
+  logs        VipWorkoutLog[]
+
+  @@unique([userId, programId])
+  @@index([userId, status])
+  @@map("vip_program_enrollments")
+}
+
+model VipProgramDayCompletion {
+  id           String               @id @default(cuid())
+  enrollmentId String
+  dayId        String
+  workoutLogId String?
+  completedAt  DateTime             @default(now())
+  enrollment   VipProgramEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  day          VipProgramDay        @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, dayId])
+  @@map("vip_program_day_completions")
+}
+
+// ─── Workout logger ─────────────────────────────────────────────────────────
+model VipWorkoutLog {
+  id            String                @id @default(cuid())
+  userId        String
+  title         String
+  enrollmentId  String?
+  programDayId  String?
+  // Exercise ids in the order the member is doing them (planned + added).
+  exerciseOrder String[]
+  notes         String?               @db.Text
+  startedAt     DateTime              @default(now())
+  finishedAt    DateTime?
+  // Local calendar day the workout counts for (set when finished).
+  localDate     String?
+  durationSec   Int?
+  totalVolumeKg Float                 @default(0)
+  totalSets     Int                   @default(0)
+  pointsAwarded Int                   @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollment    VipProgramEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  programDay    VipProgramDay?        @relation(fields: [programDayId], references: [id], onDelete: SetNull)
+  sets          VipWorkoutSet[]
+
+  @@index([userId, finishedAt])
+  @@index([userId, localDate])
+  @@map("vip_workout_logs")
+}
+
+model VipWorkoutSet {
+  id          String              @id @default(cuid())
+  logId       String
+  exerciseId  String
+  setNumber   Int
+  weightKg    Float?
+  reps        Int?
+  durationSec Int?
+  rpe         Float?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  log         VipWorkoutLog       @relation(fields: [logId], references: [id], onDelete: Cascade)
+  exercise    VipExercise         @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  records     VipPersonalRecord[]
+
+  @@index([logId, exerciseId, setNumber])
+  @@index([exerciseId])
+  @@map("vip_workout_sets")
+}
+
+// Best-ever value per member x exercise x kind ("MAX_WEIGHT", "EST_1RM",
+// "MAX_REPS", "MAX_DURATION"). Updated when a workout is finished.
+model VipPersonalRecord {
+  id         String         @id @default(cuid())
+  userId     String
+  exerciseId String
+  kind       String
+  value      Float
+  setId      String?
+  achievedAt DateTime
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise   VipExercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  set        VipWorkoutSet? @relation(fields: [setId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, exerciseId, kind])
+  @@map("vip_personal_records")
+}
+
+// ─── Habits & health (private to the member) ───────────────────────────────
+model VipCheckin {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String // local "YYYY-MM-DD"
+  waterMl     Int?
+  sleepHours  Float?
+  steps       Int?
+  mood        Int? // 1-5
+  energy      Int? // 1-5
+  workoutDone Boolean  @default(false)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("vip_checkins")
+}
+
+model VipBodyMetric {
+  id         String   @id @default(cuid())
+  userId     String
+  date       String // local "YYYY-MM-DD"
+  weightKg   Float?
+  bodyFatPct Float?
+  waistCm    Float?
+  chestCm    Float?
+  hipsCm     Float?
+  armCm      Float?
+  thighCm    Float?
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("vip_body_metrics")
+}
+
+// Stored outside public/ and outside the shared member-media folder; served
+// only to the member who took it (/api/vip/fitness/photos/<id>).
+model VipProgressPhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // local "YYYY-MM-DD"
+  fileKey   String   @unique
+  pose      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("vip_progress_photos")
+}
+
+// ─── Challenges ─────────────────────────────────────────────────────────────
+model VipChallenge {
+  id           String                    @id @default(cuid())
+  slug         String                    @unique
+  title        String
+  description  String                    @default("") @db.Text
+  coverImage   String?
+  metric       VipChallengeMetric
+  // Goal that completes the challenge (workouts, steps, days, points).
+  target       Int
+  startDate    String // "YYYY-MM-DD", inclusive, member's local calendar
+  endDate      String // "YYYY-MM-DD", inclusive
+  minTier      MembershipTier            @default(CLUB)
+  pointsReward Int                       @default(0)
+  badgeLabel   String?
+  published    Boolean                   @default(false)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  participants VipChallengeParticipant[]
+
+  @@map("vip_challenges")
+}
+
+model VipChallengeParticipant {
+  id          String       @id @default(cuid())
+  challengeId String
+  userId      String
+  // CUSTOM_POINTS challenges only: the score a coach entered.
+  customScore Int          @default(0)
+  joinedAt    DateTime     @default(now())
+  completedAt DateTime?
+  challenge   VipChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([userId])
+  @@map("vip_challenge_participants")
+}
+
+// Badges a member has earned anywhere in the clubhouse (shared table).
+model VipUserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeKey  String
+  label     String
+  awardedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeKey])
+  @@map("vip_user_badges")
+}
+
+// ─── Lifestyle library ──────────────────────────────────────────────────────
+model VipArticle {
+  id          String             @id @default(cuid())
+  slug        String             @unique
+  title       String
+  summary     String?            @db.Text
+  coverImage  String?
+  body        String             @default("") @db.Text
+  category    VipArticleCategory
+  minTier     MembershipTier     @default(CLUB)
+  published   Boolean            @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([category, publishedAt])
+  @@map("vip_articles")
 }
