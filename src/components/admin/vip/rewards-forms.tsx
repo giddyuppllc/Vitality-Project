@@ -361,6 +361,7 @@ export function OptionAdd({ itemId }: { itemId: string }) {
 
 export interface RuleField {
   key: string
+  group: string
   label: string
   help: string
   unit: string
@@ -380,27 +381,38 @@ export function EarningRulesForm({ rules, fields }: { rules: Record<string, numb
       }}
     >
       <h2 className="font-semibold">Earning rules</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {fields.map((f) => (
-          <label key={f.key} className={label}>
-            {f.label}
-            <span className="mt-1 flex items-center gap-2">
-              <input
-                className={adminInput}
-                type="number"
-                min={0}
-                max={f.max}
-                step={1}
-                required
-                value={values[f.key]}
-                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-              />
-              <span className="shrink-0 text-xs text-white/40">{f.unit}</span>
-            </span>
-            <span className="mt-0.5 block text-xs text-white/40">{f.help}</span>
-          </label>
-        ))}
-      </div>
+      <p className="text-xs text-white/50">
+        Every points amount in the clubhouse and the store, in one place. 100 points = $1; 0 turns an award off. Members see the
+        same list under Rewards → How to earn.
+      </p>
+      {[...new Set(fields.map((f) => f.group))].map((group) => (
+        <fieldset key={group} className="space-y-3 border-t border-white/[0.06] pt-4">
+          <legend className="text-xs font-semibold uppercase tracking-wider text-white/60">{group}</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fields
+              .filter((f) => f.group === group)
+              .map((f) => (
+                <label key={f.key} className={label}>
+                  {f.label}
+                  <span className="mt-1 flex items-center gap-2">
+                    <input
+                      className={adminInput}
+                      type="number"
+                      min={0}
+                      max={f.max}
+                      step={1}
+                      required
+                      value={values[f.key]}
+                      onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    />
+                    <span className="shrink-0 text-xs text-white/50">{f.unit}</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-white/50">{f.help}</span>
+                </label>
+              ))}
+          </div>
+        </fieldset>
+      ))}
       <Msg msg={msg} />
       <Submit busy={busy}>Save rules</Submit>
     </form>

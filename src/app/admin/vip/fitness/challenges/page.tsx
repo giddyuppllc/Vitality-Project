@@ -3,6 +3,7 @@ import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { getVipSetting } from '@/lib/vip/settings'
+import { getEarningRule } from '@/lib/vip/earning'
 import { METRIC_LABEL, challengeStatus } from '@/lib/vip/fitness/challenges'
 import { localDate } from '@/lib/vip/fitness/dates'
 import { ChallengeForm, FitnessSubNav } from '@/components/admin/vip/fitness-forms'
@@ -52,7 +53,7 @@ export default async function AdminVipChallengesPage() {
             </ul>
           )}
         </section>
-        <ChallengeForm metrics={METRICS} />
+        <ChallengeForm metrics={METRICS} defaultPoints={await getEarningRule('vip.points.challengeDefault')} />
       </div>
     </div>
   )

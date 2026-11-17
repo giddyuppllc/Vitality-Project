@@ -3,7 +3,7 @@ import { Prisma, type MembershipTier } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { tierAllows } from './access'
 import { awardPoints, InsufficientPointsError, spendPoints } from './points'
-import { getVipSettings } from './settings'
+import { getEarningRule } from './earning'
 
 /**
  * The Academy: access rules (tier, grants, purchase-only), completion,
@@ -15,7 +15,8 @@ import { getVipSettings } from './settings'
  *   course.purchaseOnly                    → never otherwise
  *   else                                   → tier meets lesson.minTier ?? course.minTier
  *
- * Points (all exactly-once through lib/vip/points.ts, values in settings):
+ * Points (all exactly-once through lib/vip/points.ts; amounts from the
+ * earning-rules registry, lib/vip/earning.ts):
  *   lesson complete  lesson:<lessonId>:<userId>
  *   quiz passed      quiz:<quizId>:<userId>
  *   course complete  course:<courseId>:<userId>
@@ -93,8 +94,7 @@ export async function completeLesson(userId: string, lessonId: string): Promise<
     update: {},
     create: { userId, lessonId },
   })
-  const settings = await getVipSettings()
-  const res = await award(userId, settings['vip.points.lessonComplete'], pointKeys.lesson(lessonId, userId), 'Lesson completed')
+  const res = await award(userId, await getEarningRule('vip.points.lesson'), pointKeys.lesson(lessonId, userId), 'Lesson completed')
   const course = await finishCourseIfComplete(userId, lesson.module.courseId)
   return {
     lessonPoints: res && !res.duplicate ? res.points : 0,
@@ -137,8 +137,7 @@ export async function finishCourseIfComplete(
   const state = await courseCompletionState(userId, courseId)
   if (!state.finished) return { completed: false, points: 0, certificateCode: null }
   const cert = await issueCertificate(userId, courseId)
-  const settings = await getVipSettings()
-  const res = await award(userId, settings['vip.points.courseComplete'], pointKeys.course(courseId, userId), 'Course completed')
+  const res = await award(userId, await getEarningRule('vip.points.course'), pointKeys.course(courseId, userId), 'Course completed')
   return { completed: true, points: res && !res.duplicate ? res.points : 0, certificateCode: cert.code }
 }
 

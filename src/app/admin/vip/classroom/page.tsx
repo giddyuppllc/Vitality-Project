@@ -3,23 +3,22 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { formatPrice } from '@/lib/utils'
-import { getVipSettings } from '@/lib/vip/settings'
 import { trackCategoryLabel } from '@/lib/vip/tracks'
 import { CourseForm } from '@/components/admin/vip/forms'
-import { AcademyPointsForm, TrackForm } from '@/components/admin/vip/academy-forms'
+import { TrackForm } from '@/components/admin/vip/academy-forms'
+import { EarningRulesSummary } from '@/components/admin/vip/earning-summary'
 import { AdminActionButton } from '@/components/admin/vip/admin-vip-ui'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminVipClassroomPage() {
   await requireAdminPage()
-  const [courses, tracks, settings, certCount, grantCount] = await Promise.all([
+  const [courses, tracks, certCount, grantCount] = await Promise.all([
     prisma.vipCourse.findMany({
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       include: { track: { select: { title: true } }, modules: { select: { _count: { select: { lessons: true } }, quiz: { select: { id: true } } } } },
     }),
     prisma.vipTrack.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], include: { _count: { select: { courses: true } } } }),
-    getVipSettings(),
     prisma.vipCertificate.count(),
     prisma.vipCourseGrant.count(),
   ])
@@ -90,9 +89,7 @@ export default async function AdminVipClassroomPage() {
           <div className="glass rounded-2xl p-5">
             <TrackForm />
           </div>
-          <AcademyPointsForm
-            initial={{ lesson: settings['vip.points.lessonComplete'], course: settings['vip.points.courseComplete'], quiz: settings['vip.points.quizPassed'] }}
-          />
+          <EarningRulesSummary groups={['Academy']} title="Academy points" />
         </div>
       </div>
     </div>

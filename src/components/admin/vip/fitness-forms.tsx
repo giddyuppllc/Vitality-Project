@@ -118,43 +118,6 @@ export function FitnessSubNav() {
 
 // ─── Points settings ───────────────────────────────────────────────────────
 
-export function PointsSettingsForm({ fields }: { fields: { key: string; label: string; value: number }[] }) {
-  const { busy, msg, send } = useSubmit()
-  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(fields.map((f) => [f.key, String(f.value)])))
-  return (
-    <form
-      className="glass space-y-3 rounded-2xl p-5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        const body: Record<string, number> = {}
-        for (const f of fields) body[f.key] = Math.max(0, Math.round(Number(values[f.key]) || 0))
-        send('/api/admin/vip/fitness/settings', 'PUT', body)
-      }}
-    >
-      <h2 className="font-semibold">Points</h2>
-      <p className="text-sm text-white/40">Points members earn for training and health habits (100 points = $1). 0 = off.</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map((f) => (
-          <label key={f.key} className={label}>
-            {f.label}
-            <input
-              className={`${adminInput} mt-1`}
-              type="number"
-              min={0}
-              max={100000}
-              value={values[f.key]}
-              onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-            />
-          </label>
-        ))}
-      </div>
-      <p className="text-xs text-white/40">Challenge points are set on each challenge.</p>
-      <Msg msg={msg} />
-      <Submit busy={busy}>Save points</Submit>
-    </form>
-  )
-}
-
 // ─── Exercises ─────────────────────────────────────────────────────────────
 
 export interface AdminExercise {
@@ -652,8 +615,11 @@ export function ChallengeForm({
   challenge,
   metrics,
   metricLocked,
+  defaultPoints = 0,
 }: {
   challenge?: AdminChallenge
+  /** Pre-filled points for a NEW challenge (earning rule vip.points.challengeDefault). */
+  defaultPoints?: number
   metrics: { value: Metric; label: string }[]
   metricLocked?: boolean
 }) {
@@ -668,7 +634,7 @@ export function ChallengeForm({
   const [startDate, setStartDate] = useState(challenge?.startDate ?? '')
   const [endDate, setEndDate] = useState(challenge?.endDate ?? '')
   const [minTier, setMinTier] = useState<Tier>(challenge?.minTier ?? 'CLUB')
-  const [pointsReward, setPointsReward] = useState(String(challenge?.pointsReward ?? 0))
+  const [pointsReward, setPointsReward] = useState(String(challenge?.pointsReward ?? defaultPoints))
   const [badgeLabel, setBadgeLabel] = useState(challenge?.badgeLabel ?? '')
   const [published, setPublished] = useState(challenge?.published ?? false)
   return (

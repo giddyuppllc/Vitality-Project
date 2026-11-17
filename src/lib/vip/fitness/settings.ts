@@ -1,53 +1,38 @@
-import { prisma } from '@/lib/prisma'
+import { getEarningRules, setEarningRules, type EarningKey } from '@/lib/vip/earning'
 
 /**
- * Admin-editable points for fitness & health activity. Same mechanism as the
- * clubhouse settings (lib/vip/settings.ts): rows in the shared `site_settings`
- * key/value table, code defaults until an admin saves. 0 turns an award off.
- * Edited at /admin/vip/fitness.
+ * Fitness points — a thin view over the ONE earning-rules registry
+ * (lib/vip/earning.ts, edited at /admin/vip/rewards/earning). The
+ * `vip.fitness.points.*` names are the keys the fitness branch used; they
+ * are still accepted here (and still read from site_settings as fallbacks by
+ * the registry), but the values live under the canonical `vip.points.*` keys.
  */
-export const FITNESS_POINT_DEFAULTS = {
+export const FITNESS_POINT_RULE = {
   /** A finished workout (at most one award per member per local day). */
-  'vip.fitness.points.workout': 25,
+  'vip.fitness.points.workout': 'vip.points.workout',
   /** A daily check-in. */
-  'vip.fitness.points.checkin': 5,
+  'vip.fitness.points.checkin': 'vip.points.checkin',
   /** Each completed 7-day check-in streak. */
-  'vip.fitness.points.streak7': 100,
+  'vip.fitness.points.streak7': 'vip.points.streak7',
   /** Finishing every day of a program. */
-  'vip.fitness.points.programComplete': 500,
-} as const
+  'vip.fitness.points.programComplete': 'vip.points.program',
+} as const satisfies Record<string, EarningKey>
 
-export type FitnessPointKey = keyof typeof FITNESS_POINT_DEFAULTS
+export type FitnessPointKey = keyof typeof FITNESS_POINT_RULE
 export type FitnessPoints = Record<FitnessPointKey, number>
-export const FITNESS_POINT_KEYS = Object.keys(FITNESS_POINT_DEFAULTS) as FitnessPointKey[]
-
-export const FITNESS_POINT_LABELS: Record<FitnessPointKey, string> = {
-  'vip.fitness.points.workout': 'Workout logged (max once a day)',
-  'vip.fitness.points.checkin': 'Daily check-in',
-  'vip.fitness.points.streak7': '7-day check-in streak',
-  'vip.fitness.points.programComplete': 'Program completed',
-}
+export const FITNESS_POINT_KEYS = Object.keys(FITNESS_POINT_RULE) as FitnessPointKey[]
 
 export const MAX_POINTS_SETTING = 100_000
 
-function coerce(key: FitnessPointKey, raw: string | undefined): number {
-  if (raw === undefined) return FITNESS_POINT_DEFAULTS[key]
-  const n = Number.parseInt(raw, 10)
-  return Number.isFinite(n) && n >= 0 && n <= MAX_POINTS_SETTING ? n : FITNESS_POINT_DEFAULTS[key]
-}
-
 export async function getFitnessPoints(): Promise<FitnessPoints> {
-  const rows = await prisma.siteSetting.findMany({ where: { key: { in: FITNESS_POINT_KEYS } } })
-  const map = new Map(rows.map((r) => [r.key, r.value]))
+  const rules = await getEarningRules()
   const out = {} as FitnessPoints
-  for (const k of FITNESS_POINT_KEYS) out[k] = coerce(k, map.get(k))
+  for (const k of FITNESS_POINT_KEYS) out[k] = rules[FITNESS_POINT_RULE[k]]
   return out
 }
 
 export async function setFitnessPoints(values: Partial<FitnessPoints>): Promise<void> {
-  for (const k of FITNESS_POINT_KEYS) {
-    const v = values[k]
-    if (v === undefined) continue
-    await prisma.siteSetting.upsert({ where: { key: k }, update: { value: String(v) }, create: { key: k, value: String(v) } })
-  }
+  const mapped: Partial<Record<EarningKey, number>> = {}
+  for (const k of FITNESS_POINT_KEYS) if (values[k] !== undefined) mapped[FITNESS_POINT_RULE[k]] = values[k]
+  await setEarningRules(mapped)
 }

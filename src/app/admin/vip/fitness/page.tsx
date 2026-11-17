@@ -1,16 +1,16 @@
 import Link from 'next/link'
 import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
-import { FITNESS_POINT_KEYS, FITNESS_POINT_LABELS, getFitnessPoints } from '@/lib/vip/fitness/settings'
-import { FitnessSubNav, PointsSettingsForm } from '@/components/admin/vip/fitness-forms'
+import { FitnessSubNav } from '@/components/admin/vip/fitness-forms'
+import { EarningRulesSummary } from '@/components/admin/vip/earning-summary'
 
 export const dynamic = 'force-dynamic'
 
-/** Fitness, health & lifestyle — overview + points settings. */
+/** Fitness, health & lifestyle — overview + the points it pays (edited under Rewards → Earning rules). */
 export default async function AdminVipFitnessPage() {
   await requireAdminPage()
   const weekAgo = new Date(Date.now() - 7 * 86400e3)
-  const [exercises, programs, enrollments, challenges, articles, workouts, checkins, points] = await Promise.all([
+  const [exercises, programs, enrollments, challenges, articles, workouts, checkins] = await Promise.all([
     prisma.vipExercise.count(),
     prisma.vipProgram.count(),
     prisma.vipProgramEnrollment.count({ where: { status: 'ACTIVE' } }),
@@ -18,7 +18,6 @@ export default async function AdminVipFitnessPage() {
     prisma.vipArticle.count(),
     prisma.vipWorkoutLog.count({ where: { finishedAt: { gte: weekAgo } } }),
     prisma.vipCheckin.count({ where: { createdAt: { gte: weekAgo } } }),
-    getFitnessPoints(),
   ])
   const stats = [
     { label: 'Exercises', value: exercises, href: '/admin/vip/fitness/exercises' },
@@ -64,9 +63,7 @@ export default async function AdminVipFitnessPage() {
             </ul>
           </div>
         </section>
-        <PointsSettingsForm
-          fields={FITNESS_POINT_KEYS.map((k) => ({ key: k, label: FITNESS_POINT_LABELS[k], value: points[k] }))}
-        />
+        <EarningRulesSummary groups={['Fitness']} title="Fitness points" />
       </div>
     </div>
   )

@@ -1,6 +1,8 @@
 import type { VipEvent } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { eventKind, EVENT_KIND_LABEL, GOING_WHERE } from './classroom'
+import { awardPoints } from './points'
+import { getEarningRule } from './earning'
 
 /**
  * RSVPs with capacity + waitlist, .ics export and recording archive.
@@ -171,4 +173,25 @@ export function eventIcs(e: Pick<VipEvent, 'id' | 'title' | 'description' | 'sta
     'END:VCALENDAR',
   ]
   return `${lines.map(fold).join('\r\n')}\r\n`
+}
+
+// ─── Attendance points ──────────────────────────────────────────────────────
+
+/** Joining counts as attending from 15 minutes before the start until the end (default length 3 h). */
+export const JOIN_EARLY_MS = 15 * 60e3
+
+export function isEventLive(e: Pick<VipEvent, 'startsAt' | 'endsAt'>, now = new Date()): boolean {
+  const end = e.endsAt ?? new Date(e.startsAt.getTime() + 3 * 3600e3)
+  return now.getTime() >= e.startsAt.getTime() - JOIN_EARLY_MS && now <= end
+}
+
+/**
+ * Attendance points (earning rule `vip.points.event`), exactly once per
+ * member per session through the shared ledger. 0 = off.
+ */
+export async function awardEventAttendance(userId: string, eventId: string): Promise<number> {
+  const points = await getEarningRule('vip.points.event')
+  if (points <= 0) return 0
+  const r = await awardPoints({ userId, points, type: 'EARN_ENGAGEMENT', description: 'Joined a live session', idempotencyKey: `event:${eventId}:${userId}` })
+  return r.duplicate ? 0 : r.points
 }

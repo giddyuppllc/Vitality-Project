@@ -19,14 +19,8 @@ export const VIP_SETTING_DEFAULTS = {
   'vip.timeZone': 'America/New_York',
   /** Unpaid Zelle orders are cancelled after this many days (credit returned). 0 = never. */
   'zelle.unpaidExpiryDays': 14,
-  /** Academy points (100 points = $1). Each is awarded once per member per item. 0 = off. */
-  'vip.points.lessonComplete': 50,
-  'vip.points.courseComplete': 500,
-  'vip.points.quizPassed': 25,
-  /** Points for a member's first clubhouse post (once per member). 0 = off. */
-  'vip.points.firstPost': 100,
-  /** Points for posting on a day (once per member per clubhouse-time-zone day). 0 = off. */
-  'vip.points.postDay': 10,
+  // Points amounts are NOT here: every one lives in the earning-rules
+  // registry (lib/vip/earning.ts, admin /admin/vip/rewards/earning).
 } as const
 
 export type VipSettingKey = keyof typeof VIP_SETTING_DEFAULTS

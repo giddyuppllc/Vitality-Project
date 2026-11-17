@@ -6,7 +6,7 @@ import { requireVipApi, vipJson } from '@/lib/vip/access'
 import { getQuizForMember } from '@/lib/vip/classroom'
 import { finishCourseIfComplete, pointKeys, quizOptions, scoreQuiz } from '@/lib/vip/academy'
 import { awardPoints } from '@/lib/vip/points'
-import { getVipSettings } from '@/lib/vip/settings'
+import { getEarningRule } from '@/lib/vip/earning'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   let courseCompleted = false
   let certificateCode: string | null = null
   if (result.passed) {
-    const pts = (await getVipSettings())['vip.points.quizPassed']
+    const pts = await getEarningRule('vip.points.quiz')
     if (pts > 0) {
       const r = await awardPoints({ userId: v.userId, points: pts, type: 'EARN_ENGAGEMENT', description: 'Quiz passed', idempotencyKey: pointKeys.quiz(id, v.userId) })
       if (!r.duplicate) pointsAwarded += r.points

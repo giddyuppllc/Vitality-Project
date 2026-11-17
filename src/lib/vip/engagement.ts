@@ -1,11 +1,12 @@
 import { awardPoints } from './points'
 import { getVipSettings } from './settings'
+import { getEarningRules } from './earning'
 import { zonedParts } from './time'
 
 /**
  * Community engagement points, through the shared ledger (lib/vip/points.ts —
- * exactly-once per idempotency key). Amounts are admin settings
- * (vip.points.firstPost, vip.points.postDay; 0 = off):
+ * exactly-once per idempotency key). Amounts are earning rules
+ * (lib/vip/earning.ts: vip.points.firstPost, vip.points.postDay; 0 = off):
  *
  *   first post ever         key first-post:<userId>
  *   posting on a given day  key post-day:<userId>:<yyyy-mm-dd>  (clubhouse
@@ -22,9 +23,9 @@ export function localDay(at: Date, timeZone: string): string {
 export async function awardPostPoints(userId: string, at = new Date()): Promise<{ firstPost: number; postDay: number }> {
   const out = { firstPost: 0, postDay: 0 }
   try {
-    const settings = await getVipSettings()
-    const first = settings['vip.points.firstPost']
-    const daily = settings['vip.points.postDay']
+    const [settings, rules] = await Promise.all([getVipSettings(), getEarningRules()])
+    const first = rules['vip.points.firstPost']
+    const daily = rules['vip.points.postDay']
     if (first > 0) {
       const r = await awardPoints({
         userId,

@@ -75,7 +75,7 @@ export default async function RewardsPage() {
             <caption className="sr-only">Points for each activity</caption>
             <tbody className="divide-y divide-white/[0.06]">
               {hub.earning.map((e) => (
-                <tr key={e.action}>
+                <tr key={e.key}>
                   <th scope="row" className="px-4 py-3 text-left font-medium text-white/85">
                     {e.action}
                     {e.note && <span className="mt-0.5 block text-xs font-normal text-white/55">{e.note}</span>}

@@ -398,44 +398,6 @@ export function GrantForm({ courseId }: { courseId: string }) {
 
 // ─── Points ────────────────────────────────────────────────────────────────
 
-export function AcademyPointsForm({ initial }: { initial: { lesson: number; course: number; quiz: number } }) {
-  const { busy, msg, send } = useSubmit()
-  const [v, setV] = useState({ lesson: String(initial.lesson), course: String(initial.course), quiz: String(initial.quiz) })
-  const n = (s: string) => Math.max(0, Number.parseInt(s || '0', 10) || 0)
-  return (
-    <form
-      className="glass space-y-3 rounded-2xl p-5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        send('/api/admin/vip/settings', 'PUT', {
-          'vip.points.lessonComplete': n(v.lesson),
-          'vip.points.courseComplete': n(v.course),
-          'vip.points.quizPassed': n(v.quiz),
-        })
-      }}
-    >
-      <h2 className="font-semibold">Academy points</h2>
-      <p className="text-sm text-white/45">Awarded once per member per item into the shared points balance (100 points = $1). 0 = off.</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className={label}>
-          Lesson completed
-          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.lesson} onChange={(e) => setV({ ...v, lesson: e.target.value })} />
-        </label>
-        <label className={label}>
-          Module quiz passed
-          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.quiz} onChange={(e) => setV({ ...v, quiz: e.target.value })} />
-        </label>
-        <label className={label}>
-          Course completed
-          <input className={`${adminInput} mt-1`} inputMode="numeric" value={v.course} onChange={(e) => setV({ ...v, course: e.target.value })} />
-        </label>
-      </div>
-      <Msg msg={msg} />
-      <Submit busy={busy}>Save points</Submit>
-    </form>
-  )
-}
-
 // ─── Library ───────────────────────────────────────────────────────────────
 
 export function LibraryItemForm({

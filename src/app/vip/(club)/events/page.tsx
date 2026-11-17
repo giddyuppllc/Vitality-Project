@@ -58,7 +58,7 @@ function EventCard({ e, highlight }: { e: EventView; highlight?: boolean }) {
                 capacity={e.capacity}
               />
               {e.joinUrl && (
-                <a href={e.joinUrl} target="_blank" rel="noopener noreferrer" className="vip-focus inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3.5 text-sm font-medium hover:bg-white/[0.06]">
+                <a href={`/api/vip/events/${e.id}/join`} target="_blank" rel="noopener noreferrer" className="vip-focus inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3.5 text-sm font-medium hover:bg-white/[0.06]">
                   <Video className="h-4 w-4" aria-hidden="true" /> Join link
                 </a>
               )}

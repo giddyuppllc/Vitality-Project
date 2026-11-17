@@ -3,11 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { pointsToCents } from './points'
 import {
+  EARNING_RULES,
   formatBps,
   formatMultiplier,
   getEarningRules,
   purchaseRateBps,
   tierMultiplierPct,
+  type EarningKey,
+  type EarningRuleDef,
   type EarningRules,
 } from './earning'
 import { formatMemberNumber, getOrCreateMemberCard } from './member-card'
@@ -51,26 +54,38 @@ export function pointsLabel(t: { type: LoyaltyTxType; description: string; sourc
   return TYPE_LABEL[t.type]
 }
 
-/** The how-to-earn table, built from the live settings. */
+/**
+ * The member "How to earn" table — built from the earning-rules registry
+ * (lib/vip/earning.ts): every rule with a member label, in registry order, at
+ * its live value. The admin Earning rules page edits the same list, so the
+ * two can never drift. Rules set to 0 (off) are left out.
+ */
 export function earningTable(rules: EarningRules, tier: MembershipTier, partners: { name: string; earnPointsPerDollar: number }[]) {
   const rate = purchaseRateBps(tier === 'NONE' ? 'CLUB' : tier, rules)
-  const rows: { action: string; points: string; note?: string }[] = [
-    {
+  const rows: { key: string; action: string; points: string; note?: string }[] = []
+  if (rate > 0) {
+    rows.push({
+      key: 'vip.points.purchaseBaseBps',
       action: 'Shop at vitalityproject.global',
       points: `${formatBps(rate)} back`,
       note: `${rate / 100} points per $1 on your level`,
-    },
-    { action: 'Complete a classroom lesson', points: `${rules['vip.points.lesson'].toLocaleString()} pts` },
-    { action: 'Finish a full course', points: `${rules['vip.points.course'].toLocaleString()} pts` },
-    { action: 'Your first community post', points: `${rules['vip.points.firstPost'].toLocaleString()} pts` },
-    { action: 'Attend a live event', points: `${rules['vip.points.event'].toLocaleString()} pts` },
-    { action: 'Stay active all month', points: `${rules['vip.points.streak'].toLocaleString()} pts` },
-    { action: 'Refer someone who becomes a member', points: `${rules['vip.points.referral'].toLocaleString()} pts` },
-  ]
-  for (const p of partners) {
-    rows.push({ action: `Spend at ${p.name}`, points: `${p.earnPointsPerDollar} pts per $1` })
+    })
   }
-  return rows.filter((r) => !/^0 pts/.test(r.points))
+  for (const r of EARNING_RULES as readonly EarningRuleDef[]) {
+    if (!r.member) continue
+    const value = rules[r.key as EarningKey]
+    if (!value) continue
+    rows.push({
+      key: r.key,
+      action: r.member,
+      points: r.key === 'vip.points.challengeDefault' ? 'Varies' : `${value.toLocaleString('en-US')} pts`,
+      ...(r.memberNote ? { note: r.memberNote } : {}),
+    })
+  }
+  for (const p of partners) {
+    if (p.earnPointsPerDollar > 0) rows.push({ key: `partner:${p.name}`, action: `Spend at ${p.name}`, points: `${p.earnPointsPerDollar} pts per $1` })
+  }
+  return rows
 }
 
 export async function getPointsHub(viewer: { userId: string; tier: MembershipTier }) {

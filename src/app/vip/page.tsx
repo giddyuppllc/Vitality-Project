@@ -13,6 +13,7 @@ import { VIP_COPY, faq, tierBullets } from '@/lib/vip/copy'
 import { LANDING, LANDING_FAQ_EXTRA } from '@/lib/vip/landing-copy'
 import { getTierRewardSettings } from '@/lib/vip/rewards'
 import { getVipSettings } from '@/lib/vip/settings'
+import { getEarningRules } from '@/lib/vip/earning'
 import { Wordmark } from '@/components/vip/ui'
 import { Monogram } from '@/components/vip/monogram'
 import { SignOutButton } from '@/components/vip/sign-out-button'
@@ -33,9 +34,10 @@ export default async function VipLanding() {
   const viewer = await getVipViewer()
   if (viewer?.isMember) redirect('/dashboard')
 
-  const [credits, settings, courses, tracks, upcoming] = await Promise.all([
+  const [credits, settings, rules, courses, tracks, upcoming] = await Promise.all([
     getTierRewardSettings(),
     getVipSettings(),
+    getEarningRules(),
     prisma.vipCourse.findMany({ where: { published: true }, select: { minTier: true, purchaseOnly: true } }),
     prisma.vipTrack.findMany({
       where: { published: true, courses: { some: { published: true } } },
@@ -50,8 +52,8 @@ export default async function VipLanding() {
   ])
   const included = (t: MembershipTier) => courses.filter((c) => !c.purchaseOnly && TIER_RANK[t] >= TIER_RANK[c.minTier === 'NONE' ? 'CLUB' : c.minTier]).length
   const sessionsFor = (t: MembershipTier) => upcoming.filter((e) => TIER_RANK[t] >= TIER_RANK[e.minTier === 'NONE' ? 'CLUB' : e.minTier]).length
-  const lessonPts = settings['vip.points.lessonComplete']
-  const coursePts = settings['vip.points.courseComplete']
+  const lessonPts = rules['vip.points.lesson']
+  const coursePts = rules['vip.points.course']
   const P = LANDING.pillars
 
   const pillars = [
