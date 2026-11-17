@@ -1642,6 +1642,22 @@ model VipCourse {
   updatedAt  DateTime       @updatedAt
   modules    VipModule[]
 
+  // Academy (vip/academy): learning path, level, paid trainings. All optional.
+  trackId          String?
+  track            VipTrack?         @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  // BEGINNER | INTERMEDIATE | ADVANCED (label only)
+  level            String?
+  estimatedMinutes Int?
+  // true = NOT included in any tier: opens only with a VipCourseGrant
+  // (bought with points or money, or granted by an admin).
+  purchaseOnly     Boolean?          @default(false)
+  // Purchasable price (Zelle invoice through .global) and/or points price.
+  // null = not for sale that way.
+  priceCents       Int?
+  pointsPrice      Int?
+  resumes          VipCourseResume[]
+
+  @@index([trackId])
   @@map("vip_courses")
 }
 
@@ -1654,6 +1670,7 @@ model VipModule {
   updatedAt DateTime    @updatedAt
   course    VipCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons   VipLesson[]
+  quiz      VipQuiz?
 
   @@index([courseId, sortOrder])
   @@map("vip_modules")
@@ -1674,6 +1691,11 @@ model VipLesson {
   updatedAt DateTime            @updatedAt
   module    VipModule           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   progress  VipLessonProgress[]
+
+  // Academy: running time label, downloadable resources, private notes.
+  durationMinutes Int?
+  resources       VipLessonResource[]
+  notes           VipLessonNote[]
 
   @@index([moduleId, sortOrder])
   @@map("vip_lessons")
@@ -1712,6 +1734,16 @@ model VipEvent {
   updatedAt     DateTime       @updatedAt
   rsvps         VipEventRsvp[]
 
+  // Events upgrade (vip/academy). All optional.
+  // AMA | WORKSHOP | CLASS | OFFICE_HOURS (null = AMA)
+  kind             String?
+  // Max members marked GOING; the rest join the waitlist. null = unlimited.
+  capacity         Int?
+  // Recording added after the event; also archived into the Library.
+  recordingUrl     String?
+  recordingAddedAt DateTime?
+  libraryResource  VipResource?
+
   @@index([startsAt])
   @@index([seriesId, startsAt])
   @@map("vip_events")
@@ -1724,6 +1756,9 @@ model VipEventRsvp {
   // Reminder e-mails already sent (each at most once).
   reminded24hAt DateTime?
   reminded1hAt  DateTime?
+  // GOING | WAITLIST (null = GOING, rows from before the waitlist existed).
+  status        String?   @default("GOING")
+  promotedAt    DateTime?
   createdAt     DateTime  @default(now())
   event         VipEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1883,12 +1918,36 @@ model VipRedemption {
   @@map("vip_redemptions")
 }
 
-// Course access granted outside the tier rule (a TRAINING reward, an admin
-// grant). Classroom access = the tier allows it OR a grant exists.
+// ─── Academy: learning paths, quizzes, certificates, paid trainings ─────────
+// (branch vip/academy). New tables only; columns added to existing vip_*
+// tables above are all optional.
+
+// A learning path ("track"): an ordered set of courses.
+model VipTrack {
+  id        String      @id @default(cuid())
+  slug      String      @unique
+  title     String
+  summary   String?     @db.Text
+  // FOUNDATIONS | RESEARCH | HEALTH | FITNESS | LIFESTYLE
+  category  String      @default("FOUNDATIONS")
+  published Boolean     @default(false)
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  courses   VipCourse[]
+
+  @@map("vip_tracks")
+}
+
+// Access to one course regardless of tier: bought with points or money, a
+// TRAINING reward, or granted by an admin. ONE table shared by rewards and
+// academy; classroom access = admin OR tier allows it OR a grant exists
+// (lib/vip/classroom.ts — the only place that decides).
 model VipCourseGrant {
   id        String   @id @default(cuid())
   userId    String
   courseId  String
+  // points | purchase | admin | reward
   source    String
   createdAt DateTime @default(now())
 
@@ -2050,4 +2109,175 @@ model VipPartnerStatement {
   @@unique([partnerId, period])
   @@index([period])
   @@map("vip_partner_statements")
+}
+
+// A file an admin uploaded (lesson PDF, library guide). Stored outside
+// public/; served only through /api/vip/files/<id> to members who can open
+// the lesson or library item that references it.
+model VipFile {
+  id              String              @id @default(cuid())
+  storageKey      String              @unique
+  fileName        String
+  mimeType        String
+  sizeBytes       Int
+  uploadedById    String?
+  createdAt       DateTime            @default(now())
+  lessonResources VipLessonResource[]
+  resources       VipResource[]
+
+  @@map("vip_files")
+}
+
+model VipLessonResource {
+  id        String    @id @default(cuid())
+  lessonId  String
+  title     String
+  // FILE (fileId) | LINK (url)
+  kind      String    @default("FILE")
+  url       String?
+  fileId    String?
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  lesson    VipLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  file      VipFile?  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, sortOrder])
+  @@map("vip_lesson_resources")
+}
+
+// One quiz per module. Correct answers never leave the server before a
+// member submits.
+model VipQuiz {
+  id        String            @id @default(cuid())
+  moduleId  String            @unique
+  title     String
+  intro     String?           @db.Text
+  passPct   Int               @default(70)
+  published Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  module    VipModule         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions VipQuizQuestion[]
+  attempts  VipQuizAttempt[]
+
+  @@map("vip_quizzes")
+}
+
+model VipQuizQuestion {
+  id           String   @id @default(cuid())
+  quizId       String
+  prompt       String   @db.Text
+  // string[] (2–6 options)
+  options      Json
+  correctIndex Int
+  explanation  String?  @db.Text
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  quiz         VipQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId, sortOrder])
+  @@map("vip_quiz_questions")
+}
+
+model VipQuizAttempt {
+  id        String   @id @default(cuid())
+  quizId    String
+  userId    String
+  correct   Int
+  total     Int
+  scorePct  Int
+  passed    Boolean
+  // { [questionId]: chosenIndex }
+  answers   Json
+  createdAt DateTime @default(now())
+  quiz      VipQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId, userId])
+  @@index([userId, createdAt])
+  @@map("vip_quiz_attempts")
+}
+
+// Completion certificate. Name and course title are snapshots taken at issue
+// time; the public verification page (/verify/<code>) shows only the course,
+// the date and the code — never the member.
+model VipCertificate {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  userId        String
+  courseId      String
+  recipientName String
+  courseTitle   String
+  issuedAt      DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@map("vip_certificates")
+}
+
+// Private per-lesson notes (only the author ever reads them).
+model VipLessonNote {
+  id        String    @id @default(cuid())
+  userId    String
+  lessonId  String
+  body      String    @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lesson    VipLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("vip_lesson_notes")
+}
+
+// "Resume where you left off": the last lesson a member opened per course.
+model VipCourseResume {
+  id        String    @id @default(cuid())
+  userId    String
+  courseId  String
+  lessonId  String
+  updatedAt DateTime  @updatedAt
+  course    VipCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId, updatedAt])
+  @@map("vip_course_resumes")
+}
+
+// Library: guides, PDFs, recordings, explainer links. Tier-gated.
+model VipResource {
+  id        String         @id @default(cuid())
+  title     String
+  summary   String?        @db.Text
+  // GUIDES | RESEARCH_LITERACY | COA | RECORDINGS | TRAINING | NUTRITION | RECOVERY | LIFESTYLE
+  category  String
+  // GUIDE | PDF | RECORDING | LINK
+  kind      String
+  url       String?
+  fileId    String?
+  minTier   MembershipTier @default(CLUB)
+  published Boolean        @default(false)
+  // Set when the item is an event recording archived from Events.
+  eventId   String?        @unique
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  file      VipFile?       @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  event     VipEvent?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([published, category])
+  @@map("vip_resources")
+}
+
+// First-run onboarding answers.
+model VipOnboarding {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  interests   String[]
+  goals       String[]
+  trackId     String?
+  completedAt DateTime?
+  skippedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("vip_onboarding")
 }

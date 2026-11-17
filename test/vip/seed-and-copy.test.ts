@@ -4,6 +4,7 @@ import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
 import { seedClubhouse, firstOccurrence } from '../../scripts/vip/seed-core'
 import { COURSES, EVENTS, SPACES, TEAM_POSTS } from '../../scripts/vip/starter-content'
+import { ACADEMY_COURSES, TRACKS } from '../../scripts/vip/starter-academy'
 import { makeUser } from '../helpers'
 
 const db = new PrismaClient()
@@ -74,6 +75,7 @@ const CLUBHOUSE_SOURCES = [
   ...files(path.join(root, 'src/lib/vip')),
   path.join(root, 'scripts/vip/starter-content.ts'),
   path.join(root, 'scripts/vip/starter-courses.ts'),
+  path.join(root, 'scripts/vip/starter-academy.ts'),
 ]
 // Surfaces the clubhouse must never carry: product/peptide sales, dosing,
 // treatment claims, supplier / manufacturer / third-party brand names, AI model names.
@@ -105,6 +107,9 @@ describe('clubhouse copy guard', () => {
       ...TEAM_POSTS.map((p) => p.body),
       ...EVENTS.map((e) => e.description),
       ...SPACES.map((s) => s.description),
+      ...TRACKS.map((t) => t.summary),
+      ...ACADEMY_COURSES.flatMap((c) => [c.summary, ...c.modules.flatMap((m) => [...m.lessons.map((l) => l.body), ...m.quiz.questions.map((q) => q.explanation)])]),
+      readFileSync(path.join(root, 'src/lib/vip/landing-copy.ts'), 'utf8'),
       readFileSync(path.join(root, 'src/lib/vip/copy.ts'), 'utf8'),
       readFileSync(path.join(root, 'src/lib/vip/emails.ts'), 'utf8'),
     ]
@@ -118,5 +123,26 @@ describe('clubhouse copy guard', () => {
     for (const f of CLUBHOUSE_SOURCES) {
       expect(readFileSync(f, 'utf8'), f).not.toMatch(/bg-clip-text|text-gradient|text-transparent/)
     }
+  })
+})
+
+describe('Academy starter content (vip/academy)', () => {
+  it('seeds paths, files the starter courses under them and adds a quizzed research-literacy course; insert-only', async () => {
+    const admin = await makeUser({ tag: 'seed-acad-admin', role: 'ADMIN' })
+    await seedClubhouse(db, { authorEmail: admin.email, now: new Date('2026-10-01T12:00:00Z') })
+    const again = await seedClubhouse(db, { authorEmail: admin.email, now: new Date('2026-10-01T12:00:00Z') })
+    expect(again.created).toEqual([])
+    expect(await db.vipTrack.count({ where: { slug: { in: TRACKS.map((t) => t.slug) } } })).toBe(TRACKS.length)
+    const course = await db.vipCourse.findUniqueOrThrow({
+      where: { slug: 'reading-the-research' },
+      include: { track: true, modules: { include: { lessons: true, quiz: { include: { questions: true } } } } },
+    })
+    expect(course.track?.slug).toBe('research-literacy')
+    for (const m of course.modules) {
+      expect(m.lessons.every((l) => l.body.length > 400 && (l.durationMinutes ?? 0) > 0)).toBe(true)
+      expect(m.quiz?.published).toBe(true)
+      for (const q of m.quiz!.questions) expect(q.correctIndex).toBeLessThan((q.options as string[]).length)
+    }
+    expect(await db.vipResource.count({ where: { category: 'COA', kind: 'LINK' } })).toBeGreaterThanOrEqual(1)
   })
 })

@@ -40,6 +40,15 @@ import * as adminPoints from '@/app/api/admin/vip/rewards/points/route'
 import * as adminUpload from '@/app/api/admin/vip/rewards/upload/route'
 import * as adminPartners from '@/app/api/admin/vip/partners/route'
 import * as adminStatements from '@/app/api/admin/vip/partners/statements/route'
+// Academy / Library / Events upgrade (vip/academy)
+import * as lessonNote from '@/app/api/vip/lessons/[id]/note/route'
+import * as quizAttempts from '@/app/api/vip/quizzes/[id]/attempts/route'
+import * as trainingRedeem from '@/app/api/vip/trainings/[id]/redeem/route'
+import * as trainingInvoice from '@/app/api/vip/trainings/[id]/invoice/route'
+import * as vipFiles from '@/app/api/vip/files/[id]/route'
+import * as eventIcs from '@/app/api/vip/events/[id]/ics/route'
+import * as adminFiles from '@/app/api/admin/vip/files/route'
+import * as adminLibrary from '@/app/api/admin/vip/library/route'
 
 type Handler = (r: NextRequest, ctx: { params: Promise<Record<string, unknown>> }) => Promise<Response>
 type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response> }
@@ -79,6 +88,13 @@ const CASES: Case[] = [
   { name: 'POST /rewards/partner-code', gate: 'member', run: () => h(rewardsPartnerCode.POST)(req('/api/vip/rewards/partner-code', { body: { partnerId: 'missing', points: 100 } }), ctx({})) },
   { name: 'GET /rewards/prefs', gate: 'member', run: () => h(rewardsPrefs.GET)(req('/api/vip/rewards/prefs'), ctx({})) },
   { name: 'PATCH /rewards/prefs', gate: 'member', run: () => h(rewardsPrefs.PATCH)(req('/api/vip/rewards/prefs', { method: 'PATCH', body: { hideFromLeaderboards: false } }), ctx({})) },
+  { name: 'PUT /onboarding', gate: 'member', run: () => h(onboarding.PUT)(req('/api/vip/onboarding', { method: 'PUT', body: { skip: true } }), ctx({})) },
+  { name: 'PUT /lessons/:id/note', gate: 'member', run: () => h(lessonNote.PUT)(req('/api/vip/lessons/missing/note', { method: 'PUT', body: { body: 'x' } }), ctx({ id: 'missing' })) },
+  { name: 'POST /quizzes/:id/attempts', gate: 'member', run: () => h(quizAttempts.POST)(req('/api/vip/quizzes/missing/attempts', { body: { answers: {} } }), ctx({ id: 'missing' })) },
+  { name: 'POST /trainings/:id/redeem', gate: 'member', run: () => h(trainingRedeem.POST)(req('/api/vip/trainings/missing/redeem', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'POST /trainings/:id/invoice', gate: 'member', run: () => h(trainingInvoice.POST)(req('/api/vip/trainings/missing/invoice', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'GET /files/:id', gate: 'member', run: () => h(vipFiles.GET)(req('/api/vip/files/missingfile00'), ctx({ id: 'missingfile00' })) },
+  { name: 'GET /events/:id/ics', gate: 'member', run: () => h(eventIcs.GET)(req('/api/vip/events/missing/ics'), ctx({ id: 'missing' })) },
 ]
 
 const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
@@ -105,6 +121,8 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'POST partners', run: () => h(adminPartners.POST)(req('/api/admin/vip/partners', { body: { op: 'staff.remove', id: 'x' } }), ctx({})) },
   { name: 'GET statements', run: () => h(adminStatements.GET)(req('/api/admin/vip/partners/statements'), ctx({})) },
   { name: 'POST statements', run: () => h(adminStatements.POST)(req('/api/admin/vip/partners/statements', { body: { op: 'issue', id: 'x' } }), ctx({})) },
+  { name: 'POST files', run: () => h(adminFiles.POST)(req('/api/admin/vip/files', { body: {} }), ctx({})) },
+  { name: 'POST library', run: () => h(adminLibrary.POST)(req('/api/admin/vip/library', { body: { op: 'delete', id: 'x' } }), ctx({})) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -147,6 +165,8 @@ describe('members-only gating — every clubhouse API', () => {
         'profile/route.ts', 'reactions/route.ts', 'reports/route.ts', 'rewards/route.ts', 'uploads/route.ts',
         'email-prefs/route.ts', 'onboarding/route.ts',
         'rewards/redeem/route.ts', 'rewards/redemptions/[id]/route.ts', 'rewards/partner-code/route.ts', 'rewards/prefs/route.ts',
+        'lessons/[id]/note/route.ts', 'quizzes/[id]/attempts/route.ts', 'trainings/[id]/redeem/route.ts',
+        'trainings/[id]/invoice/route.ts', 'files/[id]/route.ts', 'events/[id]/ics/route.ts',
       ].sort(),
     )
   })

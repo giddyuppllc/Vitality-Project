@@ -185,6 +185,8 @@ export async function runEventReminders(now: Date, dryRun: boolean): Promise<Rem
     where: {
       event: { published: true, cancelledAt: null, startsAt: { gt: now, lte: horizon } },
       OR: [{ reminded24hAt: null }, { reminded1hAt: null }],
+      // Waitlisted members get no reminder (null = rows from before the waitlist).
+      AND: [{ OR: [{ status: 'GOING' }, { status: null }] }],
     },
     include: {
       event: true,
@@ -282,6 +284,8 @@ export async function ensureEventSeries(now: Date, dryRun: boolean): Promise<Ser
         createdById: e.createdById,
         repeatMonthly: true,
         seriesId,
+        kind: e.kind,
+        capacity: e.capacity,
       },
     })
   }

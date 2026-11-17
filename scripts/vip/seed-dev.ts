@@ -144,6 +144,102 @@ Focus: caffeine cut-off at 1 pm, no exceptions
     create: { name: 'ZZ Test Fixture Item', slug: 'zz-test-fixture', description: 'Fake fixture for local screenshots only.', price: 4200, status: 'ACTIVE', trackInventory: false },
   })
 
+  // ── Academy / Library / Events fixtures (vip/academy) — FAKE, throwaway DB only ──
+  // Maya (Plus): mid-way through Reading the Research, one module check passed,
+  // a private note, Orientation finished with its certificate, points earned.
+  const rtr = await prisma.vipCourse.findUnique({
+    where: { slug: 'reading-the-research' },
+    include: { modules: { orderBy: { sortOrder: 'asc' }, include: { lessons: { orderBy: { sortOrder: 'asc' } }, quiz: { include: { questions: true } } } } },
+  })
+  if (rtr) {
+    const [m1] = rtr.modules
+    for (const l of m1.lessons) {
+      await prisma.vipLessonProgress.upsert({ where: { userId_lessonId: { userId: maya.id, lessonId: l.id } }, update: {}, create: { userId: maya.id, lessonId: l.id } })
+    }
+    if (m1.quiz && (await prisma.vipQuizAttempt.count({ where: { userId: maya.id, quizId: m1.quiz.id } })) === 0) {
+      const answers = Object.fromEntries(m1.quiz.questions.map((q) => [q.id, q.correctIndex]))
+      await prisma.vipQuizAttempt.create({ data: { quizId: m1.quiz.id, userId: maya.id, correct: 3, total: 3, scorePct: 100, passed: true, answers } })
+    }
+    const next = rtr.modules[1]?.lessons[0]
+    if (next) {
+      await prisma.vipCourseResume.upsert({ where: { userId_courseId: { userId: maya.id, courseId: rtr.id } }, update: { lessonId: next.id }, create: { userId: maya.id, courseId: rtr.id, lessonId: next.id } })
+      await prisma.vipLessonNote.upsert({
+        where: { userId_lessonId: { userId: maya.id, lessonId: m1.lessons[1].id } },
+        update: {},
+        create: { userId: maya.id, lessonId: m1.lessons[1].id, body: 'ZZ fake note: always find the absolute difference before believing a headline.' },
+      })
+    }
+  }
+  for (const l of lessons) {
+    await prisma.vipLessonProgress.upsert({ where: { userId_lessonId: { userId: dre.id, lessonId: l.id } }, update: {}, create: { userId: dre.id, lessonId: l.id } })
+  }
+  const orientation = await prisma.vipCourse.findUnique({ where: { slug: 'clubhouse-orientation' } })
+  if (orientation) {
+    const { issueCertificate } = await import('../../src/lib/vip/academy')
+    await issueCertificate(dre.id, orientation.id)
+  }
+  for (const [u, pts, key] of [[maya, 1375, 'zz:dev:maya'], [dre, 2650, 'zz:dev:dre']] as const) {
+    if (!(await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } }))) {
+      const acct = await prisma.loyaltyAccount.upsert({ where: { userId: u.id }, update: {}, create: { userId: u.id } })
+      await prisma.loyaltyTransaction.create({ data: { accountId: acct.id, type: 'EARN_ADMIN', points: pts, description: 'ZZ fake dev balance', idempotencyKey: key, source: 'vip' } })
+      await prisma.loyaltyAccount.update({ where: { id: acct.id }, data: { points: { increment: pts } } })
+    }
+  }
+
+  // A purchase-only training (fake) for the unlock screenshots.
+  if (!(await prisma.vipCourse.findUnique({ where: { slug: 'zz-mobility-masterclass' } }))) {
+    const fitness = await prisma.vipTrack.findUnique({ where: { slug: 'fitness' } })
+    const c = await prisma.vipCourse.create({
+      data: {
+        slug: 'zz-mobility-masterclass',
+        title: 'ZZ Mobility Masterclass (fake)',
+        summary: 'Fake training for local screenshots: hips, ankles and thoracic spine in fifteen minutes a day.',
+        minTier: 'CLUB',
+        purchaseOnly: true,
+        priceCents: 4900,
+        pointsPrice: 2500,
+        level: 'INTERMEDIATE',
+        estimatedMinutes: 90,
+        published: true,
+        sortOrder: 20,
+        trackId: fitness?.id ?? null,
+      },
+    })
+    const mod = await prisma.vipModule.create({ data: { courseId: c.id, title: 'ZZ Hips (fake)', sortOrder: 0 } })
+    for (const [i, t] of ['ZZ Hip flow (fake)', 'ZZ Ankle prep (fake)'].entries()) {
+      await prisma.vipLesson.create({ data: { moduleId: mod.id, title: t, body: 'Fake lesson body for local screenshots only.', durationMinutes: 12, published: true, sortOrder: i } })
+    }
+  }
+
+  // Library (fake links) + events with types, capacity and a recording.
+  if ((await prisma.vipResource.count({ where: { title: { startsWith: 'ZZ ' } } })) === 0) {
+    await prisma.vipResource.createMany({
+      data: [
+        { title: 'ZZ Sleep checklist (fake)', summary: 'Fake guide for screenshots: a one-page wind-down checklist.', category: 'RECOVERY', kind: 'GUIDE', url: 'https://example.invalid/sleep', minTier: 'CLUB', published: true },
+        { title: 'ZZ Protein on a budget (fake)', summary: 'Fake guide for screenshots: a weekly shop that covers four portions a day.', category: 'NUTRITION', kind: 'GUIDE', url: 'https://example.invalid/protein', minTier: 'CLUB', published: true },
+        { title: 'ZZ Strength block template (fake)', summary: 'Fake PDF stand-in for screenshots.', category: 'TRAINING', kind: 'PDF', url: 'https://example.invalid/block', minTier: 'PLUS', published: true },
+        { title: 'ZZ Premium periodisation notes (fake)', summary: 'Fake Premium-only item for screenshots.', category: 'GUIDES', kind: 'GUIDE', url: 'https://example.invalid/premium', minTier: 'PREMIUM', published: true },
+      ],
+    })
+  }
+  if (!(await prisma.vipEvent.findFirst({ where: { title: 'ZZ Mobility workshop (fake)' } }))) {
+    const workshop = await prisma.vipEvent.create({
+      data: { title: 'ZZ Mobility workshop (fake)', description: 'Fake capped workshop for screenshots.', startsAt: new Date(Date.now() + 5 * 24 * HOUR), endsAt: new Date(Date.now() + 5 * 24 * HOUR + HOUR), minTier: 'CLUB', published: true, kind: 'WORKSHOP', capacity: 3, createdById: admin.id },
+    })
+    for (const u of [dre, priya, sam]) await prisma.vipEventRsvp.create({ data: { eventId: workshop.id, userId: u.id, status: 'GOING' } })
+    await prisma.vipEventRsvp.create({ data: { eventId: workshop.id, userId: lena.id, status: 'WAITLIST' } })
+    await prisma.vipEvent.create({
+      data: { title: 'ZZ Saturday conditioning class (fake)', startsAt: new Date(Date.now() + 9 * 24 * HOUR), minTier: 'CLUB', published: true, kind: 'CLASS', createdById: admin.id },
+    })
+    const past = await prisma.vipEvent.create({
+      data: { title: 'ZZ October Q&A replay (fake)', description: 'Fake past session with a recording.', startsAt: ago(24 * 20), endsAt: ago(24 * 20 - 1), minTier: 'CLUB', published: true, kind: 'AMA', recordingUrl: 'https://example.invalid/replay', recordingAddedAt: ago(24 * 19), createdById: admin.id },
+    })
+    const { syncRecordingToLibrary } = await import('../../src/lib/vip/events')
+    await syncRecordingToLibrary(past.id)
+  }
+  // Maya has finished onboarding; Lena has not (shows the first-run banner).
+  await prisma.vipOnboarding.upsert({ where: { userId: maya.id }, update: {}, create: { userId: maya.id, interests: ['training', 'sleep', 'research'], goals: ['strength', 'sleep'], completedAt: ago(24 * 30) } })
+
   console.log(`Seeded. Sign in as zz-member@example.invalid / ${PASSWORD} (also zz-club, zz-premium, zz-sam, zz-priya, zz-nonmember, zz-joiner, zz-admin).`)
 }
 

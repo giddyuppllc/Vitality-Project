@@ -260,3 +260,6 @@ Use it: ${a.shopUrl}
 ${textFooter(a.userId, 'rewards')}`
   return { subject, html, text }
 }
+
+/** Building blocks for templates kept in other files (lib/vip/academy-emails.ts). */
+export const emailParts = { h1, p, small, button, panel, layout, textFooter, firstName }

@@ -2,6 +2,10 @@ import { prisma } from '@/lib/prisma'
 import type { Tx } from './points'
 
 /**
+ * THE VipCourseGrant module — the one place grants are read and written
+ * (rewards' TRAINING items, academy's points/Zelle purchases, admin grants).
+ * Access itself is decided in lib/vip/classroom.ts via academy.allowsTier().
+ *
  * Course access outside the tier rule. A member may open a classroom course
  * when their tier allows it OR a VipCourseGrant exists for (member, course) —
  * lib/vip/classroom.ts honours both. Grants come from TRAINING rewards
@@ -35,10 +39,17 @@ export async function revokeTrainingAccess(userId: string, courseId: string, sou
   return count > 0
 }
 
-export async function courseGrantSet(userId: string): Promise<Set<string>> {
-  const rows = await prisma.vipCourseGrant.findMany({ where: { userId }, select: { courseId: true } })
+/** Course ids this member holds a grant for (optionally limited to `courseIds`). */
+export async function grantedCourseIds(userId: string, courseIds?: string[]): Promise<Set<string>> {
+  const rows = await prisma.vipCourseGrant.findMany({
+    where: { userId, ...(courseIds ? { courseId: { in: courseIds } } : {}) },
+    select: { courseId: true },
+  })
   return new Set(rows.map((r) => r.courseId))
 }
+
+/** @deprecated alias of grantedCourseIds (rewards' original name). */
+export const courseGrantSet = (userId: string) => grantedCourseIds(userId)
 
 export async function hasCourseGrant(userId: string, courseId: string): Promise<boolean> {
   return !!(await prisma.vipCourseGrant.findUnique({ where: { userId_courseId: { userId, courseId } }, select: { id: true } }))

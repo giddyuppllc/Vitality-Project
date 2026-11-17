@@ -144,6 +144,7 @@ export function SpaceRowEditor({
 
 export function CourseForm({
   course,
+  tracks = [],
 }: {
   course?: {
     id: string
@@ -154,10 +155,24 @@ export function CourseForm({
     minTier: Tier
     published: boolean
     sortOrder: number
+    trackId?: string | null
+    level?: string | null
+    estimatedMinutes?: number | null
+    purchaseOnly?: boolean | null
+    priceCents?: number | null
+    pointsPrice?: number | null
   }
+  /** Learning paths to file the course under. */
+  tracks?: { id: string; title: string }[]
 }) {
   const router = useRouter()
   const { busy, msg, send } = useSubmit()
+  const [trackId, setTrackId] = useState(course?.trackId ?? '')
+  const [level, setLevel] = useState(course?.level ?? '')
+  const [minutes, setMinutes] = useState(course?.estimatedMinutes ? String(course.estimatedMinutes) : '')
+  const [purchaseOnly, setPurchaseOnly] = useState(!!course?.purchaseOnly)
+  const [price, setPrice] = useState(course?.priceCents ? (course.priceCents / 100).toFixed(2) : '')
+  const [pointsPrice, setPointsPrice] = useState(course?.pointsPrice ? String(course.pointsPrice) : '')
   const [title, setTitle] = useState(course?.title ?? '')
   const [slug, setSlug] = useState(course?.slug ?? '')
   const [summary, setSummary] = useState(course?.summary ?? '')
@@ -180,6 +195,12 @@ export function CourseForm({
           minTier,
           published,
           sortOrder: Number(sortOrder) || 0,
+          trackId: trackId || null,
+          level: level || null,
+          estimatedMinutes: Number.parseInt(minutes || '0', 10) || null,
+          purchaseOnly,
+          priceCents: price ? parseMoneyToCents(price) ?? null : null,
+          pointsPrice: Number.parseInt(pointsPrice || '0', 10) || null,
         })
         if (data && !course) router.push(`/admin/vip/classroom/${data.id}`)
       }}
@@ -215,6 +236,46 @@ export function CourseForm({
           <input className={`${adminInput} mt-1`} type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
         </label>
       </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className={`${label} sm:col-span-3`}>
+          Learning path
+          <select className={`${adminInput} mt-1`} value={trackId} onChange={(e) => setTrackId(e.target.value)}>
+            <option value="">None</option>
+            {tracks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+        </label>
+        <label className={label}>
+          Level
+          <select className={`${adminInput} mt-1`} value={level} onChange={(e) => setLevel(e.target.value)}>
+            <option value="">—</option>
+            <option value="BEGINNER">Beginner</option>
+            <option value="INTERMEDIATE">Intermediate</option>
+            <option value="ADVANCED">Advanced</option>
+          </select>
+        </label>
+        <label className={`${label} sm:col-span-2`}>
+          Total time (minutes, optional)
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+        </label>
+      </div>
+      <fieldset className="space-y-3 rounded-xl border border-white/10 p-3">
+        <legend className="px-1 text-sm font-medium text-white/70">Paid training</legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={label}>
+            Price ($, Zelle invoice — blank = not for sale)
+            <input className={`${adminInput} mt-1`} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
+          </label>
+          <label className={label}>
+            Points price (100 pts = $1 — blank = not for points)
+            <input className={`${adminInput} mt-1`} inputMode="numeric" value={pointsPrice} onChange={(e) => setPointsPrice(e.target.value)} />
+          </label>
+        </div>
+        <label className="flex items-start gap-2 text-sm text-white/70">
+          <input type="checkbox" checked={purchaseOnly} onChange={(e) => setPurchaseOnly(e.target.checked)} className="mt-0.5 accent-brand-500" />
+          Purchase only — not included in any level; members unlock it with points or by paying. Otherwise it is included from the
+          Access level above, and lower levels can buy it.
+        </label>
+      </fieldset>
       <label className="flex items-center gap-2 text-sm text-white/70">
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="accent-brand-500" />
         Published (visible to members)
@@ -271,10 +332,12 @@ export function LessonForm({
     minTier: Tier | null
     published: boolean
     sortOrder: number
+    durationMinutes?: number | null
   }
 }) {
   const { busy, msg, send } = useSubmit()
   const [open, setOpen] = useState(!lesson)
+  const [duration, setDuration] = useState(lesson?.durationMinutes ? String(lesson.durationMinutes) : '')
   const [title, setTitle] = useState(lesson?.title ?? '')
   const [body, setBody] = useState(lesson?.body ?? '')
   const [videoUrl, setVideoUrl] = useState(lesson?.videoUrl ?? '')
@@ -304,6 +367,7 @@ export function LessonForm({
           minTier: minTier || null,
           published,
           sortOrder: Number(sortOrder) || 0,
+          durationMinutes: Number.parseInt(duration || '0', 10) || null,
         })
         if (ok && !lesson) {
           setTitle('')
@@ -321,7 +385,7 @@ export function LessonForm({
         Body — supports # headings, - lists, 1. lists, **bold**, *italic*, [link](https://…)
         <textarea className={`${adminInput} mt-1 font-mono`} rows={8} value={body} onChange={(e) => setBody(e.target.value)} maxLength={50000} />
       </label>
-      <div className="grid gap-3 sm:grid-cols-[1fr_12rem_6rem]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem_6rem_6rem]">
         <label className={label}>
           Video URL (optional — YouTube/Vimeo embed, other links shown as a link)
           <input className={`${adminInput} mt-1`} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} maxLength={500} />
@@ -332,6 +396,10 @@ export function LessonForm({
             <option value="">Same as course</option>
             {TIER_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
+        </label>
+        <label className={label}>
+          Minutes
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
         </label>
         <label className={label}>
           Sort
@@ -377,10 +445,16 @@ export function EventForm({
     minTier: Tier
     published: boolean
     repeatMonthly?: boolean
+    kind?: string | null
+    capacity?: number | null
+    recordingUrl?: string | null
   }
 }) {
   const { busy, msg, send } = useSubmit()
   const [open, setOpen] = useState(!event)
+  const [kind, setKind] = useState(event?.kind ?? 'AMA')
+  const [capacity, setCapacity] = useState(event?.capacity ? String(event.capacity) : '')
+  const [recordingUrl, setRecordingUrl] = useState(event?.recordingUrl ?? '')
   const [repeatMonthly, setRepeatMonthly] = useState(event?.repeatMonthly ?? false)
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
@@ -414,6 +488,9 @@ export function EventForm({
           minTier,
           published,
           repeatMonthly,
+          kind,
+          capacity: Number.parseInt(capacity || '0', 10) || null,
+          recordingUrl,
         })
         if (ok && !event) {
           setTitle('')
@@ -456,6 +533,25 @@ export function EventForm({
           </select>
         </label>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className={label}>
+          Type
+          <select className={`${adminInput} mt-1`} value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="AMA">Live Q&amp;A</option>
+            <option value="WORKSHOP">Workshop</option>
+            <option value="CLASS">Workout class</option>
+            <option value="OFFICE_HOURS">Office hours</option>
+          </select>
+        </label>
+        <label className={label}>
+          Capacity (blank = unlimited; extra RSVPs join a waitlist)
+          <input className={`${adminInput} mt-1`} inputMode="numeric" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+        </label>
+      </div>
+      <label className={label}>
+        Recording link (https, after the session — also files it in the Library)
+        <input className={`${adminInput} mt-1`} value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} maxLength={500} />
+      </label>
       <label className="flex items-center gap-2 text-sm text-white/70">
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="accent-brand-500" />
         Published

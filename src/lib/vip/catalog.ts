@@ -5,6 +5,7 @@ import { logAudit } from '@/lib/audit'
 import { tierAllows } from './access'
 import { awardPoints, spendPoints, InsufficientPointsError, type Tx } from './points'
 import { grantTrainingAccess, hasCourseGrant } from './course-grants'
+import { allowsTier } from './academy'
 import { RewardsError, isUniqueViolation } from './rewards-errors'
 import { evaluateBadges } from './badges'
 
@@ -77,7 +78,7 @@ export async function listCatalog(viewer: { userId: string; accessTier: Membersh
   const granted = new Set(grants.map((g) => g.courseId))
   const courseIds = items.map((i) => i.courseId).filter((x): x is string => !!x)
   const courses = courseIds.length
-    ? await prisma.vipCourse.findMany({ where: { id: { in: courseIds } }, select: { id: true, minTier: true, title: true, published: true } })
+    ? await prisma.vipCourse.findMany({ where: { id: { in: courseIds } }, select: { id: true, minTier: true, title: true, published: true, purchaseOnly: true } })
     : []
   const courseMap = new Map(courses.map((c) => [c.id, c]))
   const points = balance?.points ?? 0
@@ -86,7 +87,7 @@ export async function listCatalog(viewer: { userId: string; accessTier: Membersh
     const inStock = hasOptions ? i.options.some((o) => o.stock === null || o.stock > 0) : i.stock === null || i.stock > 0
     const usedCount = used.get(i.id) ?? 0
     const course = i.courseId ? courseMap.get(i.courseId) : undefined
-    const alreadyUnlocked = i.kind === 'TRAINING' && !!course && (granted.has(course.id) || tierAllows(viewer.accessTier, course.minTier))
+    const alreadyUnlocked = i.kind === 'TRAINING' && !!course && allowsTier(course, course.minTier, viewer.accessTier, { granted: granted.has(course.id) })
     return {
       id: i.id,
       slug: i.slug,
@@ -153,9 +154,9 @@ export async function redeemReward(args: {
 
   if (item.kind === 'TRAINING') {
     if (!item.courseId) throw new RewardsError('misconfigured', 'This reward is not set up yet.', 409)
-    const course = await prisma.vipCourse.findUnique({ where: { id: item.courseId }, select: { minTier: true } })
+    const course = await prisma.vipCourse.findUnique({ where: { id: item.courseId }, select: { minTier: true, purchaseOnly: true } })
     if (!course) throw new RewardsError('misconfigured', 'This reward is not set up yet.', 409)
-    if (tierAllows(args.accessTier, course.minTier) || (await hasCourseGrant(userId, item.courseId))) {
+    if (allowsTier(course, course.minTier, args.accessTier, { granted: await hasCourseGrant(userId, item.courseId) })) {
       throw new RewardsError('already_unlocked', 'You already have this training.', 409)
     }
   }

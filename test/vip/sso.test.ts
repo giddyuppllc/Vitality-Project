@@ -22,13 +22,13 @@ async function consume(token: string, callbackUrl = '/dashboard') {
 }
 
 describe('SSO consume (/api/sso)', () => {
-  it('valid token → session for the SAME user row, redirect to /feed', async () => {
+  it('valid token → session for the SAME user row, redirect to the member home (/dashboard)', async () => {
     const user = await makeUser({ tag: 'sso-ok', tier: 'PLUS' })
     const res = await consume(mintSsoToken({ sub: user.id, email: user.email }))
     expect(res.status).toBe(307)
-    expect(new URL(res.headers.get('location')!, 'http://vip.test').pathname).toBe('/feed')
+    expect(new URL(res.headers.get('location')!, 'http://vip.test').pathname).toBe('/dashboard')
     // relative Location: stays on whatever host the member is on (.vip)
-    expect(res.headers.get('location')).toBe('/feed')
+    expect(res.headers.get('location')).toBe('/dashboard')
     const cookie = sessionCookie(res)
     expect(cookie).toBeTruthy()
     const decoded = await decode({ token: cookie!, secret: process.env.NEXTAUTH_SECRET! })
@@ -101,12 +101,12 @@ describe('SSO consume (/api/sso)', () => {
   })
 
   it('callbackUrl is restricted to same-site paths', () => {
-    expect(safeCallbackPath('/dashboard')).toBe('/feed')
+    expect(safeCallbackPath('/dashboard')).toBe('/dashboard')
     expect(safeCallbackPath('/classroom')).toBe('/classroom')
-    expect(safeCallbackPath('https://evil.example')).toBe('/feed')
-    expect(safeCallbackPath('//evil.example')).toBe('/feed')
-    expect(safeCallbackPath('/\\evil.example')).toBe('/feed')
-    expect(safeCallbackPath(null)).toBe('/feed')
+    expect(safeCallbackPath('https://evil.example')).toBe('/dashboard')
+    expect(safeCallbackPath('//evil.example')).toBe('/dashboard')
+    expect(safeCallbackPath('/\\evil.example')).toBe('/dashboard')
+    expect(safeCallbackPath(null)).toBe('/dashboard')
   })
 
   it('callbackUrl: browsers strip tab/CR/LF from a Location, so "/\\t/evil" must not become //evil', async () => {

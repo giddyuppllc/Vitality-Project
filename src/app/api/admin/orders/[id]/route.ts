@@ -13,6 +13,7 @@ import { createAdminNotification } from '@/lib/notifications'
 import { z } from 'zod'
 import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit, restoreOrderCredit } from '@/lib/order-credit'
+import { grantTrainingFromOrder, isTrainingInvoice } from '@/lib/vip/training-invoice'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Internal Notes box silently broke activation, so it can't be edited.
     if (
       data.notes !== undefined &&
-      prev.notes?.startsWith('MEMBERSHIP:') &&
+      (prev.notes?.startsWith('MEMBERSHIP:') || isTrainingInvoice(prev.notes)) &&
       data.notes !== prev.notes
     ) {
       return NextResponse.json(
@@ -90,7 +91,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
       runPaidPipeline = claimed.count === 1
     }
-    if (runPaidPipeline) {
+    if (runPaidPipeline && isTrainingInvoice(prev.notes)) {
+      // Clubhouse training invoice: open the course (exactly once) instead of
+      // the physical-goods pipeline below — no stock, no commission.
+      await grantTrainingFromOrder(prev).catch((err) => console.error('[admin/orders] training grant failed:', err))
+    } else if (runPaidPipeline) {
       const order = await prisma.order.findUnique({
         where: { id: id },
         include: { items: true },

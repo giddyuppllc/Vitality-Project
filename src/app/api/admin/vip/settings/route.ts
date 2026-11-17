@@ -29,6 +29,9 @@ const schema = z
     'vip.digestHourUtc': z.number().int().min(0).max(23),
     'vip.timeZone': z.string().trim().max(64).refine(validZone, 'Unknown time zone'),
     'zelle.unpaidExpiryDays': z.number().int().min(0).max(365),
+    'vip.points.lessonComplete': z.number().int().min(0).max(100_000),
+    'vip.points.courseComplete': z.number().int().min(0).max(100_000),
+    'vip.points.quizPassed': z.number().int().min(0).max(100_000),
   })
   .partial()
 

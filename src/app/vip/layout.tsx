@@ -1,5 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './vip.css'
+import { ClubhouseServiceWorker } from '@/components/vip/sw-register'
+import { VIP_THEME } from '@/lib/vip/pwa'
 
 /**
  * Clubhouse segment (everything served on VIP_HOST — src/proxy.ts rewrites
@@ -7,8 +9,10 @@ import './vip.css'
  * layout renders a bare document with none of the store's pieces).
  *
  * The metadata below replaces every store value inherited from the root:
- * private, never indexed, no store manifest / keywords / OpenGraph / Twitter
- * card. vip/opengraph-image.tsx replaces the store's og image file.
+ * private, never indexed, no store keywords / OpenGraph / Twitter card.
+ * vip/opengraph-image.tsx replaces the store's og image file. The manifest,
+ * icons and service worker are the CLUBHOUSE's own (lib/vip/pwa.ts, served
+ * under names the store does not use — lib/vip/host.ts VIP_PWA_FILES).
  */
 const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL || 'https://vitalityproject.vip'
 
@@ -20,13 +24,14 @@ export const metadata: Metadata = {
   },
   description: null,
   keywords: null,
-  manifest: null,
+  manifest: '/manifest.webmanifest',
   openGraph: null,
   // The store layout sets canonical './'; here that would name the internal
   // rewritten /vip/… path. The clubhouse is noindex — no canonical at all.
   alternates: null,
   twitter: null,
-  appleWebApp: null,
+  appleWebApp: { capable: true, title: 'Clubhouse', statusBarStyle: 'black-translucent' },
+  icons: { apple: '/apple-touch-icon.png' },
   robots: {
     index: false,
     follow: false,
@@ -35,6 +40,13 @@ export const metadata: Metadata = {
   },
   referrer: 'same-origin',
   formatDetection: { telephone: false, email: false, address: false },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: VIP_THEME.theme,
 }
 
 export default function VipLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +59,7 @@ export default function VipLayout({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
       <div className="relative z-[2] min-h-screen">{children}</div>
+      <ClubhouseServiceWorker />
     </>
   )
 }

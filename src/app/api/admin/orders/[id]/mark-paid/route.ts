@@ -12,6 +12,7 @@ import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit } from '@/lib/order-credit'
 import { sendClubhouseWelcome } from '@/lib/vip/mailer'
 import { awardReferralOnFirstPayment } from '@/lib/vip/referrals'
+import { grantTrainingFromOrder, isTrainingInvoice } from '@/lib/vip/training-invoice'
 import { logAudit } from '@/lib/audit'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
@@ -255,6 +256,15 @@ export async function POST(
     } catch (err) {
       console.error('[mark-paid] membership activation failed:', err)
     }
+  } else if (isTrainingInvoice(order.notes)) {
+    // Clubhouse training invoice ("TRAINING:<courseId>:<userId>"): open the
+    // course for the member (exactly once — unique grant). Like memberships,
+    // no fulfilment, stock, loyalty points or affiliate commission.
+    try {
+      await grantTrainingFromOrder(order)
+    } catch (err) {
+      console.error('[mark-paid] training grant failed:', err)
+    }
   } else {
     // Physical-goods order — route to fulfillment + credit affiliate (if any).
     try {
@@ -409,7 +419,7 @@ export async function POST(
   // Admin "go ship this" email — only for physical orders (not memberships).
   // Manual fulfillment phase: this is the trigger telling the owner the
   // money's in hand and the package can go out the door.
-  if (!order.notes?.startsWith(MEMBERSHIP_NOTE_PREFIX)) {
+  if (!order.notes?.startsWith(MEMBERSHIP_NOTE_PREFIX) && !isTrainingInvoice(order.notes)) {
     void (async () => {
       try {
         const adminEmail = process.env.ADMIN_EMAIL

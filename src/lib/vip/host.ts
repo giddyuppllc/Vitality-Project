@@ -89,6 +89,20 @@ const VIP_BLOCKED_API = [/^\/api\/auth\/(register|post-login)(\/|$)/]
 /** .global's PWA files must never be served on .vip (would install the store's worker). */
 const VIP_BLOCKED_FILES = new Set(['/service-worker.js', '/manifest.json', '/sitemap.xml'])
 
+/**
+ * The clubhouse's OWN installable-app files (served by src/app/vip/pwa/[file]).
+ * Different names from the store's, so neither site can pick up the other's
+ * manifest, icons or service worker.
+ */
+export const VIP_PWA_FILES = new Set([
+  '/manifest.webmanifest',
+  '/clubhouse-sw.js',
+  '/app-icon-192.png',
+  '/app-icon-512.png',
+  '/app-icon-maskable-512.png',
+  '/apple-touch-icon.png',
+])
+
 function hasFileExtension(pathname: string): boolean {
   return /\/[^/]+\.[a-z0-9]{1,8}$/i.test(pathname)
 }
@@ -105,6 +119,7 @@ export function routeFor(site: Site, pathname: string): RouteDecision {
   if (pathname.startsWith('/_next/')) return { kind: 'next' }
   if (pathname === '/robots.txt') return { kind: 'rewrite', path: `${VIP_PREFIX}/robots.txt` }
   if (VIP_BLOCKED_FILES.has(pathname)) return { kind: 'not-found' }
+  if (VIP_PWA_FILES.has(pathname)) return { kind: 'rewrite', path: `${VIP_PREFIX}/pwa${pathname}` }
   if (pathname.startsWith('/api/')) {
     if (VIP_BLOCKED_API.some((re) => re.test(pathname))) return { kind: 'not-found' }
     return VIP_PASSTHROUGH_API.some((re) => re.test(pathname)) ? { kind: 'next' } : { kind: 'not-found' }

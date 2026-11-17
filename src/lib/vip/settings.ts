@@ -19,6 +19,10 @@ export const VIP_SETTING_DEFAULTS = {
   'vip.timeZone': 'America/New_York',
   /** Unpaid Zelle orders are cancelled after this many days (credit returned). 0 = never. */
   'zelle.unpaidExpiryDays': 14,
+  /** Academy points (100 points = $1). Each is awarded once per member per item. 0 = off. */
+  'vip.points.lessonComplete': 50,
+  'vip.points.courseComplete': 500,
+  'vip.points.quizPassed': 25,
 } as const
 
 export type VipSettingKey = keyof typeof VIP_SETTING_DEFAULTS
