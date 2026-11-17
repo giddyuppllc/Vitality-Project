@@ -94,9 +94,10 @@ export async function startWorkout(
   return prisma.vipWorkoutLog.create({ data: { userId, title, exerciseOrder: [] } })
 }
 
-async function publishedExercise(exerciseId: string) {
+/** An exercise the member may log: published, or already planned in this workout by the coach. */
+async function publishedExercise(exerciseId: string, plannedIn?: string[]) {
   const ex = await prisma.vipExercise.findUnique({ where: { id: exerciseId }, select: { id: true, published: true, measure: true } })
-  if (!ex || !ex.published) throw new WorkoutError('Exercise not found', 404)
+  if (!ex || (!ex.published && !plannedIn?.includes(exerciseId))) throw new WorkoutError('Exercise not found', 404)
   return ex
 }
 
@@ -136,7 +137,7 @@ function cleanSet(measure: VipExerciseMeasure, s: SetInput) {
 
 export async function addSet(userId: string, logId: string, exerciseId: string, input: SetInput) {
   const log = await openWorkout(userId, logId)
-  const ex = await publishedExercise(exerciseId)
+  const ex = await publishedExercise(exerciseId, log.exerciseOrder)
   const data = cleanSet(ex.measure, input)
   const total = await prisma.vipWorkoutSet.count({ where: { logId: log.id } })
   if (total >= MAX_SETS_PER_WORKOUT) throw new WorkoutError('Set limit reached for this workout', 400)

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { MembershipTier } from '@prisma/client'
 import {
-  Bell, BookOpen, CalendarDays, Gift, Home, LogOut, Search, Shield, Users, UserRound, ExternalLink,
+  Bell, BookOpen, CalendarDays, Dumbbell, Gift, Home, LogOut, Search, Shield, Users, UserRound, ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, TierBadge, Wordmark } from './ui'
@@ -21,6 +21,7 @@ export interface ShellViewer {
 const NAV = [
   { href: '/feed', label: 'Community', icon: Home, community: true },
   { href: '/classroom', label: 'Classroom', icon: BookOpen },
+  { href: '/fitness', label: 'Fitness', icon: Dumbbell },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/members', label: 'Members', icon: Users, community: true },
   { href: '/rewards', label: 'Rewards', icon: Gift },
