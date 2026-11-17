@@ -134,28 +134,49 @@ ${textFooter(a.userId, null)}`
 
 // ─── Daily reply / mention digest ───────────────────────────────────────────
 export interface DigestItem {
-  type: 'REPLY' | 'COMMENT' | 'MENTION'
+  type: 'REPLY' | 'COMMENT' | 'MENTION' | 'FOLLOW' | 'MESSAGE'
   actor: string
+  /** Quoted text (empty for follows and messages — message text never goes in email). */
   snippet: string
-  postId: string
+  postId?: string
+  /** Clubhouse path the item opens (defaults to the post's thread). */
+  path?: string
 }
 
 const DIGEST_VERB: Record<DigestItem['type'], string> = {
   REPLY: 'replied to your comment',
   COMMENT: 'commented on your post',
   MENTION: 'mentioned you',
+  FOLLOW: 'started following you',
+  MESSAGE: 'sent you a message',
 }
+
+const DIGEST_LINK: Record<DigestItem['type'], string> = {
+  REPLY: 'Open the thread →',
+  COMMENT: 'Open the thread →',
+  MENTION: 'Open the thread →',
+  FOLLOW: 'View their profile →',
+  MESSAGE: 'Open messages →',
+}
+
+const digestPath = (it: DigestItem) => it.path ?? `/posts/${encodeURIComponent(it.postId ?? '')}`
 
 export function clubhouseDigestEmail(a: { userId: string; name: string | null; items: DigestItem[]; total: number }): Rendered {
   const base = vipBaseUrl()
   const n = a.total
-  const subject = n === 1 ? `${a.items[0].actor} ${DIGEST_VERB[a.items[0].type]} in the Clubhouse` : `${n} new replies and mentions in the Clubhouse`
+  const conversational = a.items.every((it) => it.type === 'REPLY' || it.type === 'COMMENT' || it.type === 'MENTION')
+  const subject =
+    n === 1
+      ? `${a.items[0].actor} ${DIGEST_VERB[a.items[0].type]} in the Clubhouse`
+      : conversational
+        ? `${n} new replies and mentions in the Clubhouse`
+        : `${n} new notifications in the Clubhouse`
   const rows = a.items
     .map(
       (it, i) => `<div style="padding:${i ? '12px' : '0'} 0 0;${i ? `border-top:1px solid ${C.line};margin-top:12px;` : ''}">
         <div style="font-size:14px;color:#ffffff;"><strong>${esc(it.actor)}</strong> <span style="color:${C.muted};">${DIGEST_VERB[it.type]}</span></div>
-        <div style="font-size:13px;line-height:1.55;color:${C.text};margin:4px 0 6px;">“${esc(it.snippet)}”</div>
-        <a href="${base}/posts/${encodeURIComponent(it.postId)}" style="font-size:13px;font-weight:700;color:${C.accentSoft};text-decoration:none;">Open the thread →</a>
+        ${it.snippet ? `<div style="font-size:13px;line-height:1.55;color:${C.text};margin:4px 0 6px;">“${esc(it.snippet)}”</div>` : '<div style="height:6px;"></div>'}
+        <a href="${base}${esc(digestPath(it))}" style="font-size:13px;font-weight:700;color:${C.accentSoft};text-decoration:none;">${DIGEST_LINK[it.type]}</a>
       </div>`,
     )
     .join('')
@@ -170,7 +191,7 @@ export function clubhouseDigestEmail(a: { userId: string; name: string | null; i
   )
   const text = `Hi ${firstName(a.name)}, the conversation kept going.
 
-${a.items.map((it) => `• ${it.actor} ${DIGEST_VERB[it.type]}: "${it.snippet}"\n  ${base}/posts/${it.postId}`).join('\n')}
+${a.items.map((it) => `• ${it.actor} ${DIGEST_VERB[it.type]}${it.snippet ? `: "${it.snippet}"` : ''}\n  ${base}${digestPath(it)}`).join('\n')}
 ${n > a.items.length ? `\nPlus ${n - a.items.length} more in your notifications.` : ''}
 Open notifications: ${base}/notifications
 ${textFooter(a.userId, 'digest')}`

@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { AtSign, MessageCircle, Reply } from 'lucide-react'
+import { AtSign, MessageCircle, MessageSquare, Reply, UserPlus } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { VIP_COPY } from '@/lib/vip/copy'
 import { requireVipPage } from '@/lib/vip/page-gate'
+import { blockedIdSet } from '@/lib/vip/blocks'
 import { Avatar, EmptyState, PageHeader, timeAgo } from '@/components/vip/ui'
 import { MarkAllRead } from '@/components/vip/mark-all-read'
 import { cn } from '@/lib/utils'
@@ -14,12 +15,24 @@ const TEXT = {
   COMMENT: { icon: MessageCircle, verb: 'commented on your post' },
   REPLY: { icon: Reply, verb: 'replied to your comment' },
   MENTION: { icon: AtSign, verb: 'mentioned you' },
+  FOLLOW: { icon: UserPlus, verb: 'started following you' },
+  MESSAGE: { icon: MessageSquare, verb: 'sent you a message' },
 } as const
+
+function hrefFor(n: { type: string; postId: string | null; actorId: string | null; conversationId: string | null }): string {
+  if (n.type === 'FOLLOW' && n.actorId) return `/members/${n.actorId}`
+  if (n.type === 'MESSAGE' && n.conversationId) return `/messages/${n.conversationId}`
+  return n.postId ? `/posts/${n.postId}` : '/feed'
+}
 
 export default async function NotificationsPage() {
   const viewer = await requireVipPage('community')
+  const hidden = await blockedIdSet(viewer.userId)
   const items = await prisma.vipNotification.findMany({
-    where: { userId: viewer.userId },
+    where: {
+      userId: viewer.userId,
+      ...(hidden.size ? { OR: [{ actorId: null }, { actorId: { notIn: [...hidden] } }] } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take: 50,
   })
@@ -47,7 +60,7 @@ export default async function NotificationsPage() {
           {items.map((n) => {
             const kind = TEXT[n.type as keyof typeof TEXT] ?? TEXT.COMMENT
             const actor = n.actorId ? actors.get(n.actorId) : null
-            const href = n.postId ? `/posts/${n.postId}` : '/feed'
+            const href = hrefFor(n)
             return (
               <li key={n.id}>
                 <Link href={href} className={cn('vip-focus flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.03]', !n.readAt && 'bg-brand-500/[0.07]')}>
