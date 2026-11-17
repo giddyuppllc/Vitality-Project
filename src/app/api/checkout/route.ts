@@ -16,6 +16,7 @@ import { calculateTaxAsync } from '@/lib/tax'
 import { computeCartTotal } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { InsufficientCreditError } from '@/lib/order-credit'
+import { resolveOrderAffiliate } from '@/lib/affiliate-tracking'
 import {
   claimDiscountCodeUse,
   DiscountCodeError,
@@ -484,7 +485,8 @@ export async function POST(req: NextRequest) {
     // Affiliate commission
     const affCode = req.cookies.get('aff_code')?.value
     if (affCode && !locationId) {
-      const affiliate = await prisma.affiliate.findUnique({ where: { code: affCode, status: 'ACTIVE' } })
+      // Never pays an affiliate on their own order (lib/affiliate-tracking.ts).
+      const affiliate = await resolveOrderAffiliate(affCode, { userId: session.user.id, email: data.email })
       if (affiliate) {
         // Gross subtotal, not post-discount/credit total — see comment above
         // and mark-paid (Edward, 2026-06-12).

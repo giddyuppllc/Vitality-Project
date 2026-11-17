@@ -22,6 +22,7 @@ import {
   spendCreditForOrder,
 } from '@/lib/order-credit'
 import { InsufficientPointsError, redeemPointsInTx } from '@/lib/loyalty'
+import { resolveOrderAffiliate } from '@/lib/affiliate-tracking'
 import {
   claimDiscountCodeUse,
   DiscountCodeError,
@@ -368,12 +369,11 @@ export async function POST(req: NextRequest) {
     const affCode = req.cookies.get('aff_code')?.value
     let resolvedAffiliateId: string | null = null
     let resolvedAffiliateCode: string | null = null
+    // An affiliate never earns on their own order (lib/affiliate-tracking.ts).
+    const buyer = { userId, email: data.email }
     if (affCode && !locationId) {
-      const aff = await prisma.affiliate.findUnique({
-        where: { code: affCode.toUpperCase() },
-        select: { id: true, code: true, status: true },
-      })
-      if (aff && aff.status === 'ACTIVE') {
+      const aff = await resolveOrderAffiliate(affCode, buyer)
+      if (aff) {
         resolvedAffiliateId = aff.id
         resolvedAffiliateCode = aff.code
       }
@@ -384,16 +384,10 @@ export async function POST(req: NextRequest) {
     // share their code, not a link). Trim + uppercase so a stray space doesn't
     // silently drop the attribution. The code can double as a discount or not.
     if (!resolvedAffiliateId && !locationId && data.discountCode) {
-      const typed = data.discountCode.trim().toUpperCase()
-      if (typed) {
-        const aff = await prisma.affiliate.findUnique({
-          where: { code: typed },
-          select: { id: true, code: true, status: true },
-        })
-        if (aff && aff.status === 'ACTIVE') {
-          resolvedAffiliateId = aff.id
-          resolvedAffiliateCode = aff.code
-        }
+      const aff = await resolveOrderAffiliate(data.discountCode, buyer)
+      if (aff) {
+        resolvedAffiliateId = aff.id
+        resolvedAffiliateCode = aff.code
       }
     }
 
