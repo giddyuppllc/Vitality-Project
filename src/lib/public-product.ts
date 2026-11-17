@@ -22,7 +22,7 @@ export const PUBLIC_PRODUCT_SELECT = {
   images: { orderBy: { position: 'asc' }, take: 1, select: { url: true, alt: true } },
   category: { select: { name: true, slug: true } },
   // Needed to show the price checkout actually charges (lib/display-price).
-  variants: { select: { price: true }, orderBy: { price: 'asc' } },
+  variants: { select: { id: true, name: true, price: true }, orderBy: { price: 'asc' } },
 } satisfies Prisma.ProductSelect
 
 /** Parse a `?limit=` query value: default when absent/garbage, clamped to [1, max]. */

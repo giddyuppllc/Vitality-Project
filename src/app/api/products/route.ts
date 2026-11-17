@@ -9,9 +9,13 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category')
   const search = searchParams.get('search')
   const limit = parseLimit(searchParams.get('limit'), 20, 100)
+  // ?ids=a,b,c — current data for specific products (the wishlist page uses
+  // it to price saved items and add the right size to the cart).
+  const ids = (searchParams.get('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 100)
 
   const where: any = { status: 'ACTIVE' }
   if (category) where.category = { slug: category }
+  if (ids.length > 0) where.id = { in: ids }
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
@@ -22,7 +26,7 @@ export async function GET(req: NextRequest) {
   const products = await prisma.product.findMany({
     where,
     select: PUBLIC_PRODUCT_SELECT,
-    take: limit,
+    take: ids.length > 0 ? ids.length : limit,
     orderBy: { featured: 'desc' },
   })
 
