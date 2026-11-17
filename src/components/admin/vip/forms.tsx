@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { parseMoneyToCents } from '@/lib/money'
 import { adminInput } from './admin-vip-ui'
+import { ImageField } from './image-field'
 
 type Tier = 'CLUB' | 'PLUS' | 'PREMIUM'
 const TIER_OPTIONS: { value: Tier; label: string }[] = [
@@ -227,10 +228,7 @@ export function CourseForm({
         <textarea className={`${adminInput} mt-1`} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={2000} />
       </label>
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
-        <label className={label}>
-          Cover image URL (optional, https)
-          <input className={`${adminInput} mt-1`} value={coverImage} onChange={(e) => setCoverImage(e.target.value)} maxLength={500} />
-        </label>
+        <ImageField value={coverImage} onChange={setCoverImage} labelText="Cover image (optional)" />
         <label className={label}>
           Sort
           <input className={`${adminInput} mt-1`} type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />

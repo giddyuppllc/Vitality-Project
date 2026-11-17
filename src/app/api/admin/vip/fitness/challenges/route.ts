@@ -5,7 +5,7 @@ import { requireAdminApi } from '@/lib/vip/access'
 import { logAudit } from '@/lib/audit'
 import { isValidDate } from '@/lib/vip/fitness/dates'
 import { evaluateChallenge } from '@/lib/vip/fitness/challenges'
-import { AdminInputError, adminError, cleanSlug, id, optionalUrl, parseAdmin, tier } from '@/lib/vip/fitness/admin-api'
+import { AdminInputError, adminError, cleanSlug, id, optionalImage, parseAdmin, tier } from '@/lib/vip/fitness/admin-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +18,7 @@ const schema = z.discriminatedUnion('op', [
     title: z.string().trim().min(1).max(160),
     slug: z.string().trim().max(80).optional(),
     description: z.string().max(20_000).default(''),
-    coverImage: optionalUrl,
+    coverImage: optionalImage,
     metric: z.enum(['WORKOUTS', 'STEPS', 'CHECKIN_STREAK', 'CUSTOM_POINTS']),
     target: z.number().int().min(1).max(100_000_000),
     startDate: date,

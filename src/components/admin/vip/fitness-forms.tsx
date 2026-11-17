@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminInput } from './admin-vip-ui'
+import { ImageField } from './image-field'
 
 /**
  * Clubhouse admin — fitness, health & lifestyle forms (client components).
@@ -213,10 +214,7 @@ export function ExerciseForm({ exercise }: { exercise?: AdminExercise }) {
           <input className={`${adminInput} mt-1`} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} maxLength={500} />
         </label>
       </div>
-      <label className={label}>
-        Image URL (optional, https)
-        <input className={`${adminInput} mt-1`} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} maxLength={500} />
-      </label>
+      <ImageField value={imageUrl} onChange={setImageUrl} labelText="Image (optional)" />
       <label className={label}>
         Instructions — supports # headings, - lists, 1. lists, **bold**, *italic*, [link](https://…)
         <textarea className={`${adminInput} mt-1 font-mono`} rows={6} value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={20000} />
@@ -312,10 +310,7 @@ export function ProgramForm({ program }: { program?: AdminProgram }) {
         Description — supports # headings, - lists, **bold**, *italic*, [link](https://…)
         <textarea className={`${adminInput} mt-1 font-mono`} rows={5} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={20000} />
       </label>
-      <label className={label}>
-        Cover image URL (optional, https)
-        <input className={`${adminInput} mt-1`} value={coverImage} onChange={(e) => setCoverImage(e.target.value)} maxLength={500} />
-      </label>
+      <ImageField value={coverImage} onChange={setCoverImage} labelText="Cover image (optional)" />
       <label className="flex items-center gap-2 text-sm text-white/70">
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="accent-brand-500" />
         Published (visible to members)
@@ -714,10 +709,7 @@ export function ChallengeForm({
         Description — supports # headings, - lists, **bold**, *italic*, [link](https://…)
         <textarea className={`${adminInput} mt-1 font-mono`} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={20000} />
       </label>
-      <label className={label}>
-        Cover image URL (optional, https)
-        <input className={`${adminInput} mt-1`} value={coverImage} onChange={(e) => setCoverImage(e.target.value)} maxLength={500} />
-      </label>
+      <ImageField value={coverImage} onChange={setCoverImage} labelText="Cover image (optional)" />
       <label className="flex items-center gap-2 text-sm text-white/70">
         <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="accent-brand-500" />
         Published (members can see and join)
@@ -820,10 +812,7 @@ export function ArticleForm({ article, categories }: { article?: AdminArticle; c
         Summary (optional, shown on the card)
         <textarea className={`${adminInput} mt-1`} rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={1000} />
       </label>
-      <label className={label}>
-        Cover image URL (optional, https)
-        <input className={`${adminInput} mt-1`} value={coverImage} onChange={(e) => setCoverImage(e.target.value)} maxLength={500} />
-      </label>
+      <ImageField value={coverImage} onChange={setCoverImage} labelText="Cover image (optional)" />
       {article && (
         <label className={label}>
           Body — supports # headings, - lists, 1. lists, **bold**, *italic*, [link](https://…)

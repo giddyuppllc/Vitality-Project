@@ -48,6 +48,7 @@ import * as adminRedemptions from '@/app/api/admin/vip/rewards/redemptions/route
 import * as adminEarning from '@/app/api/admin/vip/rewards/earning/route'
 import * as adminPoints from '@/app/api/admin/vip/rewards/points/route'
 import * as adminUpload from '@/app/api/admin/vip/rewards/upload/route'
+import * as adminImages from '@/app/api/admin/vip/images/route'
 import * as adminPartners from '@/app/api/admin/vip/partners/route'
 import * as adminStatements from '@/app/api/admin/vip/partners/statements/route'
 // Academy / Library / Events upgrade (vip/academy)
@@ -194,6 +195,7 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'GET points', run: () => h(adminPoints.GET)(req('/api/admin/vip/rewards/points?q=x'), ctx({})) },
   { name: 'POST points', run: () => h(adminPoints.POST)(req('/api/admin/vip/rewards/points', { body: { member: 'x@example.invalid', points: 5, reason: 'gate', clickKey: 'gate-test-key' } }), ctx({})) },
   { name: 'POST upload', run: () => h(adminUpload.POST)(req('/api/admin/vip/rewards/upload', { body: {} }), ctx({})) },
+  { name: 'POST images', run: () => h(adminImages.POST)(req('/api/admin/vip/images', { body: {} }), ctx({})) },
   { name: 'GET partners', run: () => h(adminPartners.GET)(req('/api/admin/vip/partners'), ctx({})) },
   { name: 'POST partners', run: () => h(adminPartners.POST)(req('/api/admin/vip/partners', { body: { op: 'staff.remove', id: 'x' } }), ctx({})) },
   { name: 'GET statements', run: () => h(adminStatements.GET)(req('/api/admin/vip/partners/statements'), ctx({})) },

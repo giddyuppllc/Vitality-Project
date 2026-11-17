@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminApi } from '@/lib/vip/access'
 import { logAudit } from '@/lib/audit'
 import { normaliseTags } from '@/lib/vip/fitness/exercises'
-import { AdminInputError, adminError, cleanSlug, id, optionalUrl, parseAdmin } from '@/lib/vip/fitness/admin-api'
+import { AdminInputError, adminError, cleanSlug, id, optionalImage, optionalUrl, parseAdmin } from '@/lib/vip/fitness/admin-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +21,7 @@ const schema = z.discriminatedUnion('op', [
     measure: z.enum(['WEIGHT_REPS', 'REPS', 'TIME']),
     instructions: z.string().max(20_000),
     videoUrl: optionalUrl,
-    imageUrl: optionalUrl,
+    imageUrl: optionalImage,
     published: z.boolean(),
   }),
   z.object({ op: z.literal('exercise.delete'), id }),

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdminApi } from '@/lib/vip/access'
 import { logAudit } from '@/lib/audit'
-import { AdminInputError, adminError, cleanSlug, id, optionalUrl, parseAdmin, sort, tier } from '@/lib/vip/fitness/admin-api'
+import { AdminInputError, adminError, cleanSlug, id, optionalImage, parseAdmin, sort, tier } from '@/lib/vip/fitness/admin-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ const schema = z.discriminatedUnion('op', [
     slug: z.string().trim().max(80).optional(),
     summary: text(2000),
     description: z.string().max(20_000).default(''),
-    coverImage: optionalUrl,
+    coverImage: optionalImage,
     level: text(40),
     minTier: tier,
     published: z.boolean(),

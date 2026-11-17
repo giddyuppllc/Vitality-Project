@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Loader2, Upload } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { adminInput } from './admin-vip-ui'
+import { ImageField } from './image-field'
 
 /* Admin forms for the points economy and partner network
    (/admin/vip/rewards/*, /admin/vip/partners/*). Every call goes to an
@@ -53,45 +54,6 @@ const label = 'block text-sm text-white/60'
 const toInt = (v: string) => (v.trim() === '' ? null : Math.round(Number(v)))
 const toCents = (v: string) => (v.trim() === '' ? null : Math.round(Number(v) * 100))
 const clickKey = () => `ak_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
-
-// ─── Image upload ─────────────────────────────────────────────────────────
-
-function ImageField({ value, onChange, labelText }: { value: string; onChange: (v: string) => void; labelText: string }) {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  return (
-    <div className={label}>
-      {labelText}
-      <div className="mt-1 flex gap-2">
-        <input aria-label={labelText} className={adminInput} value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://… or upload" maxLength={500} />
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-white/5 px-3 text-xs text-white/70 hover:bg-white/10">
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Upload className="h-3.5 w-3.5" aria-hidden="true" />}
-          Upload
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={async (e) => {
-              const f = e.target.files?.[0]
-              if (!f) return
-              setBusy(true)
-              setErr(null)
-              const fd = new FormData()
-              fd.append('file', f)
-              const res = await fetch('/api/admin/vip/rewards/upload', { method: 'POST', body: fd })
-              const data = await res.json().catch(() => ({}))
-              setBusy(false)
-              if (!res.ok) return setErr(data.error || 'Upload failed')
-              onChange(data.url)
-            }}
-          />
-        </label>
-      </div>
-      {value.startsWith('/api/vip/media/') && <p className="mt-1 text-xs text-white/40">Uploaded — shown to members on vitalityproject.vip.</p>}
-      {err && <p className="mt-1 text-xs text-red-300">{err}</p>}
-    </div>
-  )
-}
 
 // ─── Catalog ──────────────────────────────────────────────────────────────
 

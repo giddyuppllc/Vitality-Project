@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminApi } from '@/lib/vip/access'
 import { slugify } from '@/lib/utils'
 import { logAudit } from '@/lib/audit'
+import { isVipMediaUrl } from '@/lib/vip/media'
 import { finishCourseIfComplete } from '@/lib/vip/academy'
 import { grantTrainingAccess } from '@/lib/vip/course-grants'
 
@@ -30,7 +31,12 @@ const schema = z.discriminatedUnion('op', [
     title: z.string().trim().min(1).max(160),
     slug: z.string().trim().max(80).optional(),
     summary: z.string().trim().max(2000).nullish(),
-    coverImage: optionalUrl,
+    coverImage: z
+      .string()
+      .trim()
+      .max(500)
+      .refine((v) => v === '' || /^https:\/\//i.test(v) || isVipMediaUrl(v), 'Cover must be an https link or an uploaded image')
+      .nullish(),
     minTier: tier,
     published: z.boolean(),
     sortOrder: z.number().int().min(-1000).max(1000).optional(),

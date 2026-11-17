@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { slugify } from '@/lib/utils'
+import { isVipMediaUrl } from '@/lib/vip/media'
 
 /** Shared bits for the /api/admin/vip/fitness/* routes (ADMIN only, audit-logged). */
 
@@ -12,6 +13,13 @@ export const optionalUrl = z
   .trim()
   .max(500)
   .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Must be an http(s) link')
+  .nullish()
+/** A picture: '' / an https link / an image uploaded to the clubhouse media store (/api/admin/vip/images). */
+export const optionalImage = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((v) => v === '' || /^https:\/\//i.test(v) || isVipMediaUrl(v), 'Must be an https link or an uploaded image')
   .nullish()
 export const sort = z.number().int().min(-1000).max(1000).optional()
 
