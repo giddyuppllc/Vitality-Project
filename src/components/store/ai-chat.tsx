@@ -118,7 +118,10 @@ export function AiChat() {
       )}
 
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-label={open ? 'Close chat' : 'Chat with Vita'}
+        aria-expanded={open}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-brand-500 shadow-lg shadow-brand-500/30 flex items-center justify-center hover:bg-brand-600 transition-all hover:scale-105"
       >
         {open ? <X className="w-5 h-5 text-white" /> : <MessageSquare className="w-5 h-5 text-white" />}

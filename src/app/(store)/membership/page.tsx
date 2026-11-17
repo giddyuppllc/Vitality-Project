@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonClasses } from '@/components/ui/button'
 import { Sparkles, Check, Zap, Shield, Package, Star, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
@@ -172,11 +172,9 @@ function MembershipPageInner() {
               </a>
             </div>
           )}
-          <Link href="/products">
-            <Button variant="secondary">
+          <Link href="/products" className={buttonClasses({ variant: 'secondary' })}>
               Browse the Catalog <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
+            </Link>
         </div>
       </div>
     )

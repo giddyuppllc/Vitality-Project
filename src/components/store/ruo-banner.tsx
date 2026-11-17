@@ -27,7 +27,7 @@ export function RuoBanner() {
             <strong className="text-white/80">Research Use Only.</strong> All products are strictly for laboratory and research purposes. Not for human consumption. Not evaluated or approved by the FDA.
           </span>
         </div>
-        <button onClick={dismiss} className="text-white/30 hover:text-white transition-colors shrink-0 p-1">
+        <button type="button" onClick={dismiss} aria-label="Dismiss notice" className="text-white/30 hover:text-white transition-colors shrink-0 p-2 -m-1">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>

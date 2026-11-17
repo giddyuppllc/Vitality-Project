@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonClasses } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Link2, TrendingUp, DollarSign, BarChart2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -91,12 +91,8 @@ export default function AffiliatePage() {
               <h2 className="text-xl font-bold mb-3">Ready to Join?</h2>
               <p className="text-white/50 mb-6">Create an account to apply to our affiliate program.</p>
               <div className="flex gap-3">
-                <Link href="/auth/register" className="flex-1">
-                  <Button className="w-full">Create Account</Button>
-                </Link>
-                <Link href="/auth/login" className="flex-1">
-                  <Button variant="secondary" className="w-full">Sign In</Button>
-                </Link>
+                <Link href="/auth/register" className={buttonClasses({ className: 'flex-1 w-full' })}>Create Account</Link>
+                <Link href="/auth/login" className={buttonClasses({ variant: 'secondary', className: 'flex-1 w-full' })}>Sign In</Link>
               </div>
             </>
           )}
