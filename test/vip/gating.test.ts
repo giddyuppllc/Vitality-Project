@@ -29,6 +29,26 @@ import * as adminModeration from '@/app/api/admin/vip/moderation/route'
 import * as adminClassroom from '@/app/api/admin/vip/classroom/route'
 import * as adminEvents from '@/app/api/admin/vip/events/route'
 import * as adminRewards from '@/app/api/admin/vip/rewards/route'
+import * as fitPrefs from '@/app/api/vip/fitness/prefs/route'
+import * as fitProgram from '@/app/api/vip/fitness/programs/[id]/route'
+import * as fitWorkouts from '@/app/api/vip/fitness/workouts/route'
+import * as fitWorkout from '@/app/api/vip/fitness/workouts/[id]/route'
+import * as fitWorkoutExercises from '@/app/api/vip/fitness/workouts/[id]/exercises/route'
+import * as fitSets from '@/app/api/vip/fitness/workouts/[id]/sets/route'
+import * as fitSet from '@/app/api/vip/fitness/workouts/[id]/sets/[setId]/route'
+import * as fitFinish from '@/app/api/vip/fitness/workouts/[id]/finish/route'
+import * as fitCheckins from '@/app/api/vip/fitness/checkins/route'
+import * as fitMetrics from '@/app/api/vip/fitness/metrics/route'
+import * as fitMetric from '@/app/api/vip/fitness/metrics/[id]/route'
+import * as fitPhotos from '@/app/api/vip/fitness/photos/route'
+import * as fitPhoto from '@/app/api/vip/fitness/photos/[id]/route'
+import * as fitChallenge from '@/app/api/vip/fitness/challenges/[id]/route'
+import * as fitExercises from '@/app/api/vip/fitness/exercises/route'
+import * as adminFitExercises from '@/app/api/admin/vip/fitness/exercises/route'
+import * as adminFitPrograms from '@/app/api/admin/vip/fitness/programs/route'
+import * as adminFitChallenges from '@/app/api/admin/vip/fitness/challenges/route'
+import * as adminFitArticles from '@/app/api/admin/vip/fitness/articles/route'
+import * as adminFitSettings from '@/app/api/admin/vip/fitness/settings/route'
 
 type Handler = (r: NextRequest, ctx: { params: Promise<Record<string, unknown>> }) => Promise<Response>
 type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response> }
@@ -63,6 +83,32 @@ const CASES: Case[] = [
   { name: 'GET /email-prefs', gate: 'member', run: () => h(emailPrefs.GET)(req('/api/vip/email-prefs'), ctx({})) },
   { name: 'PATCH /email-prefs', gate: 'member', run: () => h(emailPrefs.PATCH)(req('/api/vip/email-prefs', { method: 'PATCH', body: { emailDigest: true } }), ctx({})) },
   { name: 'POST /onboarding', gate: 'member', run: () => h(onboarding.POST)(req('/api/vip/onboarding', { method: 'POST' }), ctx({})) },
+  // Fitness, health & lifestyle (member gate: suspension from the community keeps them).
+  { name: 'GET /fitness/prefs', gate: 'member', run: () => h(fitPrefs.GET)(req('/api/vip/fitness/prefs'), ctx({})) },
+  { name: 'PATCH /fitness/prefs', gate: 'member', run: () => h(fitPrefs.PATCH)(req('/api/vip/fitness/prefs', { method: 'PATCH', body: { units: 'IMPERIAL' } }), ctx({})) },
+  { name: 'POST /fitness/programs/:id', gate: 'member', run: () => h(fitProgram.POST)(req('/api/vip/fitness/programs/missing', { body: { action: 'enroll' } }), ctx({ id: 'missing' })) },
+  { name: 'GET /fitness/workouts', gate: 'member', run: () => h(fitWorkouts.GET)(req('/api/vip/fitness/workouts'), ctx({})) },
+  { name: 'POST /fitness/workouts', gate: 'member', run: () => h(fitWorkouts.POST)(req('/api/vip/fitness/workouts', { body: { programDayId: 'missing' } }), ctx({})) },
+  { name: 'GET /fitness/workouts/:id', gate: 'member', run: () => h(fitWorkout.GET)(req('/api/vip/fitness/workouts/missing'), ctx({ id: 'missing' })) },
+  { name: 'PATCH /fitness/workouts/:id', gate: 'member', run: () => h(fitWorkout.PATCH)(req('/api/vip/fitness/workouts/missing', { method: 'PATCH', body: { title: 'x' } }), ctx({ id: 'missing' })) },
+  { name: 'DELETE /fitness/workouts/:id', gate: 'member', run: () => h(fitWorkout.DELETE)(req('/api/vip/fitness/workouts/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'POST /fitness/workouts/:id/exercises', gate: 'member', run: () => h(fitWorkoutExercises.POST)(req('/api/vip/fitness/workouts/missing/exercises', { body: { exerciseId: 'x' } }), ctx({ id: 'missing' })) },
+  { name: 'DELETE /fitness/workouts/:id/exercises', gate: 'member', run: () => h(fitWorkoutExercises.DELETE)(req('/api/vip/fitness/workouts/missing/exercises', { method: 'DELETE', body: { exerciseId: 'x' } }), ctx({ id: 'missing' })) },
+  { name: 'POST /fitness/workouts/:id/sets', gate: 'member', run: () => h(fitSets.POST)(req('/api/vip/fitness/workouts/missing/sets', { body: { exerciseId: 'x', reps: 5 } }), ctx({ id: 'missing' })) },
+  { name: 'PATCH /fitness/workouts/:id/sets/:setId', gate: 'member', run: () => h(fitSet.PATCH)(req('/api/vip/fitness/workouts/missing/sets/x', { method: 'PATCH', body: { reps: 5 } }), ctx({ id: 'missing', setId: 'x' })) },
+  { name: 'DELETE /fitness/workouts/:id/sets/:setId', gate: 'member', run: () => h(fitSet.DELETE)(req('/api/vip/fitness/workouts/missing/sets/x', { method: 'DELETE' }), ctx({ id: 'missing', setId: 'x' })) },
+  { name: 'POST /fitness/workouts/:id/finish', gate: 'member', run: () => h(fitFinish.POST)(req('/api/vip/fitness/workouts/missing/finish', { body: {} }), ctx({ id: 'missing' })) },
+  { name: 'GET /fitness/checkins', gate: 'member', run: () => h(fitCheckins.GET)(req('/api/vip/fitness/checkins'), ctx({})) },
+  { name: 'PUT /fitness/checkins', gate: 'member', run: () => h(fitCheckins.PUT)(req('/api/vip/fitness/checkins', { method: 'PUT', body: { mood: 3 } }), ctx({})) },
+  { name: 'GET /fitness/metrics', gate: 'member', run: () => h(fitMetrics.GET)(req('/api/vip/fitness/metrics'), ctx({})) },
+  { name: 'PUT /fitness/metrics', gate: 'member', run: () => h(fitMetrics.PUT)(req('/api/vip/fitness/metrics', { method: 'PUT', body: { date: new Date(Date.now() - 3 * 86400e3).toISOString().slice(0, 10), weight: 150 } }), ctx({})) },
+  { name: 'DELETE /fitness/metrics/:id', gate: 'member', run: () => h(fitMetric.DELETE)(req('/api/vip/fitness/metrics/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'GET /fitness/photos', gate: 'member', run: () => h(fitPhotos.GET)(req('/api/vip/fitness/photos'), ctx({})) },
+  { name: 'GET /fitness/photos/:id', gate: 'member', run: () => h(fitPhoto.GET)(req('/api/vip/fitness/photos/missing'), ctx({ id: 'missing' })) },
+  { name: 'DELETE /fitness/photos/:id', gate: 'member', run: () => h(fitPhoto.DELETE)(req('/api/vip/fitness/photos/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'GET /fitness/challenges/:id', gate: 'member', run: () => h(fitChallenge.GET)(req('/api/vip/fitness/challenges/missing'), ctx({ id: 'missing' })) },
+  { name: 'POST /fitness/challenges/:id', gate: 'member', run: () => h(fitChallenge.POST)(req('/api/vip/fitness/challenges/missing', { body: { action: 'join' } }), ctx({ id: 'missing' })) },
+  { name: 'GET /fitness/exercises', gate: 'member', run: () => h(fitExercises.GET)(req('/api/vip/fitness/exercises'), ctx({})) },
 ]
 
 const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
@@ -76,6 +122,12 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'PUT rewards', run: () => h(adminRewards.PUT)(req('/api/admin/vip/rewards', { method: 'PUT', body: { CLUB: 1, PLUS: 1, PREMIUM: 1 } }), ctx({})) },
   { name: 'GET settings', run: () => h(adminSettings.GET)(req('/api/admin/vip/settings'), ctx({})) },
   { name: 'PUT settings', run: () => h(adminSettings.PUT)(req('/api/admin/vip/settings', { method: 'PUT', body: { 'vip.digestHourUtc': 13 } }), ctx({})) },
+  { name: 'POST fitness exercises', run: () => h(adminFitExercises.POST)(req('/api/admin/vip/fitness/exercises', { body: { op: 'exercise.delete', id: 'x' } }), ctx({})) },
+  { name: 'POST fitness programs', run: () => h(adminFitPrograms.POST)(req('/api/admin/vip/fitness/programs', { body: { op: 'program.delete', id: 'x' } }), ctx({})) },
+  { name: 'POST fitness challenges', run: () => h(adminFitChallenges.POST)(req('/api/admin/vip/fitness/challenges', { body: { op: 'challenge.delete', id: 'x' } }), ctx({})) },
+  { name: 'POST fitness articles', run: () => h(adminFitArticles.POST)(req('/api/admin/vip/fitness/articles', { body: { op: 'article.delete', id: 'x' } }), ctx({})) },
+  { name: 'GET fitness settings', run: () => h(adminFitSettings.GET)(req('/api/admin/vip/fitness/settings'), ctx({})) },
+  { name: 'PUT fitness settings', run: () => h(adminFitSettings.PUT)(req('/api/admin/vip/fitness/settings', { method: 'PUT', body: {} }), ctx({})) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -115,6 +167,11 @@ describe('members-only gating — every clubhouse API', () => {
         'members/route.ts', 'notifications/route.ts', 'posts/[id]/comments/route.ts', 'posts/[id]/route.ts', 'posts/route.ts',
         'profile/route.ts', 'reactions/route.ts', 'reports/route.ts', 'rewards/route.ts', 'uploads/route.ts',
         'email-prefs/route.ts', 'onboarding/route.ts',
+        'fitness/challenges/[id]/route.ts', 'fitness/checkins/route.ts', 'fitness/exercises/route.ts', 'fitness/metrics/[id]/route.ts',
+        'fitness/metrics/route.ts', 'fitness/photos/[id]/route.ts', 'fitness/photos/route.ts', 'fitness/prefs/route.ts',
+        'fitness/programs/[id]/route.ts', 'fitness/workouts/[id]/exercises/route.ts', 'fitness/workouts/[id]/finish/route.ts',
+        'fitness/workouts/[id]/route.ts', 'fitness/workouts/[id]/sets/[setId]/route.ts', 'fitness/workouts/[id]/sets/route.ts',
+        'fitness/workouts/route.ts',
       ].sort(),
     )
   })
