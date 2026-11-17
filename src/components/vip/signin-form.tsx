@@ -27,7 +27,7 @@ export function SignInForm() {
         setBusy(false)
         return
       }
-      router.replace('/feed')
+      router.replace('/dashboard')
       router.refresh()
     } catch {
       setError('Network error — try again.')

@@ -10,7 +10,7 @@ export const metadata = { title: 'Community access paused' }
 export default async function SuspendedPage() {
   const viewer = await getVipViewer()
   if (!viewer) redirect('/signin')
-  if (!viewer.suspended) redirect('/feed')
+  if (!viewer.suspended) redirect('/dashboard')
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
       <Wordmark />

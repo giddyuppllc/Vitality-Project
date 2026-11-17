@@ -143,3 +143,27 @@ body.vip-theme::after {
 .vip-theme .text-white\/45 {
   color: rgb(255 255 255 / 0.6);
 }
+
+/* ── Academy / shell additions (vip/academy) ───────────────────────────── */
+
+/* Mobile "More" sheet slides up; still for reduced-motion users. */
+@keyframes vip-sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.vip-sheet { animation: vip-sheet-in 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .vip-sheet { animation: none; }
+}
+
+/* Progress ring (course detail, dashboard). */
+.vip-ring-track { stroke: rgba(255, 255, 255, 0.1); }
+.vip-ring-value { stroke: #4aa3f7; transition: stroke-dashoffset 400ms ease; }
+.vip-ring-done .vip-ring-value { stroke: #6ee7b7; }
+
+/* Printing (certificates): the clubhouse chrome never prints. */
+@media print {
+  .vip-no-print { display: none !important; }
+  body.vip-theme::before, body.vip-theme::after { display: none !important; }
+  body.vip-theme { background: #fff !important; color: #0b1322 !important; }
+}

@@ -34,7 +34,9 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
         isAdmin: viewer.isAdmin,
         suspended: viewer.suspended,
       }}
-      unread={unread}
+      // One counter per nav badge (lib/vip/nav.ts). `messages` is filled by
+      // the messaging feature when it lands; 0 renders no badge.
+      badges={{ notifications: unread, messages: 0 }}
       spaces={spaces.map((s) => ({ slug: s.slug, name: s.name }))}
       shopUrl={GLOBAL_LINKS.shop()}
       adminUrl={viewer.isAdmin ? globalUrl('/admin/vip') : null}

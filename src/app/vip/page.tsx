@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic'
  */
 export default async function VipLanding() {
   const viewer = await getVipViewer()
-  if (viewer?.isMember) redirect(viewer.suspended ? '/classroom' : '/feed')
+  if (viewer?.isMember) redirect('/dashboard')
 
   const [credits, expiryMonths] = await Promise.all([getTierRewardSettings(), getVipSetting('vip.rewardExpiryMonths')])
   const L = VIP_COPY.landing

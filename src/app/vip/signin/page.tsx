@@ -16,7 +16,7 @@ const ERRORS: Record<string, string> = {
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const viewer = await getVipViewer()
-  if (viewer?.isMember) redirect('/feed')
+  if (viewer?.isMember) redirect('/dashboard')
   const { error } = await searchParams
 
   return (
