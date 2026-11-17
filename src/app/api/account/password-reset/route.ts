@@ -13,24 +13,28 @@ const schema = z.object({
 /**
  * Generic response — never leak whether the email exists (prevents enumeration).
  */
-const GENERIC_RESPONSE = NextResponse.json({
-  success: true,
-  message: 'If that email is registered, a reset link is on its way.',
-})
+// A function, not a module-level Response: a Response body can be read once,
+// so the shared instance answered the 2nd+ request in each server process with
+// an EMPTY body (reproduced locally: request 1 had JSON, requests 2-3 had none).
+const genericResponse = () =>
+  NextResponse.json({
+    success: true,
+    message: 'If that email is registered, a reset link is on its way.',
+  })
 
 export async function POST(req: NextRequest) {
   // Throttle reset requests per IP — deters reset-email spam / enumeration
   // probing. Return the same generic body on limit so we still don't leak
   // whether the email exists.
   const limited = checkRateLimit(req, 'password-reset', { limit: 5, windowMs: 60_000 })
-  if (!limited.allowed) return GENERIC_RESPONSE
+  if (!limited.allowed) return genericResponse()
 
   try {
     const body = await req.json().catch(() => ({}))
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
       // Even validation errors return the generic message to prevent probing
-      return GENERIC_RESPONSE
+      return genericResponse()
     }
     const email = parsed.data.email.toLowerCase()
 
@@ -71,8 +75,8 @@ export async function POST(req: NextRequest) {
       })()
     }
 
-    return GENERIC_RESPONSE
+    return genericResponse()
   } catch {
-    return GENERIC_RESPONSE
+    return genericResponse()
   }
 }
