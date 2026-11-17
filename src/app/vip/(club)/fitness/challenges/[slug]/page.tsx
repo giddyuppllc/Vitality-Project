@@ -11,8 +11,10 @@ import { renderLessonMarkdown } from '@/lib/vip/text'
 import { cn } from '@/lib/utils'
 import { Avatar, TierBadge } from '@/components/vip/ui'
 import { FitnessTabs } from '@/components/vip/fitness/tabs'
+import { LeaderboardToggle } from '@/components/vip/rewards/leaderboard-toggle'
+import { REWARDS_COPY } from '@/lib/vip/rewards-copy'
 import { BackLink, LockedNotice, SectionTitle, Tag } from '@/components/vip/fitness/bits'
-import { ChallengeJoinButton, LeaderboardVisibility } from '@/components/vip/fitness/actions'
+import { ChallengeJoinButton } from '@/components/vip/fitness/actions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Challenge' }
@@ -141,9 +143,9 @@ export default async function ChallengePage({ params }: { params: Promise<{ slug
           ))}
         </ol>
       )}
-      <section className="vip-surface mt-4 p-5">
-        <LeaderboardVisibility hidden={prefs.hideFromLeaderboards} />
-      </section>
+      <div className="mt-4">
+        <LeaderboardToggle initial={prefs.hideFromLeaderboards} label={REWARDS_COPY.hideLabel} help={REWARDS_COPY.hideHelp} />
+      </div>
     </div>
   )
 }

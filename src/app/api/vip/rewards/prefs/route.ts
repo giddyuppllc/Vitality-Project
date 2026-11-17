@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
+import { isHiddenFromLeaderboards, setHiddenFromLeaderboards } from '@/lib/vip/leaderboards'
 import { requireVipApi, vipJson } from '@/lib/vip/access'
 
 export const dynamic = 'force-dynamic'
@@ -11,20 +11,15 @@ const schema = z.object({ hideFromLeaderboards: z.boolean() })
 export async function GET() {
   const gate = await requireVipApi('member')
   if (gate.response) return gate.response
-  const p = await prisma.vipProfile.findUnique({ where: { userId: gate.viewer.userId }, select: { hideFromLeaderboards: true } })
-  return vipJson({ hideFromLeaderboards: p?.hideFromLeaderboards ?? false })
+  return vipJson({ hideFromLeaderboards: await isHiddenFromLeaderboards(gate.viewer.userId) })
 }
 
-/** PATCH /api/vip/rewards/prefs — {hideFromLeaderboards} ("hide me from leaderboards"). */
+/** PATCH /api/vip/rewards/prefs — {hideFromLeaderboards}: the ONE "hide me from leaderboards" switch (lib/vip/leaderboards.ts). */
 export async function PATCH(req: NextRequest) {
   const gate = await requireVipApi('member')
   if (gate.response) return gate.response
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return vipJson({ error: 'Invalid preference' }, { status: 400 })
-  await prisma.vipProfile.upsert({
-    where: { userId: gate.viewer.userId },
-    update: { hideFromLeaderboards: parsed.data.hideFromLeaderboards },
-    create: { userId: gate.viewer.userId, hideFromLeaderboards: parsed.data.hideFromLeaderboards },
-  })
+  await setHiddenFromLeaderboards(gate.viewer.userId, parsed.data.hideFromLeaderboards)
   return vipJson({ ok: true, hideFromLeaderboards: parsed.data.hideFromLeaderboards })
 }

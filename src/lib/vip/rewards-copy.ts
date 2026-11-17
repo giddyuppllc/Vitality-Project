@@ -36,7 +36,7 @@ export const REWARDS_COPY = {
   leaderboardIntro: 'Points earned this month across the clubhouse, the store and partner businesses. Spending never lowers your score.',
   leaderboardEmpty: { title: 'The board resets on the 1st.', body: 'Earn points this month to take the first spot.' },
   hideLabel: 'Hide me from leaderboards',
-  hideHelp: 'You still earn points and see your own score.',
+  hideHelp: 'One switch for every board in the clubhouse — points and challenges. You still earn points and badges and see your own score.',
 
   portalTitle: 'Partner portal',
   portalIntro: 'Record member purchases, take points as payment, and void mistakes within 24 hours.',

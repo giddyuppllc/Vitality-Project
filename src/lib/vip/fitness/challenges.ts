@@ -230,8 +230,8 @@ export async function leaderboard(challengeId: string, opts: { viewerId?: string
           name: true,
           username: true,
           role: true,
-          vipProfile: { select: { displayName: true, avatarUrl: true, suspendedAt: true } },
-          vipFitnessProfile: { select: { hideFromLeaderboards: true } },
+          // hideFromLeaderboards: the ONE clubhouse switch (lib/vip/leaderboards.ts).
+          vipProfile: { select: { displayName: true, avatarUrl: true, suspendedAt: true, hideFromLeaderboards: true } },
         },
       },
     },
@@ -239,7 +239,7 @@ export async function leaderboard(challengeId: string, opts: { viewerId?: string
   const scores = await challengeScores(c, parts.map((p) => p.userId))
   const rows = parts
     .map((p) => {
-      const hidden = !!p.user.vipFitnessProfile?.hideFromLeaderboards
+      const hidden = !!p.user.vipProfile?.hideFromLeaderboards
       const suspended = !!p.user.vipProfile?.suspendedAt && p.user.role !== 'ADMIN'
       return {
         userId: p.userId,

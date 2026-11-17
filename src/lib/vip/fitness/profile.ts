@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getVipSetting } from '@/lib/vip/settings'
 import type { Units } from './units'
 import { isValidTimeZone, localDate } from './dates'
+import { isHiddenFromLeaderboards, setHiddenFromLeaderboards } from '@/lib/vip/leaderboards'
 
 /**
  * A member's fitness preferences: units (imperial by default), the IANA time
@@ -16,13 +17,14 @@ export interface FitnessPrefs {
 }
 
 export async function getFitnessPrefs(userId: string): Promise<FitnessPrefs> {
-  const p = await prisma.vipFitnessProfile.findUnique({ where: { userId } })
+  const [p, hidden] = await Promise.all([prisma.vipFitnessProfile.findUnique({ where: { userId } }), isHiddenFromLeaderboards(userId)])
   const own = p?.timeZone && isValidTimeZone(p.timeZone) ? p.timeZone : null
   return {
     units: p?.units ?? 'IMPERIAL',
     timeZone: own ?? (await getVipSetting('vip.timeZone')),
     hasOwnTimeZone: !!own,
-    hideFromLeaderboards: p?.hideFromLeaderboards ?? false,
+    // The clubhouse-wide switch (VipProfile), not the fitness column.
+    hideFromLeaderboards: hidden,
   }
 }
 
@@ -47,11 +49,11 @@ export async function updateFitnessPrefs(
   userId: string,
   data: { units?: Units; hideFromLeaderboards?: boolean; timeZone?: string },
 ): Promise<void> {
-  const clean: { units?: Units; hideFromLeaderboards?: boolean; timeZone?: string } = {}
+  const clean: { units?: Units; timeZone?: string } = {}
   if (data.units) clean.units = data.units
-  if (typeof data.hideFromLeaderboards === 'boolean') clean.hideFromLeaderboards = data.hideFromLeaderboards
   if (isValidTimeZone(data.timeZone)) clean.timeZone = data.timeZone
-  await prisma.vipFitnessProfile.upsert({ where: { userId }, create: { userId, ...clean }, update: clean })
+  if (typeof data.hideFromLeaderboards === 'boolean') await setHiddenFromLeaderboards(userId, data.hideFromLeaderboards)
+  if (Object.keys(clean).length) await prisma.vipFitnessProfile.upsert({ where: { userId }, create: { userId, ...clean }, update: clean })
 }
 
 /** Today on the member's own calendar. */

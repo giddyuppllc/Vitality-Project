@@ -203,36 +203,6 @@ export function UnitsToggle({ units }: { units: 'IMPERIAL' | 'METRIC' }) {
   )
 }
 
-/** "Hide me from leaderboards" switch. */
-export function LeaderboardVisibility({ hidden }: { hidden: boolean }) {
-  const router = useRouter()
-  const [value, setValue] = useState(hidden)
-  const [busy, setBusy] = useState(false)
-  return (
-    <label className="flex cursor-pointer items-start gap-3 text-sm text-white/75">
-      <input
-        type="checkbox"
-        checked={value}
-        disabled={busy}
-        onChange={async (e) => {
-          const next = e.target.checked
-          setValue(next)
-          setBusy(true)
-          const r = await api('/api/vip/fitness/prefs', 'PATCH', { hideFromLeaderboards: next })
-          setBusy(false)
-          if (!r.ok) setValue(!next)
-          else router.refresh()
-        }}
-        className="mt-0.5 h-5 w-5 accent-brand-500"
-      />
-      <span>
-        <span className="font-medium text-white">Hide me from leaderboards</span>
-        <span className="block text-white/55">You still join challenges and earn badges; other members just won&apos;t see your name or score.</span>
-      </span>
-    </label>
-  )
-}
-
 /** Generic "delete this thing of mine" button (workout, body-metric entry, photo). */
 export function DeleteButton({ url, confirmText, label, redirectTo, compact }: { url: string; confirmText: string; label: string; redirectTo?: string; compact?: boolean }) {
   const router = useRouter()

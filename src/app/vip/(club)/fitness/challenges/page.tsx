@@ -9,8 +9,9 @@ import { fmtNum } from '@/lib/vip/fitness/units'
 import { FIT_COPY } from '@/lib/vip/fitness/copy'
 import { EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
 import { FitnessTabs } from '@/components/vip/fitness/tabs'
+import { LeaderboardToggle } from '@/components/vip/rewards/leaderboard-toggle'
+import { REWARDS_COPY } from '@/lib/vip/rewards-copy'
 import { SectionTitle, Tag } from '@/components/vip/fitness/bits'
-import { LeaderboardVisibility } from '@/components/vip/fitness/actions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Challenges' }
@@ -101,9 +102,9 @@ export default async function ChallengesPage() {
         </ul>
       )}
 
-      <section className="vip-surface mt-6 p-5">
-        <LeaderboardVisibility hidden={prefs.hideFromLeaderboards} />
-      </section>
+      <div className="mt-6">
+        <LeaderboardToggle initial={prefs.hideFromLeaderboards} label={REWARDS_COPY.hideLabel} help={REWARDS_COPY.hideHelp} />
+      </div>
     </div>
   )
 }
