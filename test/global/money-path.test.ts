@@ -152,6 +152,28 @@ describe('variants are priced from the variant the customer chose', () => {
   })
 })
 
+describe('member pricing never discounts more than the merchandise', () => {
+  it('free-peptide credits + bundle discount: the order discount is capped at the subtotal', async () => {
+    const cat = await prisma.category.upsert({
+      where: { slug: 'weight-loss' },
+      update: {},
+      create: { slug: 'weight-loss', name: 'ZZ-TEST weight-loss' },
+    })
+    const m = await makeUser({ tag: 'mp-overshoot', tier: 'PREMIUM' })
+    await prisma.membership.update({ where: { userId: m.id }, data: { freePeptideCreditsThisPeriod: 3, freePeptidesUsedThisPeriod: 0 } })
+    const a = await product(10000, { categoryId: cat.id })
+    const b = await product(8000, { categoryId: cat.id })
+    setSession(m)
+    const r = await zellePOST(zelleReq(m, [{ productId: a.id, quantity: 1 }, { productId: b.id, quantity: 1 }], { useStoreCredit: false }))
+    const body = await r.json()
+    expect(r.status, JSON.stringify(body)).toBe(200)
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: body.orderId } })
+    expect(order.subtotal).toBe(18000)
+    expect(order.discount).toBeLessThanOrEqual(order.subtotal)
+    expect(order.total).toBe(0)
+  })
+})
+
 describe('Zelle checkout: loyalty points cannot be double-spent', () => {
   it('two simultaneous Zelle orders redeeming the same points: the discount is only given once', async () => {
     const m = await makeUser({ tag: 'mp-zelle-pts' })

@@ -262,6 +262,14 @@ export async function computeCartTotal(
     Math.max(0, subtotal - creditDiscountCents),
     membership.tier,
   )
+  // The bundle % is computed on every qualifying unit, including units a
+  // peptide credit has already made free, so credits + bundle could add up to
+  // MORE than the merchandise (a Premium member with 2 credited peptides got
+  // $189 off $180). Trim the bundle discount so the cart never discounts past
+  // zero; the customer pays exactly what they did (nothing), but the order's
+  // discount and the cart's bundle line are no longer larger than the goods.
+  const overshoot = Math.max(0, bundle.discountCents + memberDiscountCents + creditDiscountCents - subtotal)
+  if (overshoot > 0) bundle.discountCents = Math.max(0, bundle.discountCents - overshoot)
   const totalDiscount = bundle.discountCents + memberDiscountCents + creditDiscountCents
   const total = Math.max(0, subtotal - totalDiscount)
 
