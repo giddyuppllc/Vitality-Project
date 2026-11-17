@@ -9,6 +9,7 @@ import { getTierRewardSettings } from '@/lib/vip/rewards'
 import { getVipSetting } from '@/lib/vip/settings'
 import { Wordmark } from '@/components/vip/ui'
 import { Monogram } from '@/components/vip/monogram'
+import { SignOutButton } from '@/components/vip/sign-out-button'
 import { formatPrice, cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -68,6 +69,7 @@ export default async function VipLanding() {
                   <a href={GLOBAL_LINKS.manageMembership()} className="vip-focus rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold hover:bg-white/[0.06]">
                     My membership
                   </a>
+                  <SignOutButton />
                 </div>
               </div>
             ) : (
