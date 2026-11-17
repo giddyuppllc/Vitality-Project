@@ -21,6 +21,7 @@ import {
   plannedCreditUse,
   spendCreditForOrder,
 } from '@/lib/order-credit'
+import { InsufficientPointsError, redeemPointsInTx } from '@/lib/loyalty'
 import { z } from 'zod'
 
 // Shared system user that owns guest shipping-address rows (Address.userId is a
@@ -441,6 +442,19 @@ export async function POST(req: NextRequest) {
           amountCents: creditToUse,
         })
       }
+      // Points are burned in the same transaction, with a conditional
+      // decrement: if a simultaneous order already spent them, this order is
+      // refused (409) and rolled back instead of keeping a discount nobody
+      // paid for. (Was a read-then-write after the order was committed, so
+      // parallel orders each got the full points discount and the balance
+      // went negative.)
+      if (loyaltyPointsToUse > 0 && userId) {
+        await redeemPointsInTx(tx, {
+          userId,
+          points: loyaltyPointsToUse,
+          orderId: created.id,
+        })
+      }
       return created
     })
 
@@ -476,23 +490,6 @@ export async function POST(req: NextRequest) {
         .catch((err) =>
           console.error('[checkout-zelle] credit decrement failed:', err),
         )
-    }
-
-    // Burn the loyalty points now that the order row exists — passes orderId
-    // for the ledger transaction. If this fails the order still stands but
-    // the points won't be debited; admin can reconcile manually. Wrapping
-    // in a transaction across order.create above would be ideal long-term.
-    if (loyaltyPointsToUse > 0) {
-      try {
-        const { redeemPointsForOrder } = await import('@/lib/loyalty')
-        await redeemPointsForOrder({
-          userId: userId!, // loyaltyPointsToUse>0 only when userId is set (guarded above)
-          pointsToRedeem: loyaltyPointsToUse,
-          orderId: order.id,
-        })
-      } catch (err) {
-        console.error('[checkout-zelle] loyalty redemption failed:', err)
-      }
     }
 
     // Clear server-side cart_items for this user so the abandoned-cart cron
@@ -628,7 +625,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (error instanceof InsufficientCreditError) {
+    if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     return NextResponse.json(
