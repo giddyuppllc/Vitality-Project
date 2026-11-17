@@ -31,7 +31,10 @@ export const metadata: Metadata = {
   alternates: null,
   twitter: null,
   appleWebApp: { capable: true, title: 'Clubhouse', statusBarStyle: 'black-translucent' },
-  icons: { apple: '/apple-touch-icon.png' },
+  // Setting `icons` replaces the icon.svg file convention, so the monogram is
+  // listed here too — without it browsers fall back to /favicon.ico, which is
+  // the store's file and answers 404 on .vip.
+  icons: { icon: [{ url: '/vip/icon.svg', type: 'image/svg+xml' }], apple: '/apple-touch-icon.png' },
   robots: {
     index: false,
     follow: false,

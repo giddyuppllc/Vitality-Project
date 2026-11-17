@@ -16,11 +16,12 @@ import { listChallenges } from './fitness/challenges'
 async function loadFitness(viewer: VipViewer, now: Date) {
   const prefs = await getFitnessPrefs(viewer.userId)
   const today = todayIn(prefs.timeZone, now)
-  const [plan, open, streak, challenges] = await Promise.all([
+  const [plan, open, streak, challenges, trainedToday] = await Promise.all([
     getTodaysWorkout(viewer.userId, viewer.accessTier),
     findOpenWorkout(viewer.userId),
     streakInfo(viewer.userId, today),
     listChallenges(viewer.userId, viewer.accessTier, today),
+    prisma.vipWorkoutLog.count({ where: { userId: viewer.userId, localDate: today, finishedAt: { not: null } } }),
   ])
   const active = challenges.filter((c) => c.status === 'active' && c.allowed)
   return {
@@ -36,6 +37,7 @@ async function loadFitness(viewer: VipViewer, now: Date) {
         }
       : null,
     openWorkout: open ? { id: open.id, title: open.title } : null,
+    trainedToday: trainedToday > 0,
     checkedInToday: streak.checkedInToday,
     streak: streak.current,
     // Joined first, then ones the member could join; three at most.

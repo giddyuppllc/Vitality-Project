@@ -142,7 +142,11 @@ export default async function DashboardPage() {
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-300/10 ring-1 ring-inset ring-emerald-300/25" aria-hidden="true">
                     <Dumbbell className="h-5 w-5 text-emerald-200" />
                   </span>
-                  <ArrowRight className="h-4 w-4 text-white/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  {d.fitness.trainedToday && !d.fitness.openWorkout ? (
+                    <Pill tone="green">Trained today</Pill>
+                  ) : (
+                    <ArrowRight className="h-4 w-4 text-white/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  )}
                 </span>
                 <span className="min-w-0">
                   <span className="block text-xs font-semibold uppercase tracking-wider text-white/60">Today’s workout</span>
