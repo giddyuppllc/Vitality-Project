@@ -22,10 +22,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const isPassword = type === 'password'
     const [revealed, setRevealed] = useState(false)
     const effectiveType = isPassword ? (revealed ? 'text' : 'password') : type
-    // Tie the visible label to the input (it wasn't: clicking the label did
-    // nothing and screen readers announced an unlabelled field).
-    const autoId = useId()
-    const inputId = props.id ?? autoId
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -51,7 +47,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             {...props}
-            id={inputId}
           />
           {isPassword && (
             <button
