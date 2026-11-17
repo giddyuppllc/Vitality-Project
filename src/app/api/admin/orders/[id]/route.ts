@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit, restoreOrderCredit } from '@/lib/order-credit'
 import { grantTrainingFromOrder, isTrainingInvoice } from '@/lib/vip/training-invoice'
+import { awardPointsForOrder } from '@/lib/loyalty'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -165,6 +166,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             }
           }
         }
+      }
+      // Purchase points-back (tier-scaled for members, lib/loyalty.ts) — the
+      // same award mark-paid makes. Keyed `purchase:<orderId>`, so an order
+      // paid through either path earns exactly once. Membership invoices
+      // earn nothing (as in mark-paid).
+      if (order?.userId && !prev.notes?.startsWith('MEMBERSHIP:')) {
+        await awardPointsForOrder({ userId: order.userId, orderId: order.id, orderTotal: order.total }).catch((err) =>
+          console.error('[admin/orders] loyalty award failed:', err),
+        )
       }
     }
 
