@@ -7,6 +7,13 @@ import RewardsPage from '@/app/admin/vip/rewards/page'
 import SpacesPage from '@/app/admin/vip/spaces/page'
 import ClassroomPage from '@/app/admin/vip/classroom/page'
 import CourseEditor from '@/app/admin/vip/classroom/[id]/page'
+import CatalogPage from '@/app/admin/vip/rewards/catalog/page'
+import RedemptionsPage from '@/app/admin/vip/rewards/redemptions/page'
+import EarningPage from '@/app/admin/vip/rewards/earning/page'
+import PointsPage from '@/app/admin/vip/rewards/points/page'
+import PartnersPage from '@/app/admin/vip/partners/page'
+import PartnerDetail from '@/app/admin/vip/partners/[id]/page'
+import StatementsPage from '@/app/admin/vip/partners/statements/page'
 
 /**
  * The admin layout's role check is NOT an access boundary: Next renders only
@@ -24,6 +31,13 @@ const pages: Array<[string, () => Promise<unknown>]> = [
   ['/admin/vip/spaces', () => SpacesPage()],
   ['/admin/vip/classroom', () => ClassroomPage()],
   ['/admin/vip/classroom/[id]', () => CourseEditor({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/rewards/catalog', () => CatalogPage()],
+  ['/admin/vip/rewards/redemptions', () => RedemptionsPage({ searchParams: Promise.resolve({}) })],
+  ['/admin/vip/rewards/earning', () => EarningPage()],
+  ['/admin/vip/rewards/points', () => PointsPage({ searchParams: Promise.resolve({ q: 'zz-nobody@example.invalid' }) })],
+  ['/admin/vip/partners', () => PartnersPage()],
+  ['/admin/vip/partners/[id]', () => PartnerDetail({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/partners/statements', () => StatementsPage({ searchParams: Promise.resolve({}) })],
 ]
 
 async function outcome(render: () => Promise<unknown>): Promise<string> {
