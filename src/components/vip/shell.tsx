@@ -59,7 +59,7 @@ export function VipShell({
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#070b14]/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Link href="/feed" className="vip-focus rounded-xl" aria-label="Clubhouse home">
+          <Link href="/feed" className="vip-focus rounded-xl">
             <span className="sm:hidden"><Wordmark compact /></span>
             <span className="hidden sm:inline"><Wordmark /></span>
           </Link>
@@ -95,9 +95,9 @@ export function VipShell({
             <Link
               href="/profile"
               className="vip-focus flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-white/[0.06]"
-              aria-label="Your profile"
             >
-              <Avatar name={viewer.displayName} src={viewer.avatarUrl} size={32} />
+              <span aria-hidden="true"><Avatar name={viewer.displayName} src={viewer.avatarUrl} size={32} /></span>
+              <span className="sr-only lg:hidden">Your profile</span>
               <span className="hidden max-w-[10rem] truncate text-sm font-medium lg:inline">{viewer.displayName}</span>
             </Link>
           </div>

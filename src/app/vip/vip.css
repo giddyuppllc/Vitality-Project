@@ -132,3 +132,14 @@ body.vip-theme::after {
 @media (min-width: 1024px) {
   .vip-safe-bottom { padding-bottom: 3rem; }
 }
+
+/* Readable small print (WCAG 2.1 AA, 4.5:1). White at 30–45% opacity on the
+   navy surfaces measured 2.6–4.4:1 in an axe pass (course module numbers,
+   lesson position, "Monthly" tags, timestamps, the wellness note). Lifted to
+   the lowest opacity that clears 4.5:1 on the lightest surface used. */
+.vip-theme .text-white\/30,
+.vip-theme .text-white\/35,
+.vip-theme .text-white\/40,
+.vip-theme .text-white\/45 {
+  color: rgb(255 255 255 / 0.6);
+}

@@ -10,13 +10,15 @@ import { Monogram } from './monogram'
 /** Clubhouse wordmark: the VP monogram + name. */
 export function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-2.5" aria-label="The Vitality Project Clubhouse">
+    <span className="inline-flex items-center gap-2.5">
       <Monogram size={36} />
-      {!compact && (
+      {compact ? (
+        <span className="sr-only">The Vitality Project Clubhouse</span>
+      ) : (
         <span className="leading-tight">
           <span className="block text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/55">
             The Vitality Project
-          </span>
+          </span>{' '}
           <span className="block text-[15px] font-extrabold tracking-tight text-white">Clubhouse</span>
         </span>
       )}
