@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { beforeAll, describe, expect, it } from 'vitest'
 import { makeUser, params, req, setSession } from '../helpers'
 
