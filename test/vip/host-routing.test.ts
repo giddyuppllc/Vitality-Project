@@ -1,15 +1,26 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { mintSessionToken } from '@/lib/vip/session'
+import { SESSION_COOKIE_NAME } from '@/lib/auth'
 import { proxy } from '@/proxy'
 import { isVipHost, resolveSite, routeFor } from '@/lib/vip/host'
 import { metadata as vipMetadata } from '@/app/vip/layout'
 
-function call(host: string, pathname: string, cookie?: string) {
+const isAdminPath = (p: string) => p === '/admin' || p.startsWith('/admin/')
+
+/** Synchronous for every path except .global /admin pages (see the admin guard tests). */
+function call(host: string, pathname: string, cookie?: string): NextResponse {
   const headers: Record<string, string> = { host }
   if (cookie) headers.cookie = cookie
-  return proxy(new NextRequest(new URL(pathname, `http://${host}`), { headers }))
+  const res = proxy(new NextRequest(new URL(pathname, `http://${host}`), { headers }))
+  if (res instanceof Promise) throw new Error(`async proxy result for ${host}${pathname}`)
+  return res
+}
+
+async function callAsync(host: string, pathname: string, headers: Record<string, string> = {}) {
+  return proxy(new NextRequest(new URL(pathname, `http://${host}`), { headers: { host, ...headers } }))
 }
 
 const isPassthrough = (res: Response) =>
@@ -51,6 +62,7 @@ describe('host routing — .global is untouched', () => {
           .map((s) => `/${s}`),
       ]
       for (const p of paths) {
+        if (isAdminPath(p)) continue // covered by the admin guard tests below
         const res = call(host, p)
         expect(isPassthrough(res), `${host}${p}`).toBe(true)
         expect(res.headers.get('x-robots-tag'), `${host}${p}`).toBeNull()
@@ -67,6 +79,43 @@ describe('host routing — .global is untouched', () => {
       expect(isPassthrough(res), p).toBe(false)
       if (p.startsWith('/api/')) expect(res.status, p).toBe(404)
       else expect(rewriteTarget(res), p).toBe('/__not-found')
+    }
+  })
+})
+
+describe('.global /admin pages are guarded in the proxy (not only by the layout)', () => {
+  const host = 'vitalityproject.global'
+  const adminPages = ['/admin', '/admin/customers', '/admin/members', '/admin/vip', '/admin/vip/members', '/admin/orders/abc']
+  const rscHeaders = {
+    RSC: '1',
+    'Next-Router-State-Tree': encodeURIComponent(JSON.stringify(['', { children: ['admin', { children: ['__PAGE__', {}] }] }])),
+  }
+  const session = async (role: string) =>
+    `${SESSION_COOKIE_NAME}=${await mintSessionToken({ id: `zz-${role}`, email: `zz-${role}@example.invalid`, name: null, role })}`
+
+  it('anonymous and non-admin sessions are sent to /auth/login, even with a crafted RSC request', async () => {
+    const member = await session('CUSTOMER')
+    for (const p of adminPages) {
+      for (const headers of [{} as Record<string, string>, rscHeaders, { cookie: member }, { cookie: member, ...rscHeaders }, { cookie: `${SESSION_COOKIE_NAME}=forged` }]) {
+        const res = await callAsync(host, p, headers)
+        expect(res.status, `${p} ${JSON.stringify(headers).slice(0, 40)}`).toBe(307)
+        expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/login')
+      }
+    }
+  })
+
+  it('an admin session passes straight through, untouched', async () => {
+    const admin = await session('ADMIN')
+    for (const p of adminPages) {
+      const res = await callAsync(host, p, { cookie: admin, ...rscHeaders })
+      expect(isPassthrough(res), p).toBe(true)
+      expect(res.headers.get('x-middleware-override-headers'), p).toBeNull()
+    }
+  })
+
+  it('leaves /api/admin (handlers check for themselves) and look-alike paths synchronous', () => {
+    for (const p of ['/api/admin/vip/moderation', '/administrator', '/admins']) {
+      expect(isPassthrough(call(host, p)), p).toBe(true)
     }
   })
 })
@@ -90,11 +139,11 @@ describe('host routing — .vip serves the clubhouse', () => {
     for (const p of ['/', '/feed', '/api/vip/posts', '/does-not-exist']) {
       expect(call('vitalityproject.vip', p).headers.get('x-middleware-request-x-vp-site'), p).toBe('vip')
     }
-    const spoofed = proxy(
+    const spoofed = (proxy(
       new NextRequest(new URL('/', 'http://vitalityproject.global'), {
         headers: { host: 'vitalityproject.global', 'x-vp-site': 'vip' },
       }),
-    )
+    ) as NextResponse)
     expect(spoofed.headers.get('x-middleware-override-headers') ?? '').not.toContain('x-vp-site=')
     expect(spoofed.headers.get('x-middleware-request-x-vp-site')).toBeNull()
     expect(spoofed.headers.get('x-middleware-override-headers')).not.toBeNull() // header list rewritten without it
