@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
 const C = '/api/admin/vip/classroom'
 
 export default async function AdminVipCourseEditor({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const { id } = await params
   const course = await prisma.vipCourse.findUnique({
     where: { id },

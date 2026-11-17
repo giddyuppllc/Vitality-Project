@@ -1,9 +1,11 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { SpaceCreateForm, SpaceRowEditor } from '@/components/admin/vip/forms'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminVipSpacesPage() {
+  await requireAdminPage()
   const spaces = await prisma.vipSpace.findMany({
     orderBy: [{ archived: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     include: { _count: { select: { posts: true } } },

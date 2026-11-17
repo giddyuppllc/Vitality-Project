@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { formatDate, formatPrice } from '@/lib/utils'
 import { TIER_BENEFITS } from '@/lib/membership'
@@ -8,6 +9,7 @@ import { getVipSettings } from '@/lib/vip/settings'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminVipRewardsPage() {
+  await requireAdminPage()
   const [settings, grants, preview, lastRun, clubSettings] = await Promise.all([
     getTierRewardSettings(),
     prisma.vipRewardGrant.findMany({

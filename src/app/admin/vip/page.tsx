@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { AdminActionButton } from '@/components/admin/vip/admin-vip-ui'
@@ -12,6 +13,7 @@ function snippet(s: string, n = 220) {
 
 /** Moderation queue: open reports first, then recent posts and hidden items. */
 export default async function AdminVipModerationPage() {
+  await requireAdminPage()
   const [reports, posts, hiddenComments] = await Promise.all([
     prisma.vipReport.findMany({
       where: { status: 'OPEN' },

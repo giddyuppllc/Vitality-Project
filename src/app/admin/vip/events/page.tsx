@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { TIER_BENEFITS } from '@/lib/membership'
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic'
 const E = '/api/admin/vip/events'
 
 export default async function AdminVipEventsPage() {
+  await requireAdminPage()
   const events = await prisma.vipEvent.findMany({
     orderBy: { startsAt: 'desc' },
     take: 100,

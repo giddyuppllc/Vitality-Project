@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { TIER_BENEFITS } from '@/lib/membership'
@@ -6,6 +7,7 @@ import { CourseForm } from '@/components/admin/vip/forms'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminVipClassroomPage() {
+  await requireAdminPage()
   const courses = await prisma.vipCourse.findMany({
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: { modules: { select: { _count: { select: { lessons: true } } } } },
