@@ -35,10 +35,11 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
 
   return (
     <form onSubmit={submit} className="glass rounded-2xl p-5">
-      <label className="text-sm font-medium text-white/70 mb-2 block">
+      <label htmlFor="reply-textarea-1" className="text-sm font-medium text-white/70 mb-2 block">
         Reply
       </label>
       <textarea
+              id="reply-textarea-1"
         rows={5}
         value={body}
         onChange={(e) => setBody(e.target.value)}

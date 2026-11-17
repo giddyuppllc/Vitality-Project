@@ -93,10 +93,11 @@ export function ReviewForm({
       />
 
       <div>
-        <label className="text-sm font-medium text-white/70 mb-1.5 block">
+        <label htmlFor="review-textarea-1" className="text-sm font-medium text-white/70 mb-1.5 block">
           Review
         </label>
         <textarea
+              id="review-textarea-1"
           rows={6}
           value={body}
           onChange={(e) => setBody(e.target.value)}
