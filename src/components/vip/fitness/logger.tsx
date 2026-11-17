@@ -80,7 +80,7 @@ function Stepper({
     <div className="min-w-0 flex-1">
       <span className="mb-1 block text-xs font-medium text-white/60">{label}</span>
       <div className="flex h-14 items-stretch overflow-hidden rounded-xl border border-white/12 bg-white/[0.04]">
-        <button type="button" onClick={() => bump(-step)} className="vip-focus grid w-12 shrink-0 place-items-center text-white/75 active:bg-white/10" aria-label={`Decrease ${label}`}>
+        <button type="button" onClick={() => bump(-step)} className="vip-focus grid w-10 shrink-0 place-items-center text-white/75 active:bg-white/10" aria-label={`Decrease ${label}`}>
           <Minus className="h-5 w-5" aria-hidden="true" />
         </button>
         <label className="relative flex min-w-0 flex-1 items-center justify-center">
@@ -90,11 +90,11 @@ function Stepper({
             onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ''))}
             inputMode={inputMode}
             enterKeyHint="done"
-            className="vip-focus w-full min-w-0 bg-transparent text-center text-xl font-bold tabular-nums text-white outline-none"
+            className={cn('vip-focus w-full min-w-0 bg-transparent text-center font-bold tabular-nums text-white outline-none', value.length > 4 ? 'text-lg' : 'text-xl')}
           />
           {suffix && <span className="pointer-events-none pr-1 text-xs text-white/50">{suffix}</span>}
         </label>
-        <button type="button" onClick={() => bump(step)} className="vip-focus grid w-12 shrink-0 place-items-center text-white/75 active:bg-white/10" aria-label={`Increase ${label}`}>
+        <button type="button" onClick={() => bump(step)} className="vip-focus grid w-10 shrink-0 place-items-center text-white/75 active:bg-white/10" aria-label={`Increase ${label}`}>
           <Plus className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
@@ -128,8 +128,9 @@ function BlockCard({
   const wStep = units === 'METRIC' ? 2.5 : 5
 
   const [weight, setWeight] = useState(seed?.weightKg ? String(fromKg(seed.weightKg, units)) : '')
-  const [reps, setReps] = useState(String(seed?.reps ?? firstInt(target?.reps) ?? ''))
-  const [secs, setSecs] = useState(String(seed?.durationSec ?? target?.durationSec ?? ''))
+  // Weight carries over from this session / last time; reps and time follow the coach's target first.
+  const [reps, setReps] = useState(String(last?.reps ?? firstInt(target?.reps) ?? prevSame?.reps ?? ''))
+  const [secs, setSecs] = useState(String(last?.durationSec ?? target?.durationSec ?? prevSame?.durationSec ?? ''))
   const [rpe, setRpe] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

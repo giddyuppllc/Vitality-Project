@@ -13,7 +13,7 @@ export interface Datum {
 }
 
 const W = 600
-const PAD = { top: 12, right: 8, bottom: 26, left: 8 }
+const PAD = { top: 22, right: 8, bottom: 32, left: 8 }
 
 function niceMax(v: number) {
   if (v <= 0) return 1
@@ -45,7 +45,7 @@ export function BarChart({ data, caption, height = 150 }: { data: Datum[]; capti
   const innerH = height - PAD.top - PAD.bottom
   const slot = innerW / Math.max(1, data.length)
   const bw = Math.max(4, Math.min(28, slot - 4))
-  const every = data.length > 8 ? 2 : 1
+  const every = data.length > 8 ? 3 : data.length > 5 ? 2 : 1
   return (
     <figure className="m-0">
       <svg viewBox={`0 0 ${W} ${height}`} className="h-auto w-full" role="img" aria-label={caption}>
@@ -69,7 +69,7 @@ export function BarChart({ data, caption, height = 150 }: { data: Datum[]; capti
                 />
               )}
               {i % every === (data.length - 1) % every && (
-                <text x={x + bw / 2} y={height - 8} textAnchor="middle" fontSize="11" fill="rgba(255,255,255,0.6)">
+                <text x={x + bw / 2} y={height - 9} textAnchor="middle" fontSize="16" fill="rgba(255,255,255,0.6)">
                   {d.label}
                 </text>
               )}
@@ -114,20 +114,20 @@ export function LineChart({ data, caption, height = 160 }: { data: Datum[]; capt
           <text
             key={`v${i}`}
             x={x(i)}
-            y={y(data[i].value) - 10}
+            y={y(data[i].value) - 12}
             textAnchor={i === 0 && last > 0 ? 'start' : 'end'}
-            fontSize="12"
+            fontSize="17"
             fontWeight="600"
             fill="rgba(255,255,255,0.85)"
           >
             {data[i].display}
           </text>
         ))}
-        <text x={x(0)} y={height - 8} textAnchor="start" fontSize="11" fill="rgba(255,255,255,0.6)">
+        <text x={x(0)} y={height - 9} textAnchor="start" fontSize="16" fill="rgba(255,255,255,0.6)">
           {data[0].label}
         </text>
         {last > 0 && (
-          <text x={x(last)} y={height - 8} textAnchor="end" fontSize="11" fill="rgba(255,255,255,0.6)">
+          <text x={x(last)} y={height - 9} textAnchor="end" fontSize="16" fill="rgba(255,255,255,0.6)">
             {data[last].label}
           </text>
         )}

@@ -32,6 +32,9 @@ export default async function FitnessTodayPage() {
     personalRecords(viewer.userId),
   ])
   const myChallenges = challenges.filter((c) => c.joined && c.status === 'active')
+  // Newest record per exercise (one line per lift, not one per record kind).
+  const recent: typeof prs = []
+  for (const r of prs) if (!recent.some((x) => x.exerciseId === r.exerciseId)) recent.push(r)
   const day = plan?.day
 
   return (
@@ -181,11 +184,11 @@ export default async function FitnessTodayPage() {
         </>
       )}
 
-      {prs.length > 0 && (
+      {recent.length > 0 && (
         <>
           <SectionTitle action={<Link href="/fitness/history" className="text-sm text-brand-300 hover:text-brand-200">History</Link>}>Recent records</SectionTitle>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {prs.slice(0, 4).map((r) => (
+            {recent.slice(0, 4).map((r) => (
               <li key={r.id} className="vip-surface flex items-center gap-3 p-3.5">
                 <Trophy className="h-5 w-5 shrink-0 text-[#d4b26a]" aria-hidden="true" />
                 <div className="min-w-0 flex-1">

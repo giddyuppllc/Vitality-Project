@@ -194,12 +194,12 @@ export function VipShell({
               href={n.href}
               aria-current={active(n.href) ? 'page' : undefined}
               className={cn(
-                'vip-focus flex flex-col items-center gap-1 py-2.5 text-[10.5px] font-medium',
+                'vip-focus flex min-w-0 flex-col items-center gap-1 py-2.5 text-[10.5px] font-medium',
                 active(n.href) ? 'text-brand-200' : 'text-white/50',
               )}
             >
               <n.icon className="h-5 w-5" aria-hidden="true" />
-              {n.label}
+              <span className="max-w-full truncate px-0.5">{n.label}</span>
             </Link>
           ))}
           <Link
