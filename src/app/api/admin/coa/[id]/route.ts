@@ -19,14 +19,14 @@ export async function DELETE(
   const existing = await prisma.certificateOfAnalysis.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Best-effort: delete uploaded file if it lives in /public/coa
+  // Best-effort: delete uploaded file if it lives in /public/coa — and ONLY
+  // there: a stored URL like /coa/../../x must never unlink outside it.
   if (existing.documentUrl?.startsWith('/coa/')) {
-    const filePath = path.resolve(
-      process.cwd(),
-      'public',
-      existing.documentUrl.replace(/^\//, ''),
-    )
-    await fs.unlink(filePath).catch(() => {})
+    const coaDir = path.resolve(process.cwd(), 'public', 'coa')
+    const filePath = path.resolve(process.cwd(), 'public', existing.documentUrl.replace(/^\//, ''))
+    if (path.dirname(filePath) === coaDir) {
+      await fs.unlink(filePath).catch(() => {})
+    }
   }
 
   await prisma.certificateOfAnalysis.delete({ where: { id } })
