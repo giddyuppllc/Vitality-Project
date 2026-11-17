@@ -11,6 +11,7 @@
  */
 import type { PrismaClient } from '@prisma/client'
 import { COURSES, EVENTS, SPACES, TEAM_POSTS } from './starter-content'
+import { ACADEMY_COURSES, COURSE_TRACK, TRACKS } from './starter-academy'
 import { zonedParts, zonedTimeToUtc } from '../../src/lib/vip/time'
 
 export interface SeedOptions {
@@ -104,6 +105,22 @@ export async function seedClubhouse(prisma: PrismaClient, opts: SeedOptions = {}
     }
   }
 
+  // ── Academy learning paths (vip/academy) ────────────────────────────────
+  const trackIds: Record<string, string> = {}
+  for (const t of TRACKS) {
+    const existing = await prisma.vipTrack.findUnique({ where: { slug: t.slug } })
+    if (existing) {
+      trackIds[t.slug] = existing.id
+      skipped(`learning path ${t.slug}`)
+      continue
+    }
+    created(`learning path ${t.slug}`)
+    if (dry) continue
+    const row = await prisma.vipTrack.create({ data: { ...t, published: true } })
+    trackIds[t.slug] = row.id
+  }
+  const trackFor = (courseSlug: string) => (COURSE_TRACK[courseSlug] ? trackIds[COURSE_TRACK[courseSlug]] ?? null : null)
+
   // ── Classroom ────────────────────────────────────────────────────────────
   for (const c of COURSES) {
     const existing = await prisma.vipCourse.findUnique({ where: { slug: c.slug } })
@@ -115,12 +132,71 @@ export async function seedClubhouse(prisma: PrismaClient, opts: SeedOptions = {}
     created(`course ${c.slug} (${c.modules.length} modules, ${lessons} lessons)`)
     if (dry) continue
     const course = await prisma.vipCourse.create({
-      data: { slug: c.slug, title: c.title, summary: c.summary, minTier: c.minTier, sortOrder: c.sortOrder, published: true },
+      data: { slug: c.slug, title: c.title, summary: c.summary, minTier: c.minTier, sortOrder: c.sortOrder, published: true, trackId: trackFor(c.slug) },
     })
     for (const [mi, m] of c.modules.entries()) {
       const mod = await prisma.vipModule.create({ data: { courseId: course.id, title: m.title, sortOrder: mi } })
       for (const [li, l] of m.lessons.entries()) {
         await prisma.vipLesson.create({ data: { moduleId: mod.id, title: l.title, body: l.body, sortOrder: li, published: true } })
+      }
+    }
+  }
+
+  // ── Academy courses with module checks (vip/academy) ────────────────────
+  for (const c of ACADEMY_COURSES) {
+    const existing = await prisma.vipCourse.findUnique({ where: { slug: c.slug } })
+    if (existing) {
+      skipped(`course ${c.slug}`)
+      continue
+    }
+    const lessons = c.modules.reduce((n, m) => n + m.lessons.length, 0)
+    created(`course ${c.slug} (${c.modules.length} modules, ${lessons} lessons, ${c.modules.length} quizzes)`)
+    if (dry) continue
+    const course = await prisma.vipCourse.create({
+      data: {
+        slug: c.slug,
+        title: c.title,
+        summary: c.summary,
+        minTier: c.minTier,
+        level: c.level,
+        sortOrder: c.sortOrder,
+        published: true,
+        trackId: trackFor(c.slug),
+        estimatedMinutes: c.modules.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.minutes, 0), 0),
+      },
+    })
+    for (const [mi, m] of c.modules.entries()) {
+      const mod = await prisma.vipModule.create({ data: { courseId: course.id, title: m.title, sortOrder: mi } })
+      for (const [li, l] of m.lessons.entries()) {
+        await prisma.vipLesson.create({ data: { moduleId: mod.id, title: l.title, body: l.body, durationMinutes: l.minutes, sortOrder: li, published: true } })
+      }
+      const quiz = await prisma.vipQuiz.create({ data: { moduleId: mod.id, title: m.quiz.title, passPct: m.quiz.passPct, published: true } })
+      for (const [qi, q] of m.quiz.questions.entries()) {
+        await prisma.vipQuizQuestion.create({ data: { quizId: quiz.id, prompt: q.prompt, options: q.options, correctIndex: q.correctIndex, explanation: q.explanation, sortOrder: qi } })
+      }
+    }
+  }
+
+  // ── Library: the certificate-of-analysis lookup on .global (vip/academy) ─
+  {
+    const title = 'Look up a certificate of analysis'
+    const existing = await prisma.vipResource.findFirst({ where: { title }, select: { id: true } })
+    if (existing) skipped(`library item "${title}"`)
+    else {
+      created(`library item "${title}"`)
+      if (!dry) {
+        const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global').replace(/\/+$/, '')
+        await prisma.vipResource.create({
+          data: {
+            title,
+            summary: 'Search the published certificates of analysis by name or lot number at vitalityproject.global — then read them with the Reading the Research course.',
+            category: 'COA',
+            kind: 'LINK',
+            url: `${base.startsWith('https://') ? base : 'https://vitalityproject.global'}/coa`,
+            minTier: 'CLUB',
+            published: true,
+          },
+        })
       }
     }
   }
