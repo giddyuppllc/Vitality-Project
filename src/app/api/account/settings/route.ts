@@ -28,19 +28,37 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Build update payload
-    const updateData: { name?: string; email?: string; passwordHash?: string } = {}
+    const updateData: { name?: string; email?: string; passwordHash?: string; emailVerified?: null } = {}
 
     if (data.name !== undefined) {
       updateData.name = data.name
     }
 
-    if (data.email !== undefined && data.email !== user.email) {
+    // Compare case-insensitively: emails are stored lower-case, so typing the
+    // same address with a capital letter used to look like a change, find the
+    // user's own row, and fail with "Email is already in use".
+    if (data.email !== undefined && data.email.toLowerCase() !== user.email.toLowerCase()) {
+      // The sign-in email is the account-recovery address: changing it with
+      // only a session cookie let anyone at an unlocked/borrowed session move
+      // the account to their inbox and then reset the password. Require the
+      // current password, as a password change already does.
+      if (user.passwordHash) {
+        if (!data.currentPassword) {
+          return NextResponse.json({ error: 'Enter your current password to change your email' }, { status: 400 })
+        }
+        const ok = await bcrypt.compare(data.currentPassword, user.passwordHash)
+        if (!ok) {
+          return NextResponse.json({ error: 'Current password is incorrect' }, { status: 403 })
+        }
+      }
       // Check if email is already taken
       const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } })
       if (existing) {
         return NextResponse.json({ error: 'Email is already in use' }, { status: 409 })
       }
       updateData.email = data.email.toLowerCase()
+      // The new address has not been verified.
+      updateData.emailVerified = null
     }
 
     // Password change
