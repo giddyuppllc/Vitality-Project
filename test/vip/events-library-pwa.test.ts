@@ -16,7 +16,9 @@ import { canReadFile, saveAdminFile, sniffKind } from '@/lib/vip/files'
 import { eventIcs } from '@/lib/vip/events'
 import { loadDashboard } from '@/lib/vip/dashboard'
 import { loadVipViewer } from '@/lib/vip/access'
-import { VIP_NAV, visibleNav } from '@/lib/vip/nav'
+import { VIP_NAV, isActive, visibleNav } from '@/lib/vip/nav'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 
 type H = (r: NextRequest, c: { params: Promise<Record<string, unknown>> }) => Promise<Response>
 const call = (fn: unknown, r: NextRequest, p: Record<string, unknown> = {}) => (fn as H)(r, params(p))
@@ -207,16 +209,26 @@ describe('dashboard + nav', () => {
     expect(Array.isArray(d.events)).toBe(true)
   })
 
-  it('nav: five tabs; integration routes present; suspended members lose community items', () => {
-    expect(VIP_NAV.filter((n) => n.tab).map((n) => n.href)).toEqual(['/dashboard', '/feed', '/classroom', '/training', '/rewards'])
-    for (const href of ['/training', '/checkin', '/messages', '/partners', '/rewards', '/events', '/library', '/members', '/profile', '/settings']) {
+  it('nav: exactly five tabs; every href is a real clubhouse page; suspended members lose community items', () => {
+    expect(VIP_NAV.filter((n) => n.tab).map((n) => n.href)).toEqual(['/dashboard', '/feed', '/classroom', '/fitness', '/rewards'])
+    expect(VIP_NAV.filter((n) => n.tab).map((n) => n.label)).toEqual(['Home', 'Community', 'Learn', 'Fitness', 'Rewards'])
+    for (const href of ['/messages', '/discover', '/saved', '/events', '/library', '/rewards/partners', '/members', '/profile', '/settings']) {
       expect(VIP_NAV.some((n) => n.href === href), href).toBe(true)
     }
+    // Every nav href has a page under src/app/vip/(club) — no links to routes that don't exist.
+    const club = path.resolve(__dirname, '../../src/app/vip/(club)')
+    for (const n of VIP_NAV) expect(existsSync(path.join(club, n.href, 'page.tsx')), n.href).toBe(true)
+    // Mobile labels fit a 390px bar (6 columns ≈ 65px; 10.5px type ≈ 6px/char).
+    for (const n of VIP_NAV.filter((x) => x.tab)) expect(n.label.length, n.label).toBeLessThanOrEqual(9)
     const s = visibleNav({ suspended: true }).map((n) => n.href)
-    expect(s).not.toContain('/feed')
-    expect(s).not.toContain('/members')
-    expect(s).not.toContain('/messages')
+    for (const gone of ['/feed', '/members', '/messages', '/discover', '/saved']) expect(s).not.toContain(gone)
     expect(new Set(VIP_NAV.map((n) => n.key)).size).toBe(VIP_NAV.length)
+    // /rewards/partners lights Partners, not Rewards.
+    const rewards = VIP_NAV.find((n) => n.key === 'rewards')!
+    const partners = VIP_NAV.find((n) => n.key === 'partners')!
+    expect(isActive(rewards, '/rewards/partners')).toBe(false)
+    expect(isActive(partners, '/rewards/partners')).toBe(true)
+    expect(isActive(rewards, '/rewards/catalog')).toBe(true)
   })
 })
 

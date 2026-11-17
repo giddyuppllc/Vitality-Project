@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -57,6 +57,7 @@ import * as trainingRedeem from '@/app/api/vip/trainings/[id]/redeem/route'
 import * as trainingInvoice from '@/app/api/vip/trainings/[id]/invoice/route'
 import * as vipFiles from '@/app/api/vip/files/[id]/route'
 import * as eventIcs from '@/app/api/vip/events/[id]/ics/route'
+import * as eventJoin from '@/app/api/vip/events/[id]/join/route'
 import * as adminFiles from '@/app/api/admin/vip/files/route'
 import * as adminLibrary from '@/app/api/admin/vip/library/route'
 import * as fitPrefs from '@/app/api/vip/fitness/prefs/route'
@@ -81,7 +82,8 @@ import * as adminFitArticles from '@/app/api/admin/vip/fitness/articles/route'
 import * as adminFitSettings from '@/app/api/admin/vip/fitness/settings/route'
 
 type Handler = (r: NextRequest, ctx: { params: Promise<Record<string, unknown>> }) => Promise<Response>
-type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response> }
+/** `passed`: statuses that mean the gate let the request through (default 200/201/404). */
+type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response>; passed?: number[] }
 
 let postId = 'missing'
 const ctx = (p: Record<string, unknown>) => params(p)
@@ -141,6 +143,7 @@ const CASES: Case[] = [
   { name: 'POST /trainings/:id/invoice', gate: 'member', run: () => h(trainingInvoice.POST)(req('/api/vip/trainings/missing/invoice', { method: 'POST' }), ctx({ id: 'missing' })) },
   { name: 'GET /files/:id', gate: 'member', run: () => h(vipFiles.GET)(req('/api/vip/files/missingfile00'), ctx({ id: 'missingfile00' })) },
   { name: 'GET /events/:id/ics', gate: 'member', run: () => h(eventIcs.GET)(req('/api/vip/events/missing/ics'), ctx({ id: 'missing' })) },
+  { name: 'GET /events/:id/join', gate: 'member', run: () => h(eventJoin.GET)(req('/api/vip/events/missing/join'), ctx({ id: 'missing' })) },
   // Fitness, health & lifestyle (member gate: suspension from the community keeps them).
   { name: 'GET /fitness/prefs', gate: 'member', run: () => h(fitPrefs.GET)(req('/api/vip/fitness/prefs'), ctx({})) },
   { name: 'PATCH /fitness/prefs', gate: 'member', run: () => h(fitPrefs.PATCH)(req('/api/vip/fitness/prefs', { method: 'PATCH', body: { units: 'IMPERIAL' } }), ctx({})) },
@@ -162,6 +165,8 @@ const CASES: Case[] = [
   { name: 'PUT /fitness/metrics', gate: 'member', run: () => h(fitMetrics.PUT)(req('/api/vip/fitness/metrics', { method: 'PUT', body: { date: new Date(Date.now() - 3 * 86400e3).toISOString().slice(0, 10), weight: 150 } }), ctx({})) },
   { name: 'DELETE /fitness/metrics/:id', gate: 'member', run: () => h(fitMetric.DELETE)(req('/api/vip/fitness/metrics/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
   { name: 'GET /fitness/photos', gate: 'member', run: () => h(fitPhotos.GET)(req('/api/vip/fitness/photos'), ctx({})) },
+  // No file: past the gate it is a 400 (bad upload), never a 401/403.
+  { name: 'POST /fitness/photos', gate: 'member', passed: [400], run: () => h(fitPhotos.POST)(req('/api/vip/fitness/photos', { body: {} }), ctx({})) },
   { name: 'GET /fitness/photos/:id', gate: 'member', run: () => h(fitPhoto.GET)(req('/api/vip/fitness/photos/missing'), ctx({ id: 'missing' })) },
   { name: 'DELETE /fitness/photos/:id', gate: 'member', run: () => h(fitPhoto.DELETE)(req('/api/vip/fitness/photos/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
   { name: 'GET /fitness/challenges/:id', gate: 'member', run: () => h(fitChallenge.GET)(req('/api/vip/fitness/challenges/missing'), ctx({ id: 'missing' })) },
@@ -245,7 +250,7 @@ describe('members-only gating — every clubhouse API', () => {
         'email-prefs/route.ts', 'onboarding/route.ts',
         'rewards/redeem/route.ts', 'rewards/redemptions/[id]/route.ts', 'rewards/partner-code/route.ts', 'rewards/prefs/route.ts',
         'lessons/[id]/note/route.ts', 'quizzes/[id]/attempts/route.ts', 'trainings/[id]/redeem/route.ts',
-        'trainings/[id]/invoice/route.ts', 'files/[id]/route.ts', 'events/[id]/ics/route.ts',
+        'trainings/[id]/invoice/route.ts', 'files/[id]/route.ts', 'events/[id]/ics/route.ts', 'events/[id]/join/route.ts',
         'bookmarks/route.ts', 'discover/route.ts', 'members/[id]/follow/route.ts', 'members/[id]/block/route.ts',
         'members/[id]/follows/route.ts', 'members/suggest/route.ts', 'messages/route.ts', 'messages/unread/route.ts',
         'messages/[id]/route.ts',
@@ -256,6 +261,39 @@ describe('members-only gating — every clubhouse API', () => {
         'fitness/workouts/route.ts',
       ].sort(),
     )
+  })
+
+  it('every exported handler of every clubhouse + clubhouse-admin route has a gating case', () => {
+    // Integration guard: four builders each added routes. A route file being
+    // listed is not enough — every method it exports must be exercised by a
+    // CASE / ADMIN_CASE above (found through its import alias in this file).
+    const src = readFileSync(__filename, 'utf8')
+    const apiRoot = path.resolve(__dirname, '../../src/app/api')
+    const missing: string[] = []
+    const walk = (d: string, out: string[]) => {
+      for (const f of readdirSync(d)) {
+        const p = path.join(d, f)
+        if (statSync(p).isDirectory()) walk(p, out)
+        else if (f === 'route.ts') out.push(p)
+      }
+      return out
+    }
+    const files = [...walk(path.join(apiRoot, 'vip'), []), ...walk(path.join(apiRoot, 'admin', 'vip'), [])]
+    for (const file of files) {
+      const rel = path.relative(apiRoot, file).replace(/\\/g, '/').replace(/\/route\.ts$/, '')
+      if (rel.startsWith('vip/auth/') || rel.startsWith('vip/partner-portal')) continue
+      const alias = new RegExp(`import \\* as (\\w+) from '@/app/api/${rel.replace(/[.[\]]/g, (c) => `\\${c}`)}/route'`).exec(src)?.[1]
+      if (!alias) {
+        missing.push(`${rel} (not imported)`)
+        continue
+      }
+      const methods = [...readFileSync(file, 'utf8').matchAll(/export async function (GET|POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1])
+      for (const m of methods) {
+        if (rel === 'vip/email-prefs' && m === 'POST') continue // signed one-click opt-out, see above
+        if (!src.includes(`${alias}.${m})`)) missing.push(`${m} ${rel}`)
+      }
+    }
+    expect(missing).toEqual([])
   })
 
   it('signed out → 401 everywhere', async () => {
@@ -287,7 +325,7 @@ describe('members-only gating — every clubhouse API', () => {
         expect(res.status, c.name).toBe(403)
         expect((await res.json()).error, c.name).toBe('community_suspended')
       } else {
-        expect([200, 201, 404], c.name).toContain(res.status)
+        expect(c.passed ?? [200, 201, 404], c.name).toContain(res.status)
       }
     }
   })

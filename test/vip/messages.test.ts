@@ -12,6 +12,7 @@ import * as block from '@/app/api/vip/members/[id]/block/route'
 import * as adminMedia from '@/app/api/admin/vip/media/[...path]/route'
 import AdminConversationPage from '@/app/admin/vip/conversations/[id]/page'
 import sharp from 'sharp'
+import { randomUUID } from 'node:crypto'
 import { saveMemberImage } from '@/lib/vip/media'
 
 type H = (r: NextRequest, c: { params: Promise<Record<string, unknown>> }) => Promise<Response>
@@ -114,7 +115,8 @@ describe('1:1 conversations', () => {
 
   it('images must come from the clubhouse upload pipeline; a shared post must be visible', async () => {
     expect((await send(amy, dm, { body: '', imageUrl: 'https://evil.example/x.jpg' })).status).toBe(400)
-    expect((await send(amy, dm, { body: '', imageUrl: '/api/vip/media/2026-11/00000001-0000-4000-8000-000000000000.jpg' })).status).toBe(201)
+    // A fresh upload link (DM photos must not re-use a link used anywhere else — see dm-media-privacy.test.ts).
+    expect((await send(amy, dm, { body: '', imageUrl: `/api/vip/media/2026-11/${randomUUID()}.jpg` })).status).toBe(201)
     expect((await send(amy, dm, { body: '' })).status).toBe(400)
     const p = await prisma.vipPost.create({ data: { authorId: cy.id, body: 'share me' } })
     const shared = await send(amy, dm, { body: 'look', sharedPostId: p.id })

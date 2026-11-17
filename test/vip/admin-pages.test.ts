@@ -15,6 +15,17 @@ import PartnersPage from '@/app/admin/vip/partners/page'
 import PartnerDetail from '@/app/admin/vip/partners/[id]/page'
 import StatementsPage from '@/app/admin/vip/partners/statements/page'
 import ReportedConversation from '@/app/admin/vip/conversations/[id]/page'
+import LibraryPage from '@/app/admin/vip/library/page'
+import FitnessPage from '@/app/admin/vip/fitness/page'
+import FitArticles from '@/app/admin/vip/fitness/articles/page'
+import FitArticle from '@/app/admin/vip/fitness/articles/[id]/page'
+import FitChallenges from '@/app/admin/vip/fitness/challenges/page'
+import FitChallenge from '@/app/admin/vip/fitness/challenges/[id]/page'
+import FitExercises from '@/app/admin/vip/fitness/exercises/page'
+import FitPrograms from '@/app/admin/vip/fitness/programs/page'
+import FitProgram from '@/app/admin/vip/fitness/programs/[id]/page'
+import { readdirSync, statSync } from 'node:fs'
+import path from 'node:path'
 
 /**
  * The admin layout's role check is NOT an access boundary: Next renders only
@@ -40,6 +51,15 @@ const pages: Array<[string, () => Promise<unknown>]> = [
   ['/admin/vip/partners/[id]', () => PartnerDetail({ params: Promise.resolve({ id: 'nope' }) })],
   ['/admin/vip/partners/statements', () => StatementsPage({ searchParams: Promise.resolve({}) })],
   ['/admin/vip/conversations/[id]', () => ReportedConversation({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/library', () => LibraryPage()],
+  ['/admin/vip/fitness', () => FitnessPage()],
+  ['/admin/vip/fitness/articles', () => FitArticles()],
+  ['/admin/vip/fitness/articles/[id]', () => FitArticle({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/fitness/challenges', () => FitChallenges()],
+  ['/admin/vip/fitness/challenges/[id]', () => FitChallenge({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/fitness/exercises', () => FitExercises({ searchParams: Promise.resolve({}) })],
+  ['/admin/vip/fitness/programs', () => FitPrograms()],
+  ['/admin/vip/fitness/programs/[id]', () => FitProgram({ params: Promise.resolve({ id: 'nope' }) })],
 ]
 
 async function outcome(render: () => Promise<unknown>): Promise<string> {
@@ -55,6 +75,20 @@ async function outcome(render: () => Promise<unknown>): Promise<string> {
 }
 
 describe('clubhouse admin pages check the role themselves', () => {
+  it('lists every page under src/app/admin/vip (a new page must be added here)', () => {
+    const root = path.resolve(__dirname, '../../src/app/admin/vip')
+    const found: string[] = []
+    const walk = (d: string) => {
+      for (const f of readdirSync(d)) {
+        const p = path.join(d, f)
+        if (statSync(p).isDirectory()) walk(p)
+        else if (f === 'page.tsx') found.push(('/admin/vip/' + path.relative(root, path.dirname(p)).replace(/\\/g, '/')).replace(/\/$/, ''))
+      }
+    }
+    walk(root)
+    expect(found.sort()).toEqual(pages.map(([p]) => p).sort())
+  })
+
   it('anonymous and non-admin members are redirected away from every page', async () => {
     const member = await makeUser({ tag: 'adm-pg-member', tier: 'PREMIUM' })
     for (const who of [null, member]) {
