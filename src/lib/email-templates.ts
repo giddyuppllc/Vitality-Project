@@ -42,8 +42,7 @@ function wrap(innerHtml: string, opts: WrapOptions = {}): string {
   const unsubscribe = includeMarketingFooter
     ? `<p style="margin:8px 0 0 0;font-size:11px;color:#6b7280;">
          You are receiving this because you are subscribed to The Vitality Project.
-         <a href="${APP_URL}/account/settings" style="color:#8193f8;text-decoration:underline;">Manage preferences</a> ·
-         <a href="${APP_URL}/unsubscribe" style="color:#8193f8;text-decoration:underline;">Unsubscribe</a>
+         <a href="${APP_URL}/account/settings" style="color:#8193f8;text-decoration:underline;">Manage preferences / unsubscribe</a>
        </p>`
     : ''
 

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
-import { sendCampaign } from '@/lib/campaigns'
+import { CampaignAlreadySendingError, sendCampaign } from '@/lib/campaigns'
 
 async function guard() {
   const session = await getServerSession(authOptions)
@@ -58,7 +58,12 @@ export async function POST(
 
     return NextResponse.json(result)
   } catch (err) {
+    if (err instanceof CampaignAlreadySendingError) {
+      return NextResponse.json({ error: err.message }, { status: 409 })
+    }
     console.error('[campaigns/send] error', err)
+    // Back to DRAFT so it can be retried — sendCampaign skips everyone who
+    // already received it, so a retry can't double-mail.
     await prisma.marketingCampaign.update({
       where: { id },
       data: { status: 'DRAFT' },

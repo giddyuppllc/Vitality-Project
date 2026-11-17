@@ -46,6 +46,14 @@ const JOBS: Array<{
     maxAgeMinutes: 26 * 60,
   },
   {
+    // Sends campaigns whose Schedule time has passed. Needs a crontab line on
+    // the box: GET /api/cron/scheduled-campaigns?secret=<CRON_SECRET> every 10 min.
+    name: 'Scheduled campaigns',
+    endpoint: '/api/cron/scheduled-campaigns',
+    scheduleHuman: 'Every 10 min',
+    maxAgeMinutes: 30,
+  },
+  {
     // Not in the box's crontab until the clubhouse deploys — see
     // docs/VIP_CLUBHOUSE.md. Grants nothing while every tier is $0.
     name: 'VIP member rewards',

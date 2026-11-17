@@ -1,5 +1,6 @@
 'use client'
 
+import { isoToLocalInput, localInputToIso } from '@/lib/datetime-local'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -21,7 +22,9 @@ export interface SegmentOption {
 }
 
 type Channel = 'EMAIL' | 'SMS'
-type Audience = 'segment' | 'all' | 'new'
+// 'New recipients only' was offered but never implemented server-side — it
+// mailed every customer. Removed until there is a real implementation.
+type Audience = 'segment' | 'all'
 
 interface FormState {
   name: string
@@ -85,9 +88,7 @@ export function CampaignBuilder({
           body: c.body ?? '',
           audience: c.segmentId ? 'segment' : 'all',
           segmentId: c.segmentId ?? '',
-          scheduledAt: c.scheduledAt
-            ? new Date(c.scheduledAt).toISOString().slice(0, 16)
-            : '',
+          scheduledAt: isoToLocalInput(c.scheduledAt),
           testEmail: adminEmail || '',
         })
         setStatus(c.status ?? 'DRAFT')
@@ -98,32 +99,20 @@ export function CampaignBuilder({
   const up = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
 
-  // Live recipient count — only for segment audience (others require server)
+  // Live recipient count — the same audience logic the send uses (opt-outs
+  // excluded), so the number shown is the number that will be mailed.
   const runRecipientCount = async () => {
     setCountingRecipients(true)
     setRecipientCount(null)
     try {
-      if (form.audience === 'segment' && form.segmentId) {
-        const res = await fetch(
-          `/api/admin/segments/${form.segmentId}/customers?limit=1&offset=0`,
-        )
-        if (res.ok) {
-          const data = await res.json()
-          setRecipientCount(data.total ?? 0)
-        }
-      } else if (form.audience === 'all') {
-        const res = await fetch('/api/admin/customers/count').catch(() => null)
-        if (res && res.ok) {
-          const d = await res.json()
-          setRecipientCount(d.count ?? null)
-        } else {
-          setRecipientCount(null)
-          setNotice('Count preview unavailable — will compute on send.')
-        }
-      } else if (form.audience === 'new') {
-        setNotice(
-          'New-recipient count computed at send time (anyone who has never received a campaign).',
-        )
+      if (form.audience === 'segment' && !form.segmentId) return
+      const qs = form.audience === 'segment' ? `?segmentId=${encodeURIComponent(form.segmentId)}` : ''
+      const res = await fetch(`/api/admin/customers/count${qs}`).catch(() => null)
+      if (res && res.ok) {
+        const d = await res.json()
+        setRecipientCount(d.count ?? null)
+      } else {
+        setNotice('Could not count recipients right now — try again.')
       }
     } finally {
       setCountingRecipients(false)
@@ -150,7 +139,7 @@ export function CampaignBuilder({
       subject: f.subject || null,
       body: f.body,
       segmentId: f.audience === 'segment' ? f.segmentId || null : null,
-      scheduledAt: f.scheduledAt || null,
+      scheduledAt: localInputToIso(f.scheduledAt),
     }
   }
 
@@ -360,12 +349,11 @@ export function CampaignBuilder({
           </span>
           <h2 className="font-semibold text-white/80">Audience</h2>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {(
             [
               ['all', 'All customers'],
               ['segment', 'Saved segment'],
-              ['new', 'New recipients only'],
             ] as const
           ).map(([val, label]) => (
             <button

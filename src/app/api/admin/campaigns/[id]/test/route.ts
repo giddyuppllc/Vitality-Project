@@ -57,7 +57,9 @@ export async function POST(
     const html = marketingWrapper({
       subject,
       body,
-      unsubscribeUrl: `${APP_URL}/unsubscribe`,
+      // Test sends go to an arbitrary address, not a customer — point at the
+      // preferences page (the old /unsubscribe was a 404).
+      unsubscribeUrl: `${APP_URL}/account/settings`,
     })
 
     const result = await sendEmail({ to: email, subject, html })
