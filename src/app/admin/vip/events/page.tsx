@@ -34,6 +34,8 @@ export default async function AdminVipEventsPage() {
                       <p className="text-xs text-white/40">
                         {formatDate(e.startsAt)} {e.startsAt.toISOString().slice(11, 16)} UTC · {TIER_BENEFITS[minTier].label} and up ·{' '}
                         {e.published ? 'published' : 'draft'} · {e._count.rsvps} RSVPs
+                        {e.capacity ? ` (capacity ${e.capacity})` : ''}
+                        {e.recordingUrl && ' · recording in Library'}
                         {e.cancelledAt && <span className="text-amber-300"> · cancelled</span>}
                       </p>
                     </div>
@@ -58,6 +60,9 @@ export default async function AdminVipEventsPage() {
                         minTier,
                         published: e.published,
                         repeatMonthly: e.repeatMonthly,
+                        kind: e.kind,
+                        capacity: e.capacity,
+                        recordingUrl: e.recordingUrl,
                       }}
                     />
                   </div>
