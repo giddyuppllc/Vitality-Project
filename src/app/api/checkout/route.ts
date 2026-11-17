@@ -14,7 +14,7 @@ import {
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
 import { computeCartTotal, UnorderableLineError } from '@/lib/pricing'
-import { TIER_BENEFITS } from '@/lib/membership'
+import { consumePeptideCredits, PeptideCreditsChangedError, TIER_BENEFITS } from '@/lib/membership'
 import { InsufficientCreditError } from '@/lib/order-credit'
 import { resolveOrderAffiliate } from '@/lib/affiliate-tracking'
 import {
@@ -35,7 +35,13 @@ import { z } from 'zod'
 import { decrementStock } from '@/lib/inventory'
 
 /** Credit/points debited before the card is charged; released if no order results. */
-type Reservation = { userId: string; credit: number; points: number } | null
+type Reservation = {
+  userId: string
+  credit: number
+  points: number
+  peptideCredits: number
+  membershipId: string | null
+} | null
 
 async function releaseReservation(r: Reservation) {
   if (!r) return
@@ -51,6 +57,12 @@ async function releaseReservation(r: Reservation) {
         await tx.loyaltyAccount.update({
           where: { userId: r.userId },
           data: { points: { increment: r.points } },
+        })
+      }
+      if (r.peptideCredits > 0 && r.membershipId) {
+        await tx.membership.updateMany({
+          where: { id: r.membershipId, freePeptidesUsedThisPeriod: { gte: r.peptideCredits } },
+          data: { freePeptidesUsedThisPeriod: { decrement: r.peptideCredits } },
         })
       }
     })
@@ -287,8 +299,17 @@ export async function POST(req: NextRequest) {
     // $50 credit left it at -$76.72). A lost race now refuses with 409 before
     // any card is charged. The reservation is released if the payment fails
     // or the order cannot be written.
-    if (actualCreditUse > 0 || plannedPointsRedeem > 0) {
+    const creditsToConsume = membership && peptideCreditsApplied > 0 ? peptideCreditsApplied : 0
+    if (actualCreditUse > 0 || plannedPointsRedeem > 0 || creditsToConsume > 0) {
       await prisma.$transaction(async (tx) => {
+        // Free-peptide credits too (conditional — see consumePeptideCredits).
+        if (membership && creditsToConsume > 0) {
+          await consumePeptideCredits(tx, {
+            membershipId: membership.id,
+            applied: creditsToConsume,
+            creditsThisPeriod: membership.freePeptideCreditsThisPeriod,
+          })
+        }
         if (actualCreditUse > 0) {
           const { count } = await tx.storeCredit.updateMany({
             where: { userId: session.user.id, balance: { gte: actualCreditUse } },
@@ -304,7 +325,13 @@ export async function POST(req: NextRequest) {
           if (count !== 1) throw new InsufficientPointsError()
         }
       })
-      reservation = { userId: session.user.id, credit: actualCreditUse, points: plannedPointsRedeem }
+      reservation = {
+        userId: session.user.id,
+        credit: actualCreditUse,
+        points: plannedPointsRedeem,
+        peptideCredits: creditsToConsume,
+        membershipId: membership?.id ?? null,
+      }
     }
 
     // Only charge the card for the remaining balance.
@@ -422,17 +449,6 @@ export async function POST(req: NextRequest) {
     // The discount-code use was claimed atomically up-front; clear the release
     // tracker so the catch won't roll it back now the order exists.
     claimedDiscountCodeId = null
-
-    // Consume this cycle's free-peptide credits (mirrors checkout-zelle). BAC +
-    // syringes are free on every order, so nothing to decrement for those.
-    if (membership && peptideCreditsApplied > 0) {
-      await prisma.membership
-        .update({
-          where: { id: membership.id },
-          data: { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } },
-        })
-        .catch((err) => console.error('[checkout] credit decrement failed:', err))
-    }
 
     // Decrement inventory NOW — this order is created PAID/PROCESSING, so it never
     // traverses the mark-paid/PATCH path that decrements Zelle orders. Without
@@ -591,7 +607,11 @@ export async function POST(req: NextRequest) {
     if (error instanceof DiscountCodeError || error instanceof UnorderableLineError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {
+    if (
+      error instanceof InsufficientCreditError ||
+      error instanceof InsufficientPointsError ||
+      error instanceof PeptideCreditsChangedError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     return NextResponse.json({ error: 'Checkout failed' }, { status: 500 })

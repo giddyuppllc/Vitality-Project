@@ -174,6 +174,29 @@ describe('member pricing never discounts more than the merchandise', () => {
   })
 })
 
+describe('free-peptide credits cannot be double-spent', () => {
+  for (const path of ['zelle', 'card'] as const) {
+    it(`${path}: simultaneous orders get one free peptide per credit, no more`, async () => {
+      const m = await makeUser({ tag: `mp-pepcred-${path}`, tier: 'PLUS' })
+      await prisma.membership.update({ where: { userId: m.id }, data: { freePeptideCreditsThisPeriod: 1, freePeptidesUsedThisPeriod: 0 } })
+      const p = await product(10000)
+      setSession(m)
+      await Promise.all(
+        [1, 2, 3].map(() =>
+          path === 'zelle'
+            ? zellePOST(zelleReq(m, [{ productId: p.id, quantity: 1 }], { useStoreCredit: false }))
+            : cardPOST(cardReq(m, [{ productId: p.id, quantity: 1 }])),
+        ),
+      )
+      const mem = await prisma.membership.findUniqueOrThrow({ where: { userId: m.id } })
+      expect(mem.freePeptidesUsedThisPeriod).toBeLessThanOrEqual(1)
+      const orders = await prisma.order.findMany({ where: { userId: m.id } })
+      // Credited units are discounted to $0: at most one order may have had that.
+      expect(orders.filter((o) => o.discount >= 10000).length).toBeLessThanOrEqual(1)
+    })
+  }
+})
+
 describe('Zelle checkout: loyalty points cannot be double-spent', () => {
   it('two simultaneous Zelle orders redeeming the same points: the discount is only given once', async () => {
     const m = await makeUser({ tag: 'mp-zelle-pts' })

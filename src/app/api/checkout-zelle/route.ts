@@ -15,7 +15,7 @@ import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { computeCartTotal, UnorderableLineError } from '@/lib/pricing'
-import { TIER_BENEFITS } from '@/lib/membership'
+import { consumePeptideCredits, PeptideCreditsChangedError, TIER_BENEFITS } from '@/lib/membership'
 import {
   InsufficientCreditError,
   plannedCreditUse,
@@ -440,6 +440,14 @@ export async function POST(req: NextRequest) {
       // paid for. (Was a read-then-write after the order was committed, so
       // parallel orders each got the full points discount and the balance
       // went negative.)
+      // This cycle's free-peptide credits, consumed atomically with the order.
+      if (membership && peptideCreditsApplied > 0) {
+        await consumePeptideCredits(tx, {
+          membershipId: membership.id,
+          applied: peptideCreditsApplied,
+          creditsThisPeriod: membership.freePeptideCreditsThisPeriod,
+        })
+      }
       if (loyaltyPointsToUse > 0 && userId) {
         await redeemPointsInTx(tx, {
           userId,
@@ -470,19 +478,6 @@ export async function POST(req: NextRequest) {
     // release tracker means the catch below won't roll it back now the order
     // exists.
     claimedDiscountCodeId = null
-
-    // Consume this cycle's peptide credits now that the order row exists.
-    // (BAC + syringes are free on every order, so there's nothing to decrement.)
-    if (membership && peptideCreditsApplied > 0) {
-      await prisma.membership
-        .update({
-          where: { id: membership.id },
-          data: { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } },
-        })
-        .catch((err) =>
-          console.error('[checkout-zelle] credit decrement failed:', err),
-        )
-    }
 
     // Clear server-side cart_items for this user so the abandoned-cart cron
     // doesn't pester them while they're still mid-Zelle-transfer. Best-effort
@@ -620,7 +615,11 @@ export async function POST(req: NextRequest) {
     if (error instanceof DiscountCodeError || error instanceof UnorderableLineError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {
+    if (
+      error instanceof InsufficientCreditError ||
+      error instanceof InsufficientPointsError ||
+      error instanceof PeptideCreditsChangedError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     return NextResponse.json(
