@@ -7,6 +7,7 @@ import RewardsPage from '@/app/admin/vip/rewards/page'
 import SpacesPage from '@/app/admin/vip/spaces/page'
 import ClassroomPage from '@/app/admin/vip/classroom/page'
 import CourseEditor from '@/app/admin/vip/classroom/[id]/page'
+import ReportedConversation from '@/app/admin/vip/conversations/[id]/page'
 
 /**
  * The admin layout's role check is NOT an access boundary: Next renders only
@@ -24,6 +25,7 @@ const pages: Array<[string, () => Promise<unknown>]> = [
   ['/admin/vip/spaces', () => SpacesPage()],
   ['/admin/vip/classroom', () => ClassroomPage()],
   ['/admin/vip/classroom/[id]', () => CourseEditor({ params: Promise.resolve({ id: 'nope' }) })],
+  ['/admin/vip/conversations/[id]', () => ReportedConversation({ params: Promise.resolve({ id: 'nope' }) })],
 ]
 
 async function outcome(render: () => Promise<unknown>): Promise<string> {
