@@ -4,7 +4,14 @@
 
 export function escapeCsvCell(value: unknown): string {
   if (value === null || value === undefined) return ''
-  const str = String(value)
+  let str = String(value)
+  // Formula injection: exports carry customer-typed text (names, emails,
+  // addresses). A cell starting with = + - @ (or tab/CR) is executed as a
+  // formula when an admin opens the file in Excel/Sheets. Prefix text cells
+  // with ' so they stay text. Real numbers are left alone.
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`
+  }
   // RFC 4180: quote if contains comma, quote, CR, or LF
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`
