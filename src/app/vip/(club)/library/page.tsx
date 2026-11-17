@@ -80,7 +80,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
           <EmptyState title="The Library fills up as the team publishes.">Guides, PDFs and every recorded live session land here.</EmptyState>
         )
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2" data-testid="library-items">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="library-items">
           {items.map((it) => {
             const Icon = KIND_ICON[it.kind as keyof typeof KIND_ICON] ?? LibraryIcon
             const body = (
@@ -94,7 +94,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
                     <span className="text-xs text-white/60">{categoryLabel(it.category)}</span>
                   </span>
                   <span className="mt-1 block font-semibold leading-snug">{it.title}</span>
-                  {it.summary && <span className="mt-1 line-clamp-2 block text-sm text-white/65">{it.summary}</span>}
+                  {it.summary && <span className="mt-1 line-clamp-2 text-sm text-white/65">{it.summary}</span>}
                   <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/60">
                     {it.allowed ? (
                       it.fileName ? (

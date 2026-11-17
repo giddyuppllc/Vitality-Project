@@ -161,7 +161,10 @@ export async function getCourse(slug: string, userId: string, accessTier: Member
   const completedCount = lessonIds.filter((id) => done.has(id)).length
   const allLessons = modules.flatMap((m) => m.lessons)
   const nextLesson = allLessons.find((l) => l.allowed && !l.completed) ?? null
-  const resumeLesson = resume ? allLessons.find((l) => l.id === resume.lessonId && l.allowed) ?? null : null
+  // Resume: the last lesson opened while it is unfinished, else the first
+  // unfinished lesson (a finished last-opened lesson would skip work).
+  const lastOpened = resume ? allLessons.find((l) => l.id === resume.lessonId && l.allowed) ?? null : null
+  const resumeLesson = lastOpened && !lastOpened.completed ? lastOpened : nextLesson ?? lastOpened
   const totalSteps = lessonIds.length + quizzes.length
   const doneSteps = completedCount + quizzes.filter((q) => q.passed).length
   return {
@@ -176,7 +179,7 @@ export async function getCourse(slug: string, userId: string, accessTier: Member
     totalSteps,
     doneSteps,
     progressPct: totalSteps ? Math.round((doneSteps / totalSteps) * 100) : 0,
-    resumeLesson: resumeLesson ?? nextLesson,
+    resumeLesson,
     certificate: cert ? { code: cert.code, issuedAt: cert.issuedAt.toISOString() } : null,
   }
 }
@@ -253,6 +256,7 @@ export async function continueLearning(userId: string, accessTier: MembershipTie
   const [lessons, granted, certs] = await Promise.all([
     prisma.vipLesson.findMany({
       where: { published: true, module: { courseId: { in: courseIds } } },
+      orderBy: [{ module: { sortOrder: 'asc' } }, { module: { createdAt: 'asc' } }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, title: true, minTier: true, module: { select: { courseId: true } } },
     }),
     grantedCourseIds(userId, courseIds),
@@ -266,9 +270,11 @@ export async function continueLearning(userId: string, accessTier: MembershipTie
   for (const r of resumes) {
     if (finished.has(r.course.id)) continue
     const own = lessons.filter((l) => l.module.courseId === r.course.id)
-    const lesson = own.find((l) => l.id === r.lessonId)
     const gate = { granted: granted.has(r.course.id), isAdmin: opts.isAdmin }
-    if (!lesson || !allowsTier(r.course, lesson.minTier ?? r.course.minTier, accessTier, gate)) continue
+    const open = (l: (typeof own)[number]) => allowsTier(r.course, l.minTier ?? r.course.minTier, accessTier, gate)
+    const last = own.find((l) => l.id === r.lessonId)
+    const lesson = last && !done.has(last.id) && open(last) ? last : own.find((l) => !done.has(l.id) && open(l)) ?? (last && open(last) ? last : undefined)
+    if (!lesson) continue
     out.push({
       courseSlug: r.course.slug,
       courseTitle: r.course.title,

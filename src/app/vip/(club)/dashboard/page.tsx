@@ -74,13 +74,13 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-6">
           {/* Continue learning */}
           <section aria-labelledby="learn-h">
             <SectionHead id="learn-h" title="Continue learning" href="/classroom" linkLabel="Academy" />
             {d.learning.length > 0 ? (
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {d.learning.map((c, i) => {
                   const pct = c.total ? (c.done / c.total) * 100 : 0
                   return (
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
           {/* Today */}
           <section aria-labelledby="today-h">
             <SectionHead id="today-h" title="Today" />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Link href="/training" className="vip-focus vip-surface group flex flex-col gap-3 p-5 hover:bg-white/[0.04]" data-testid="card-training">
                 <span className="flex items-center justify-between">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-300/10 ring-1 ring-inset ring-emerald-300/25" aria-hidden="true">
@@ -180,7 +180,7 @@ export default async function DashboardPage() {
                             {p.space && <span className="text-white/60"># {p.space.name}</span>}
                             <span className="text-xs text-white/60">{timeAgo(p.createdAt)}</span>
                           </span>
-                          <span className="mt-0.5 line-clamp-2 block text-sm text-white/80">{p.body}</span>
+                          <span className="mt-0.5 line-clamp-2 text-sm text-white/80">{p.body}</span>
                           <span className="mt-1.5 flex gap-4 text-xs text-white/60">
                             <span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5" aria-hidden="true" /> {p.likes}</span>
                             <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {p.comments}</span>

@@ -125,7 +125,7 @@ export function TrainingPurchase({
       </h2>
       <p className="mt-1 text-sm text-white/70">Yours to keep: every lesson, module check and the certificate, whatever your level.</p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {pointsPrice !== null && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/60">With points</p>

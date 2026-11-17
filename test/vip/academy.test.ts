@@ -309,6 +309,21 @@ describe('paid trainings: Zelle invoice (TRAINING:<courseId>:<userId>)', () => {
   })
 })
 
+describe('resume where you left off', () => {
+  it('resumes the last opened lesson while unfinished, then the first unfinished one', async () => {
+    const { recordResume, continueLearning } = await import('@/lib/vip/classroom')
+    const c = await buildCourse({ tag: 'resume' })
+    const m = await makeUser({ tag: 'acad-resume', tier: 'CLUB' })
+    expect((await getCourse(c.slug, m.id, 'CLUB'))!.resumeLesson?.id).toBe(c.l1)
+    await recordResume(m.id, c.course, c.l2)
+    expect((await getCourse(c.slug, m.id, 'CLUB'))!.resumeLesson?.id).toBe(c.l2)
+    setSession(m)
+    await call(progress.POST, req(`/api/vip/lessons/${c.l2}/progress`, { method: 'POST' }), { id: c.l2 })
+    expect((await getCourse(c.slug, m.id, 'CLUB'))!.resumeLesson?.id).toBe(c.l1)
+    expect((await continueLearning(m.id, 'CLUB'))[0]).toMatchObject({ lessonId: c.l1, done: 1, total: 2 })
+  })
+})
+
 describe('private lesson notes', () => {
   it('saves per member; nobody else reads them; empty deletes', async () => {
     const c = await buildCourse({ tag: 'notes' })

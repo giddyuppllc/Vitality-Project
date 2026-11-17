@@ -87,7 +87,7 @@ export default async function VipLanding() {
   const questions = [...faq({ expiryMonths: settings['vip.rewardExpiryMonths'], credits }), ...LANDING_FAQ_EXTRA]
 
   return (
-    <div className="vip-landing">
+    <div className="vip-landing overflow-x-clip">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <header className="flex h-20 items-center justify-between">
           <Wordmark />
@@ -103,7 +103,7 @@ export default async function VipLanding() {
 
       <main id="main" className="pb-16">
         {/* Hero */}
-        <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-6 sm:px-6 sm:pt-12 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-4 pt-6 sm:px-6 sm:pt-12 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-white/80">
               <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {LANDING.eyebrow}
@@ -203,7 +203,7 @@ export default async function VipLanding() {
           <h2 id="inside" className="mt-2 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
             Four parts of a healthier life, working together.
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
             {pillars.map((p) => (
               <article key={p.key} className="vip-surface relative overflow-hidden p-6 sm:p-7">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.05]">
@@ -262,7 +262,7 @@ export default async function VipLanding() {
             {LANDING.compareTitle}
           </h2>
           <p className="mt-2 max-w-2xl text-white/70">{LANDING.compareIntro}</p>
-          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
             {PAID_TIERS.map((t) => {
               const b = TIER_BENEFITS[t]
               const premium = t === 'PREMIUM'
@@ -354,7 +354,7 @@ export default async function VipLanding() {
           <h2 id="steps" className="mt-2 text-3xl font-bold tracking-tight">
             {LANDING.stepsTitle}
           </h2>
-          <ol className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {VIP_COPY.joinSteps.map((s, i) => (
               <li key={s.title} className="vip-surface p-5">
                 <span className="vip-gold text-sm font-bold">0{i + 1}</span>

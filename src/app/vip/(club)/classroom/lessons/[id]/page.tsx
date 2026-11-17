@@ -31,7 +31,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
   const video = allowed ? videoEmbed(lesson.videoUrl) : null
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0">
         <Link href={`/classroom/${course.slug}`} className="vip-focus mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-sm text-white/65 hover:text-white">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {course.title}
@@ -91,7 +91,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
               {resources.length > 0 && (
                 <section className="mt-7" aria-labelledby="res-h">
                   <h2 id="res-h" className="text-sm font-semibold">Resources</h2>
-                  <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {resources.map((r) => (
                       <li key={r.id}>
                         <a

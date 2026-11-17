@@ -37,7 +37,7 @@ export default async function AcademyPage() {
           {resume.length > 0 && (
             <section aria-labelledby="resume-h">
               <SectionHead id="resume-h" title="Pick up where you left off" />
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {resume.map((r) => (
                   <li key={r.courseSlug}>
                     <Link href={`/classroom/lessons/${r.lessonId}`} className="vip-focus vip-surface-strong flex items-center gap-4 p-4 hover:bg-white/[0.05]">
@@ -57,7 +57,7 @@ export default async function AcademyPage() {
           {tracks.length > 0 && (
             <section aria-labelledby="paths-h">
               <SectionHead id="paths-h" title="Learning paths" />
-              <ul className="grid gap-3 md:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {tracks.map((t) => {
                   const pct = t.lessonCount ? (t.completedCount / t.lessonCount) * 100 : 0
                   return (
@@ -93,7 +93,7 @@ export default async function AcademyPage() {
 
           <section aria-labelledby="courses-h">
             <SectionHead id="courses-h" title="All courses" />
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {courses.map((c, i) => (
                 <li key={c.id}>
                   <CourseTile c={c} index={i} />
@@ -107,7 +107,7 @@ export default async function AcademyPage() {
             {certs.length === 0 ? (
               <p className="vip-surface p-5 text-sm text-white/65">Finish every lesson and module check in a course and its certificate appears here.</p>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {certs.map((c) => (
                   <li key={c.code}>
                     <Link href={`/certificate/${c.code}`} className="vip-focus vip-surface vip-premium flex items-center gap-4 p-4 hover:bg-white/[0.04]">

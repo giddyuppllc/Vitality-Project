@@ -258,7 +258,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
               All in the Library →
             </Link>
           </div>
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {recordings.map((e) => (
               <li key={e.id}>
                 {e.allowed && e.recordingUrl ? (
