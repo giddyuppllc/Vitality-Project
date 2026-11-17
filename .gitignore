@@ -41,3 +41,4 @@ scripts/out/
 .vip-dev-db/
 .dev-db-*/
 private-uploads/
+.dev-db-fit/

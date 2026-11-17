@@ -16,6 +16,7 @@ export function VipAdminTabs() {
     { href: '/admin/vip/classroom', label: 'Classroom' },
     { href: '/admin/vip/events', label: 'Events' },
     { href: '/admin/vip/library', label: 'Library' },
+    { href: '/admin/vip/fitness', label: 'Fitness' },
     { href: '/admin/vip/rewards', label: 'Rewards' },
     { href: '/admin/vip/partners', label: 'Partners' },
   ]
