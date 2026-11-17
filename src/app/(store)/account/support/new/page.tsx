@@ -23,7 +23,7 @@ export default function NewTicketPage() {
 
   useEffect(() => {
     // Best-effort: grab orders so customer can tag the ticket
-    fetch('/api/orders')
+    fetch('/api/account/orders')
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (Array.isArray(data)) setOrders(data)

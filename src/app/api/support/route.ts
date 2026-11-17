@@ -59,6 +59,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Only the customer's own order can be attached to their ticket; a guest
+    // (or a tampered id) gets no order link rather than someone else's.
+    let orderId: string | undefined
+    if (data.orderId && session?.user?.id) {
+      const own = await prisma.order.findFirst({
+        where: { id: data.orderId, userId: session.user.id },
+        select: { id: true },
+      })
+      orderId = own?.id
+    }
+
     const number = await nextTicketNumber()
 
     const ticket = await prisma.supportTicket.create({
@@ -69,7 +80,7 @@ export async function POST(req: NextRequest) {
         subject: data.subject,
         status: 'OPEN',
         priority: data.priority ?? 'NORMAL',
-        orderId: data.orderId,
+        orderId,
         messages: {
           create: {
             authorId: session?.user?.id ?? null,
