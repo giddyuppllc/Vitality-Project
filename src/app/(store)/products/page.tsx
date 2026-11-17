@@ -4,6 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { ProductCard } from '@/components/store/product-card'
 import { SortSelect } from '@/components/store/sort-select'
 import type { ProductWithImages } from '@/types'
+import type { Metadata } from 'next'
+import { displayPrice } from '@/lib/display-price'
+
+// Was missing: /products carried the homepage's title.
+export const metadata: Metadata = { title: 'Products' }
 
 interface Props {
   searchParams: Promise<{
@@ -28,18 +33,17 @@ async function getProducts(searchParams: Awaited<Props['searchParams']>) {
     ]
   }
 
+  // Price sorts are applied after the query, on the price shoppers see
+  // (lib/display-price). Sorting on the Product.price column ordered the grid
+  // by a stale number — e.g. Selank ($74 on its card) sorted as $45.
   const orderBy: any =
-    searchParams.sort === 'price-asc'
-      ? { price: 'asc' }
-      : searchParams.sort === 'price-desc'
-      ? { price: 'desc' }
-      : searchParams.sort === 'newest'
+    searchParams.sort === 'newest'
       ? { createdAt: 'desc' }
       : searchParams.sort === 'name-asc'
       ? { name: 'asc' }
       : { featured: 'desc' }
 
-  return prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where,
     include: {
       images: { orderBy: { position: 'asc' }, take: 1 },
@@ -48,6 +52,21 @@ async function getProducts(searchParams: Awaited<Props['searchParams']>) {
     },
     orderBy,
   })
+
+  if (searchParams.sort === 'price-asc' || searchParams.sort === 'price-desc') {
+    const dir = searchParams.sort === 'price-asc' ? 1 : -1
+    // Unavailable products (no sellable price) always sort last.
+    const key = (p: (typeof products)[number]) => displayPrice(p)
+    return products.slice().sort((a, b) => {
+      const pa = key(a)
+      const pb = key(b)
+      if (pa === null && pb === null) return 0
+      if (pa === null) return 1
+      if (pb === null) return -1
+      return (pa - pb) * dir
+    })
+  }
+  return products
 }
 
 async function getCategories() {
