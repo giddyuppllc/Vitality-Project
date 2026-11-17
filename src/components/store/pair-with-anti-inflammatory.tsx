@@ -61,6 +61,7 @@ export async function PairWithAntiInflammatory({ currentSlug, currentCategorySlu
                   src={productImage(p)}
                   alt={p.name}
                   fill
+                  sizes="64px"
                   className={isFallbackImage(p) ? 'object-contain p-2' : 'object-cover'}
                 />
               </div>

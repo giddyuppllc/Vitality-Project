@@ -45,6 +45,7 @@ export default async function HomePage() {
             src="/images/lifestyle/hero-athlete-sunrise.png"
             alt="Active lifestyle"
             fill
+            sizes="100vw"
             className="object-cover object-center"
             priority
           />
@@ -106,6 +107,7 @@ export default async function HomePage() {
                 src="/images/lifestyle/wellness-morning.png"
                 alt="Morning routine"
                 fill
+                sizes="(max-width: 1024px) 100vw, 640px"
                 className="object-cover"
               />
             </div>
@@ -139,6 +141,7 @@ export default async function HomePage() {
                       src={cat.image}
                       alt={cat.title}
                       fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -189,6 +192,7 @@ export default async function HomePage() {
               src="/images/lifestyle/lab-quality.png"
               alt="Pharmaceutical grade vials"
               fill
+              sizes="(max-width: 1280px) 100vw, 1280px"
               className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
