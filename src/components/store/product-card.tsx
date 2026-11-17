@@ -64,7 +64,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.category && (
               <p className="text-xs text-brand-400 uppercase tracking-wider">{product.category.name}</p>
             )}
-            <span className="text-[10px] text-white/25 font-medium tracking-wide">RUO</span>
+            <span className="text-[10px] text-white/50 font-medium tracking-wide">RUO</span>
           </div>
           <h3 className="font-semibold text-white mb-1.5 line-clamp-2">{product.name}</h3>
           {variantLabels.length > 0 && (

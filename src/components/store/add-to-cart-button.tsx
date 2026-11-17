@@ -71,7 +71,7 @@ export function AddToCartButton({ product }: Props) {
     <div className="space-y-4">
       {hasVariants && (
         <div className="space-y-2">
-          <p id="variant-label" className="text-xs uppercase tracking-[0.12em] text-white/45 font-semibold">
+          <p id="variant-label" className="text-xs uppercase tracking-[0.12em] text-white/60 font-semibold">
             Strength / size
           </p>
           <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="variant-label">
@@ -152,7 +152,7 @@ export function AddToCartButton({ product }: Props) {
         </Button>
       </div>
 
-      <p className="text-[11px] text-white/35 leading-relaxed">
+      <p className="text-[11px] text-white/55 leading-relaxed">
         Pay via Zelle. After you place the order we email you the send-to address. Items ship same day funds arrive.
       </p>
     </div>

@@ -200,7 +200,7 @@ export default async function ProductPage({ params }: Props) {
 
           <div>
             <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-            {product.sku && <p className="text-white/30 text-sm">SKU: {product.sku}</p>}
+            {product.sku && <p className="text-white/50 text-sm">SKU: {product.sku}</p>}
           </div>
 
           {/* Price */}
@@ -289,8 +289,8 @@ export default async function ProductPage({ params }: Props) {
 
           {/* RUO Disclaimer */}
           <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
-            <p className="text-[11px] text-white/30 leading-relaxed">
-              <strong className="text-white/40">For Research Use Only.</strong> Not for human consumption. Not intended to diagnose, treat, cure, or prevent any disease. Not evaluated by the FDA. By purchasing you confirm these are for legitimate research purposes.
+            <p className="text-[11px] text-white/55 leading-relaxed">
+              <strong className="text-white/75">For Research Use Only.</strong> Not for human consumption. Not intended to diagnose, treat, cure, or prevent any disease. Not evaluated by the FDA. By purchasing you confirm these are for legitimate research purposes.
             </p>
           </div>
         </div>
