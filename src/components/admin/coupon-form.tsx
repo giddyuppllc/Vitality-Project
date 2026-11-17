@@ -246,6 +246,8 @@ export function CouponForm({
             required
             type="number"
             step={form.type === 'FIXED' ? '0.01' : '1'}
+            min="0"
+            max={form.type === 'PERCENTAGE' ? '100' : undefined}
             value={form.value}
             onChange={(e) => up('value', e.target.value)}
           />

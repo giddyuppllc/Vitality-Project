@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { couponExpiryFromInput, zodMessage } from '@/lib/coupon-admin'
 
 const ruleSchema = z
   .object({
@@ -37,6 +38,9 @@ const schema = z.object({
   expiresAt: z.string().optional().nullable(),
   active: z.boolean().default(true),
   rule: ruleSchema,
+}).refine((d) => d.type !== 'PERCENTAGE' || d.value <= 100, {
+  message: 'A percentage discount can be at most 100',
+  path: ['value'],
 })
 
 export const dynamic = 'force-dynamic'
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
     const created = await prisma.discountCode.create({
       data: {
         ...base,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        expiresAt: couponExpiryFromInput(expiresAt),
         rule: rule
           ? {
               create: {
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error) }, { status: 400 })
     console.error('Discount create error:', error)
     return NextResponse.json(
       { error: 'Failed to create discount code' },
