@@ -1,5 +1,6 @@
 'use client'
 
+import { localInputToIso } from '@/lib/datetime-local'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -100,7 +101,7 @@ export function CustomerQuickActions({ userId, userEmail }: Props) {
           title: taskTitle.trim(),
           description: taskDesc.trim() || undefined,
           priority: taskPriority,
-          dueAt: taskDueAt || undefined,
+          dueAt: localInputToIso(taskDueAt) ?? undefined,
           entityType: 'User',
           entityId: userId,
         }),
