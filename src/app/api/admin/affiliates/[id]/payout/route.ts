@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const schema = z.object({
   /** Cents — what we're recording as paid out. Defaults to "all approved unpaid commissions". */
@@ -50,7 +51,7 @@ export async function POST(
     body = schema.parse(await req.json())
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof z.ZodError ? e.issues : 'Invalid body' },
+      { error: e instanceof z.ZodError ? zodMessage(e) : 'Invalid body' },
       { status: 400 },
     )
   }
