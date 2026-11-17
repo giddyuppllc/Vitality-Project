@@ -2,18 +2,19 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireVipApi, vipJson } from '@/lib/vip/access'
 import { lessonAccess } from '@/lib/vip/classroom'
+import { hasCourseGrant } from '@/lib/vip/course-grants'
 
 export const dynamic = 'force-dynamic'
 
 type Ctx = { params: Promise<{ id: string }> }
 
-async function load(id: string, accessTier: Parameters<typeof lessonAccess>[1]) {
+async function load(id: string, accessTier: Parameters<typeof lessonAccess>[1], userId: string) {
   const lesson = await prisma.vipLesson.findUnique({
     where: { id },
     include: { module: { include: { course: true } } },
   })
   if (!lesson) return null
-  return lessonAccess(lesson, accessTier)
+  return lessonAccess(lesson, accessTier, await hasCourseGrant(userId, lesson.module.courseId))
 }
 
 /** POST /api/vip/lessons/:id/progress — mark a lesson complete. */
@@ -21,7 +22,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   const gate = await requireVipApi('member')
   if (gate.response) return gate.response
   const { id } = await params
-  const access = await load(id, gate.viewer.accessTier)
+  const access = await load(id, gate.viewer.accessTier, gate.viewer.userId)
   if (!access) return vipJson({ error: 'Not found' }, { status: 404 })
   if (!access.allowed) return vipJson({ error: 'tier_required', minTier: access.minTier }, { status: 403 })
   await prisma.vipLessonProgress.upsert({
