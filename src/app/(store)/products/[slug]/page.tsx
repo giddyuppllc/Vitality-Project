@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { cache } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
@@ -23,7 +24,10 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
-async function getProduct(slug: string) {
+// cache(): generateMetadata and the page both ask for the product; without it
+// the whole include tree (product, images, category, variants, reviews+users)
+// was queried twice per view.
+const getProduct = cache(async (slug: string) => {
   return prisma.product.findUnique({
     where: { slug, status: 'ACTIVE' },
     include: {
@@ -38,7 +42,7 @@ async function getProduct(slug: string) {
       },
     },
   })
-}
+})
 
 /**
  * Lab reports for this product. CoAs are keyed to a product by `productSlug`
@@ -92,11 +96,16 @@ export default async function ProductPage({ params }: Props) {
       : product.inventory > 0)
   const discountPct = discountPercent(product.comparePrice, price)
 
-  const related = await getRelatedProducts(product.id, 4)
-  const coas = await getProductCoas(product.slug, product.name)
+  // Independent reads run together. They ran one after another; each Prisma
+  // include is its own round trip, and live TTFB for a product page was ~5.3 s
+  // (vs ~0.3 s for a static page).
+  const [related, coas, session] = await Promise.all([
+    getRelatedProducts(product.id, 4),
+    getProductCoas(product.slug, product.name),
+    getServerSession(authOptions),
+  ])
 
   // Determine if current user has purchased this product (to show review button)
-  const session = await getServerSession(authOptions)
   let canReview = false
   let alreadyReviewed = false
   if (session?.user?.id) {
