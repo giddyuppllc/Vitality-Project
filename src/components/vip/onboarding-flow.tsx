@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Bell, Check, Loader2, Route, Sparkles, Target, UserRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bell, Check, Dumbbell, Loader2, Route, Sparkles, Target, UserRound, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MAX_GOALS, ONBOARDING_GOALS, ONBOARDING_INTERESTS } from '@/lib/vip/onboarding-options'
+import { FitnessUnitsStep, FollowSuggestionsStep, type OnboardingExtraContext } from './onboarding-steps'
 
 export interface OnboardingTrack {
   id: string
@@ -26,17 +27,33 @@ interface State {
 }
 
 /**
- * Extra first-run steps contributed by other clubhouse features. The
- * "follow suggested members" step belongs to the social builder: at merge,
- * push a step here (it receives the shared state and renders its own UI).
- * Nothing is shown for it until then.
+ * Extra first-run steps contributed by other clubhouse features — social's
+ * "follow suggested members" and fitness's units. Each gets the server data
+ * from /welcome (OnboardingExtraContext), decides whether it applies, and
+ * saves as the member acts.
  */
 export const ONBOARDING_EXTRA_STEPS: Array<{
   key: string
   title: string
   icon: typeof UserRound
-  render: () => React.ReactNode
-}> = []
+  show: (ctx: OnboardingExtraContext & { suspended: boolean }) => boolean
+  render: (ctx: OnboardingExtraContext) => React.ReactNode
+}> = [
+  {
+    key: 'follow',
+    title: 'Follow a few members',
+    icon: Users,
+    show: (ctx) => !ctx.suspended && ctx.suggestions.length > 0,
+    render: (ctx) => <FollowSuggestionsStep suggestions={ctx.suggestions} />,
+  },
+  {
+    key: 'units',
+    title: 'Your training units',
+    icon: Dumbbell,
+    show: () => true,
+    render: (ctx) => <FitnessUnitsStep initial={ctx.units} />,
+  },
+]
 
 function Chip({ on, label, onClick, disabled }: { on: boolean; label: string; onClick: () => void; disabled?: boolean }) {
   return (
@@ -76,11 +93,14 @@ export function OnboardingFlow({
   initial,
   tracks,
   suspended,
+  extra: extraCtx = { suggestions: [], units: 'IMPERIAL' },
 }: {
   firstName: string
   initial: State
   tracks: OnboardingTrack[]
   suspended: boolean
+  /** Data for the social + fitness steps (ONBOARDING_EXTRA_STEPS). */
+  extra?: OnboardingExtraContext
 }) {
   const router = useRouter()
   const [s, setS] = useState<State>(initial)
@@ -98,7 +118,7 @@ export function OnboardingFlow({
     { key: 'goals', title: 'What are you working toward?', icon: Target },
     { key: 'notifications', title: 'How should we keep you posted?', icon: Bell },
     ...(tracks.length ? [{ key: 'path', title: 'Pick a learning path', icon: Route }] : []),
-    ...ONBOARDING_EXTRA_STEPS.map(({ key, title, icon }) => ({ key, title, icon })),
+    ...ONBOARDING_EXTRA_STEPS.filter((x) => x.show({ ...extraCtx, suspended })).map(({ key, title, icon }) => ({ key, title, icon })),
   ]
   const step = steps[i]
   const last = i === steps.length - 1
@@ -244,7 +264,7 @@ export function OnboardingFlow({
             </div>
           )}
 
-          {extra?.render()}
+          {extra?.render(extraCtx)}
         </div>
 
         {error && (

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import {
-  ArrowRight, Award, BookOpen, ClipboardCheck, Dumbbell, Gift, MessageCircle, PlayCircle, Sparkles, Heart,
+  ArrowRight, Award, BookOpen, ClipboardCheck, Dumbbell, Gift, Heart, ImageIcon, MessageCircle, PlayCircle, Sparkles, Trophy,
 } from 'lucide-react'
 import { requireVipPage } from '@/lib/vip/page-gate'
 import { loadDashboard } from '@/lib/vip/dashboard'
@@ -129,41 +129,95 @@ export default async function DashboardPage() {
             )}
           </section>
 
-          {/* Today */}
+          {/* Today — fitness data (lib/vip/fitness via lib/vip/dashboard.ts) */}
           <section aria-labelledby="today-h">
-            <SectionHead id="today-h" title="Today" />
+            <SectionHead id="today-h" title="Today" href="/fitness" linkLabel="Fitness" />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Link href="/training" className="vip-focus vip-surface group flex flex-col gap-3 p-5 hover:bg-white/[0.04]" data-testid="card-training">
+              <Link
+                href={d.fitness.openWorkout ? `/fitness/workout/${d.fitness.openWorkout.id}` : '/fitness'}
+                className="vip-focus vip-surface group flex flex-col gap-3 p-5 hover:bg-white/[0.04]"
+                data-testid="card-training"
+              >
                 <span className="flex items-center justify-between">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-300/10 ring-1 ring-inset ring-emerald-300/25" aria-hidden="true">
                     <Dumbbell className="h-5 w-5 text-emerald-200" />
                   </span>
                   <ArrowRight className="h-4 w-4 text-white/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                 </span>
-                <span>
-                  <span className="block font-semibold">Today’s workout</span>
-                  <span className="mt-0.5 block text-sm text-white/65">Your program, the workout log and the challenges you have joined.</span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-white/60">Today’s workout</span>
+                  {d.fitness.openWorkout ? (
+                    <>
+                      <span className="mt-0.5 block truncate font-semibold">{d.fitness.openWorkout.title}</span>
+                      <span className="mt-0.5 block text-sm text-amber-100">In progress — tap to resume</span>
+                    </>
+                  ) : d.fitness.workout && !d.fitness.workout.finished && d.fitness.workout.allowed ? (
+                    <>
+                      <span className="mt-0.5 block truncate font-semibold">{d.fitness.workout.rest ? 'Rest day' : d.fitness.workout.dayTitle}</span>
+                      <span className="mt-0.5 block truncate text-sm text-white/65">
+                        {d.fitness.workout.programTitle}
+                        {d.fitness.workout.position ? ` · day ${d.fitness.workout.position.index} of ${d.fitness.workout.position.total}` : ''}
+                      </span>
+                    </>
+                  ) : d.fitness.workout?.finished ? (
+                    <>
+                      <span className="mt-0.5 block truncate font-semibold">{d.fitness.workout.programTitle} — complete</span>
+                      <span className="mt-0.5 block text-sm text-white/65">Pick your next program or log a free session.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mt-0.5 block font-semibold">No program running</span>
+                      <span className="mt-0.5 block text-sm text-white/65">Choose a program or log whatever you train today.</span>
+                    </>
+                  )}
                 </span>
               </Link>
-              <Link href="/checkin" className="vip-focus vip-surface group flex flex-col gap-3 p-5 hover:bg-white/[0.04]" data-testid="card-checkin">
+              <Link href="/fitness/health" className="vip-focus vip-surface group flex flex-col gap-3 p-5 hover:bg-white/[0.04]" data-testid="card-checkin">
                 <span className="flex items-center justify-between">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-500/15 ring-1 ring-inset ring-brand-400/25" aria-hidden="true">
                     <ClipboardCheck className="h-5 w-5 text-brand-200" />
                   </span>
-                  <ArrowRight className="h-4 w-4 text-white/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  {d.fitness.checkedInToday ? <Pill tone="green">Done today</Pill> : <ArrowRight className="h-4 w-4 text-white/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
                 </span>
                 <span>
-                  <span className="block font-semibold">Daily check-in</span>
-                  <span className="mt-0.5 block text-sm text-white/65">Sleep, training, fuel and mood — one minute, every day.</span>
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-white/60">Daily check-in</span>
+                  <span className="mt-0.5 block font-semibold">
+                    {d.fitness.checkedInToday ? 'Checked in' : 'Log today in a minute'}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-white/65">
+                    {d.fitness.streak > 0 ? `${d.fitness.streak}-day streak` : 'Sleep, training, fuel and mood.'}
+                  </span>
                 </span>
               </Link>
             </div>
+            {d.fitness.challenges.length > 0 && (
+              <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Active challenges" data-testid="card-challenges">
+                {d.fitness.challenges.map((c) => (
+                  <li key={c.slug}>
+                    <Link href={`/fitness/challenges/${c.slug}`} className="vip-focus vip-surface flex h-full items-center gap-3 p-3.5 hover:bg-white/[0.04]">
+                      <Trophy className="h-5 w-5 shrink-0 text-[#ead7a8]" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{c.title}</span>
+                        <span className="block text-xs text-white/60">
+                          {c.completed ? 'Completed' : c.joined ? `${(c.score ?? 0).toLocaleString('en-US')} of ${c.target.toLocaleString('en-US')}` : `${c.participants} taking part · join`}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {/* Community */}
           {!viewer.suspended && (
             <section aria-labelledby="community-h">
-              <SectionHead id="community-h" title="Latest in the community" href="/feed" linkLabel="Community" />
+              <SectionHead
+                id="community-h"
+                title={d.postsSource === 'following' ? 'From people you follow' : 'Latest in the community'}
+                href="/feed"
+                linkLabel="Community"
+              />
               {d.posts.length === 0 ? (
                 <Link href="/feed" className="vip-focus vip-surface block p-5 text-sm text-white/70 hover:bg-white/[0.04]">
                   Start the conversation — share today’s training, a win from this week or a question.
@@ -184,6 +238,9 @@ export default async function DashboardPage() {
                           <span className="mt-1.5 flex gap-4 text-xs text-white/60">
                             <span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5" aria-hidden="true" /> {p.likes}</span>
                             <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> {p.comments}</span>
+                            {p.photos > 0 && (
+                              <span className="inline-flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" aria-hidden="true" /> {p.photos}</span>
+                            )}
                           </span>
                         </span>
                       </Link>
@@ -233,7 +290,23 @@ export default async function DashboardPage() {
             </div>
             <p className="mt-3 text-3xl font-extrabold tabular-nums">{formatPoints(d.points)}</p>
             <p className="text-sm text-white/65">points · 100 points = $1</p>
-            {d.unlockable.length > 0 && (
+            {d.rewards.length > 0 ? (
+              <div className="mt-4" data-testid="card-rewards-catalog">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/60">From the rewards catalog</p>
+                <ul className="mt-2 space-y-1.5">
+                  {d.rewards.map((r) => (
+                    <li key={r.id}>
+                      <Link href="/rewards/catalog" className="vip-focus flex items-center justify-between gap-2 rounded-lg py-1 text-sm hover:text-white">
+                        <span className="truncate text-white/80">{r.title}</span>
+                        <span className={r.canAfford ? 'shrink-0 font-semibold text-emerald-200' : 'shrink-0 text-white/60'}>
+                          {formatPoints(r.pointsCost)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : d.unlockable.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-white/60">Unlock with points</p>
                 <ul className="mt-2 space-y-1.5">
@@ -250,7 +323,7 @@ export default async function DashboardPage() {
                 </ul>
               </div>
             )}
-            <Link href="/rewards" className="vip-focus mt-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-sm font-semibold text-[#ead7a8] hover:text-white">
+            <Link href="/rewards/catalog" className="vip-focus mt-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-sm font-semibold text-[#ead7a8] hover:text-white">
               Spend your points <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </section>

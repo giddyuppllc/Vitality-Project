@@ -9,16 +9,21 @@ import { cn } from '@/lib/utils'
 const POLL_MS = 30_000
 
 /**
- * Top-bar Messages link with an unread badge. Polls the unread count every
- * 30 s while the tab is visible, on focus, and on every navigation (opening a
- * conversation clears its unread).
+ * Live unread-conversation count for the shell. Starts from the count the
+ * (club) layout loaded on the server (so the first paint is right), then
+ * polls every 30 s while the tab is visible, on focus, on every navigation and
+ * whenever a thread is read (`vip:messages-read`). One counter feeds every
+ * Messages badge in the shell — the desktop rail, the mobile More sheet and
+ * the mobile top-bar icon.
  */
-export function MessagesNavLink() {
+export function useUnreadMessages(initial: number, enabled: boolean): number {
   const pathname = usePathname() || ''
-  const [unread, setUnread] = useState(0)
-  const active = pathname === '/messages' || pathname.startsWith('/messages/')
+  const [unread, setUnread] = useState(initial)
+
+  useEffect(() => setUnread(initial), [initial])
 
   useEffect(() => {
+    if (!enabled) return
     let stopped = false
     const load = async () => {
       if (document.visibilityState !== 'visible') return
@@ -42,21 +47,32 @@ export function MessagesNavLink() {
       window.removeEventListener('focus', onVis)
       window.removeEventListener('vip:messages-read', onVis)
     }
-  }, [pathname])
+  }, [pathname, enabled])
 
+  return unread
+}
+
+/** Top-bar Messages icon with its unread badge (mobile; the desktop rail lists Messages itself). */
+export function MessagesNavLink({ unread, className }: { unread: number; className?: string }) {
+  const pathname = usePathname() || ''
+  const active = pathname === '/messages' || pathname.startsWith('/messages/')
   return (
     <Link
       href="/messages"
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'vip-focus relative grid h-10 w-10 place-items-center rounded-xl hover:bg-white/[0.06] hover:text-white',
+        'vip-focus relative grid h-11 w-11 place-items-center rounded-xl hover:bg-white/[0.06] hover:text-white',
         active ? 'text-white' : 'text-white/70',
+        className,
       )}
       aria-label={unread ? `Messages, ${unread} unread` : 'Messages'}
     >
       <MessageSquare className="h-5 w-5" aria-hidden="true" />
       {unread > 0 && (
-        <span className="absolute right-1.5 top-1.5 grid min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold leading-[18px] text-white">
+        <span
+          className="absolute right-1 top-1 grid min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold leading-[18px] text-white"
+          aria-hidden="true"
+        >
           {unread > 99 ? '99+' : unread}
         </span>
       )}

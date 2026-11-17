@@ -8,7 +8,7 @@ import { Bell, ExternalLink, LayoutGrid, LogOut, Search, Shield, X } from 'lucid
 import { cn } from '@/lib/utils'
 import { isActive, visibleNav, type VipNavBadge, type VipNavItem } from '@/lib/vip/nav'
 import { Avatar, TierBadge, Wordmark } from './ui'
-import { MessagesNavLink } from './messages-nav-link'
+import { MessagesNavLink, useUnreadMessages } from './messages-nav-link'
 
 export interface ShellViewer {
   displayName: string
@@ -46,7 +46,7 @@ function navLabel(item: VipNavItem, badges: Badges): string {
  */
 export function VipShell({
   viewer,
-  badges,
+  badges: initialBadges,
   spaces,
   shopUrl,
   adminUrl,
@@ -63,13 +63,18 @@ export function VipShell({
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  // Messages unread stays live (polled); every Messages badge reads this one count.
+  const messages = useUnreadMessages(initialBadges.messages ?? 0, !viewer.suspended)
+  const badges: Badges = { ...initialBadges, messages }
   const nav = visibleNav({ suspended: viewer.suspended })
   const tabs = nav.filter((n) => n.tab).slice(0, 5)
   const main = nav.filter((n) => n.group === 'main')
   const more = nav.filter((n) => n.group === 'more')
   const sheetItems = nav.filter((n) => !n.tab)
   const moreActive = sheetItems.some((n) => isActive(n, pathname))
-  const moreBadge = sheetItems.reduce((s, n) => s + (n.badge ? badges[n.badge] ?? 0 : 0), 0)
+  // Messages is left out of the More tab's total: on mobile the top bar
+  // already shows the Messages icon with its own count (no double badge).
+  const moreBadge = sheetItems.reduce((s, n) => s + (n.badge && n.badge !== 'messages' ? badges[n.badge] ?? 0 : 0), 0)
   const unread = badges.notifications ?? 0
 
   // Close the sheet on navigation.
@@ -126,7 +131,8 @@ export function VipShell({
             </form>
           )}
           <div className="ml-auto flex items-center gap-1.5">
-            {!viewer.suspended && <MessagesNavLink />}
+            {/* Mobile only: on desktop the rail lists Messages with the same count. */}
+            {!viewer.suspended && <MessagesNavLink unread={messages} className="lg:hidden" />}
             {!viewer.suspended && (
               <Link
                 href="/notifications"
