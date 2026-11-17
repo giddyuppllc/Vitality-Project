@@ -22,6 +22,12 @@ import {
   spendCreditForOrder,
 } from '@/lib/order-credit'
 import { InsufficientPointsError, redeemPointsInTx } from '@/lib/loyalty'
+import {
+  claimDiscountCodeUse,
+  DiscountCodeError,
+  normalizeDiscountCode,
+  priceDiscountCode,
+} from '@/lib/checkout-discount'
 import { z } from 'zod'
 
 // Shared system user that owns guest shipping-address rows (Address.userId is a
@@ -219,43 +225,27 @@ export async function POST(req: NextRequest) {
     const peptideCreditsApplied = priced?.member.peptideCreditsApplied ?? 0
 
     let discount = membershipDiscount
-    if (data.discountCode) {
-      const code = await prisma.discountCode.findUnique({
-        where: { code: data.discountCode.trim().toUpperCase(), active: true },
-      })
-      const notExpired = !!code && (!code.expiresAt || code.expiresAt > new Date())
-      if (code && notExpired) {
-        // Atomically CLAIM one use BEFORE applying the discount. The old path
-        // read `usedCount < maxUses` here and incremented separately after the
-        // order was created, so two concurrent checkouts could both pass the cap
-        // and both redeem past `maxUses`. A conditional updateMany
-        // (`usedCount < maxUses`) lets exactly maxUses checkouts win under any
-        // concurrency; a code with no cap increments unconditionally.
-        const claimed =
-          code.maxUses == null
-            ? (await prisma.discountCode.update({
-                where: { id: code.id },
-                data: { usedCount: { increment: 1 } },
-              }),
-              true)
-            : (
-                await prisma.discountCode.updateMany({
-                  where: { id: code.id, usedCount: { lt: code.maxUses } },
-                  data: { usedCount: { increment: 1 } },
-                })
-              ).count > 0
-        if (claimed) {
-          claimedDiscountCodeId = code.id
-          // Discount code stacks on top of the membership discount, applied to
-          // the post-membership amount so it never over-discounts.
-          const base = Math.max(0, subtotal - membershipDiscount)
-          const codeDiscount =
-            code.type === 'PERCENTAGE'
-              ? Math.round(base * (code.value / 100))
-              : Math.min(code.value, base)
-          discount += codeDiscount
-        }
+    // Every rule set on the code is enforced (lib/checkout-discount.ts); a code
+    // that exists but doesn't apply is refused with its reason (400) instead
+    // of being silently dropped or misapplied. Unknown codes (e.g. affiliate
+    // codes typed into the same box) are not an error.
+    const pricedCode = await priceDiscountCode(data.discountCode, {
+      userId,
+      subtotal,
+      // Stacks on the post-membership amount so it never over-discounts.
+      base: subtotal - membershipDiscount,
+      items: data.items,
+    })
+    let codeFreeShipping = false
+    if (pricedCode) {
+      // Atomically CLAIM one use BEFORE applying the discount (conditional on
+      // usedCount < maxUses), so concurrent checkouts can't redeem past the cap.
+      if (!(await claimDiscountCodeUse(pricedCode))) {
+        throw new DiscountCodeError('Code usage limit reached')
       }
+      claimedDiscountCodeId = pricedCode.id
+      discount += pricedCode.amount
+      codeFreeShipping = pricedCode.freeShipping
     }
 
     // Loyalty redemption — validate balance and convert to discount cents.
@@ -291,7 +281,7 @@ export async function POST(req: NextRequest) {
       membership.status === 'ACTIVE' &&
       (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
       TIER_BENEFITS[membership.tier].freeShipping
-    const shippingCost = memberFreeShipping
+    const shippingCost = memberFreeShipping || codeFreeShipping
       ? 0
       : (
           await calculateShipping(
@@ -418,7 +408,8 @@ export async function POST(req: NextRequest) {
         shipping: shippingCost,
         tax: taxAmount,
         total,
-        discountCode: data.discountCode,
+        // Canonical upper-case form, so uses-per-customer counts every use.
+        discountCode: normalizeDiscountCode(data.discountCode),
         paymentMethod: 'zelle',
         paymentStatus: 'UNPAID',
         status: 'PENDING',
@@ -624,6 +615,9 @@ export async function POST(req: NextRequest) {
         { error: error.issues[0].message },
         { status: 400 },
       )
+    }
+    if (error instanceof DiscountCodeError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
     if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {
       return NextResponse.json({ error: error.message }, { status: 409 })

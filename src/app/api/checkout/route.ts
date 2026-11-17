@@ -17,6 +17,12 @@ import { computeCartTotal } from '@/lib/pricing'
 import { TIER_BENEFITS } from '@/lib/membership'
 import { InsufficientCreditError } from '@/lib/order-credit'
 import {
+  claimDiscountCodeUse,
+  DiscountCodeError,
+  normalizeDiscountCode,
+  priceDiscountCode,
+} from '@/lib/checkout-discount'
+import {
   awardPointsForOrder,
   InsufficientPointsError,
   pointsToDiscountCents,
@@ -196,34 +202,21 @@ export async function POST(req: NextRequest) {
     // up-front (conditional on usedCount < maxUses) so concurrent checkouts can't
     // redeem past the cap — the old read-then-increment let two orders both pass.
     let discount = membershipDiscount
-    if (data.discountCode) {
-      const code = await prisma.discountCode.findUnique({
-        where: { code: data.discountCode.trim().toUpperCase(), active: true },
-      })
-      const notExpired = !!code && (!code.expiresAt || code.expiresAt > new Date())
-      if (code && notExpired) {
-        const claimed =
-          code.maxUses == null
-            ? (await prisma.discountCode.update({
-                where: { id: code.id },
-                data: { usedCount: { increment: 1 } },
-              }),
-              true)
-            : (
-                await prisma.discountCode.updateMany({
-                  where: { id: code.id, usedCount: { lt: code.maxUses } },
-                  data: { usedCount: { increment: 1 } },
-                })
-              ).count > 0
-        if (claimed) {
-          claimedDiscountCodeId = code.id
-          const base = Math.max(0, subtotal - membershipDiscount)
-          discount +=
-            code.type === 'PERCENTAGE'
-              ? Math.round(base * (code.value / 100))
-              : Math.min(code.value, base)
-        }
+    // Same rules + pricing as checkout-zelle (lib/checkout-discount.ts).
+    const pricedCode = await priceDiscountCode(data.discountCode, {
+      userId: session.user.id,
+      subtotal,
+      base: subtotal - membershipDiscount,
+      items: data.items,
+    })
+    let codeFreeShipping = false
+    if (pricedCode) {
+      if (!(await claimDiscountCodeUse(pricedCode))) {
+        throw new DiscountCodeError('Code usage limit reached')
       }
+      claimedDiscountCodeId = pricedCode.id
+      discount += pricedCode.amount
+      codeFreeShipping = pricedCode.freeShipping
     }
 
     // Member free shipping (active Plus/Premium).
@@ -232,7 +225,7 @@ export async function POST(req: NextRequest) {
       membership.status === 'ACTIVE' &&
       (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
       TIER_BENEFITS[membership.tier].freeShipping
-    const { rate: shippingCost } = memberFreeShipping
+    const { rate: shippingCost } = memberFreeShipping || codeFreeShipping
       ? { rate: 0 }
       : await calculateShipping(
           subtotal,
@@ -368,7 +361,7 @@ export async function POST(req: NextRequest) {
           shipping: shippingCost,
           tax: taxAmount,
           total,
-          discountCode: data.discountCode,
+          discountCode: normalizeDiscountCode(data.discountCode),
           paymentMethod: 'card',
           paymentStatus: 'PAID',
           paymentId: paymentTransactionId,
@@ -585,6 +578,9 @@ export async function POST(req: NextRequest) {
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 })
+    }
+    if (error instanceof DiscountCodeError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
     if (error instanceof InsufficientCreditError || error instanceof InsufficientPointsError) {
       return NextResponse.json({ error: error.message }, { status: 409 })
