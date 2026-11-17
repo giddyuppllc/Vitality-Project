@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ export function TicketAdminPanel({
   const [internal, setInternal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -54,7 +56,7 @@ export function TicketAdminPanel({
       // claimed success. Only report saved when the server actually persisted it.
       if (!res.ok) {
         const body = await res.json().catch(() => null)
-        throw new Error(body?.error ?? `Save failed (${res.status})`)
+        throw new Error(typeof body?.error === 'string' ? body.error : `Save failed (${res.status})`)
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -70,16 +72,21 @@ export function TicketAdminPanel({
     e.preventDefault()
     if (!reply.trim()) return
     setSending(true)
+    setSendError(null)
     try {
-      const res = await fetch(`/api/support/${ticketId}/messages`, {
+      // The reply box used to keep the text and say nothing when the post
+      // failed (expired session, server error) — looked like it hung.
+      const r = await adminFetch(`/api/support/${ticketId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: reply, internal }),
       })
-      if (res.ok) {
+      if (r.ok) {
         setReply('')
         setInternal(false)
         router.refresh()
+      } else {
+        setSendError(r.error)
       }
     } finally {
       setSending(false)
@@ -180,6 +187,7 @@ export function TicketAdminPanel({
             Internal note (only admins see this)
           </span>
         </label>
+        {sendError && <p role="alert" className="text-xs text-red-400">{sendError}</p>}
         <Button type="submit" loading={sending} size="sm" className="w-full">
           Send
         </Button>

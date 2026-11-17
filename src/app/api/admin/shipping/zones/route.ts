@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
         countries: data.countries.map((c) => c.toUpperCase()),
         active: data.active ?? true,
       },
+    })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.zone.create',
+      entityType: 'ShippingZone',
+      entityId: zone.id,
+      metadata: data,
     })
     return NextResponse.json(zone, { status: 201 })
   } catch (err) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { logAudit } from '@/lib/audit'
 import { authOptions } from '@/lib/auth'
 import {
   getRecipients,
@@ -59,6 +60,14 @@ export async function POST(_req: NextRequest) {
       { status: 409 },
     )
   }
+
+  await logAudit({
+    userId: session.user.id,
+    userEmail: session.user.email,
+    action: 'campaign.early_outreach.send',
+    entityType: 'MarketingCampaign',
+    metadata: { sent: result.sent, failed: result.failed, recipients: result.recipients.length },
+  })
 
   return NextResponse.json({
     ok: true,

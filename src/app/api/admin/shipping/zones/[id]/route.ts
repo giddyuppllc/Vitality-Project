@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -34,6 +35,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         ...(data.active != null ? { active: data.active } : {}),
       },
     })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.zone.update',
+      entityType: 'ShippingZone',
+      entityId: id,
+      metadata: data,
+    })
     return NextResponse.json(updated)
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -49,7 +58,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { id } = await params
   try {
-    await prisma.shippingZone.delete({ where: { id } })
+    const gone = await prisma.shippingZone.delete({ where: { id } })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.zone.delete',
+      entityType: 'ShippingZone',
+      entityId: id,
+      metadata: { name: gone.name, countries: gone.countries },
+    })
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[admin/shipping/zones DELETE]', err)

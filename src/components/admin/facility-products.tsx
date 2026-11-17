@@ -76,8 +76,9 @@ export function FacilityProducts({ facilityId, assigned, available }: Props) {
 
   const update = async (productId: string, patch: Partial<AssignedProduct>) => {
     setLoading(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/facilities/${facilityId}/products`, {
+      const res = await fetch(`/api/admin/facilities/${facilityId}/products`, {
         method: 'POST', // POST is upsert
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,7 +88,13 @@ export function FacilityProducts({ facilityId, assigned, available }: Props) {
           inventory: patch.inventory,
         }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Update failed (${res.status})`)
+      }
       router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Update failed')
     } finally {
       setLoading(false)
     }
@@ -96,11 +103,18 @@ export function FacilityProducts({ facilityId, assigned, available }: Props) {
   const remove = async (productId: string) => {
     if (!confirm('Remove this product from the facility?')) return
     setLoading(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/facilities/${facilityId}/products?productId=${productId}`, {
+      const res = await fetch(`/api/admin/facilities/${facilityId}/products?productId=${encodeURIComponent(productId)}`, {
         method: 'DELETE',
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Remove failed (${res.status})`)
+      }
       router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Remove failed')
     } finally {
       setLoading(false)
     }

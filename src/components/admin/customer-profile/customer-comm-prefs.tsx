@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Mail, MessageSquareText, Phone } from 'lucide-react'
@@ -26,6 +27,7 @@ export function CustomerCommPrefs({
   const [prefs, setPrefs] = useState<Prefs>(initial)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const endpoint =
     mode === 'admin'
@@ -33,18 +35,25 @@ export function CustomerCommPrefs({
       : `/api/account/communication`
 
   const save = async (next: Prefs) => {
+    const before = prefs
     setPrefs(next)
     setBusy(true)
+    setError(null)
     try {
-      const res = await fetch(endpoint, {
+      const r = await adminFetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
       })
-      if (res.ok) {
+      if (r.ok) {
         setSaved(true)
         setTimeout(() => setSaved(false), 1500)
         router.refresh()
+      } else {
+        // The toggle used to stay flipped on failure, showing a preference
+        // that was never saved.
+        setPrefs(before)
+        setError(r.error)
       }
     } finally {
       setBusy(false)
@@ -74,7 +83,7 @@ export function CustomerCommPrefs({
     {
       key: 'sms',
       label: 'SMS',
-      desc: 'Text message updates (placeholder — not yet wired).',
+      desc: 'Text message updates.',
       icon: <MessageSquareText className="w-4 h-4 text-purple-400" />,
     },
     {
@@ -95,6 +104,7 @@ export function CustomerCommPrefs({
           </span>
         )}
       </div>
+      {error && <p role="alert" className="text-xs text-red-400 mb-3">{error}</p>}
       <div className="space-y-3">
         {items.map((it) => (
           <div

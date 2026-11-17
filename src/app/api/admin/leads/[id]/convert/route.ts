@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { slugify } from '@/lib/utils'
-import bcrypt from 'bcryptjs'
 import type { OrgType } from '@prisma/client'
 
 const VALID_ORG_TYPES: OrgType[] = ['GYM', 'CLINIC', 'DOCTOR_OFFICE', 'OTHER']
@@ -41,15 +40,14 @@ export async function POST(
     const email = lead.contactEmail.toLowerCase()
     let user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
-      const tempHash = await bcrypt.hash(
-        Math.random().toString(36).slice(2) + Date.now().toString(36),
-        10,
-      )
+      // No password: approving the org (SUSPENDED -> ACTIVE) emails every
+      // PASSWORDLESS owner an activation link. A random throwaway hash here
+      // meant that email was skipped and the owner could never get in.
       user = await prisma.user.create({
         data: {
           email,
           name: lead.contactName,
-          passwordHash: tempHash,
+          passwordHash: null,
           role: 'CUSTOMER',
         },
       })

@@ -3,6 +3,14 @@ import { sendEmail } from './email'
 import { marketingWrapper } from './email-templates'
 import { findCustomersBySegment, parseSegmentFilters } from './segments'
 import type { User } from '@prisma/client'
+import { unsubscribeUrl as unsubscribeUrlFor } from './unsubscribe'
+
+/** Thrown when another send already claimed (or finished) this campaign. */
+export class CampaignAlreadySendingError extends Error {
+  constructor(public status: string) {
+    super(`Campaign already ${status.toLowerCase()}`)
+  }
+}
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://vitalityproject.global'
@@ -43,13 +51,26 @@ export async function loadRecipients(
 ): Promise<User[]> {
   const campaign = await prisma.marketingCampaign.findUnique({
     where: { id: campaignId },
-    include: { segment: true },
+    select: { segmentId: true },
   })
   if (!campaign) return []
+  return audienceRecipients(campaign.segmentId)
+}
+
+/**
+ * Recipients for an audience: a saved segment, or (no segment) all customers.
+ * Used by the send AND by the builder's recipient-count preview, so the
+ * preview is the number that will actually be mailed.
+ */
+export async function audienceRecipients(segmentId: string | null): Promise<User[]> {
+  const segment = segmentId
+    ? await prisma.savedSegment.findUnique({ where: { id: segmentId } })
+    : null
+  if (segmentId && !segment) return []
 
   let users: User[] = []
-  if (campaign.segmentId && campaign.segment) {
-    const filters = parseSegmentFilters(campaign.segment.filters)
+  if (segment) {
+    const filters = parseSegmentFilters(segment.filters)
     const { users: matched } = await findCustomersBySegment(filters, {
       limit: 100_000,
       offset: 0,
@@ -92,22 +113,39 @@ export async function sendCampaign(
     return { sent: 0, skipped: 0 }
   }
 
-  await prisma.marketingCampaign.update({
-    where: { id: campaignId },
+  // Atomic claim: two clicks / two tabs used to both pass the status check
+  // and both mail the whole list.
+  const claim = await prisma.marketingCampaign.updateMany({
+    where: { id: campaignId, status: { notIn: ['SENT', 'SENDING'] } },
     data: { status: 'SENDING' },
   })
+  if (claim.count === 0) {
+    const now = await prisma.marketingCampaign.findUnique({ where: { id: campaignId }, select: { status: true } })
+    throw new CampaignAlreadySendingError(now?.status ?? 'SENT')
+  }
 
   const recipients = await loadRecipients(campaignId)
 
+  // A retry after a failed send must not re-mail anyone who already got it.
+  const alreadySent = new Set(
+    (
+      await prisma.outboundMessage.findMany({
+        where: { campaignId, status: 'SENT', userId: { not: null } },
+        select: { userId: true },
+      })
+    ).map((m) => m.userId as string),
+  )
+
   let sent = 0
   let skipped = 0
-  const unsubscribeUrl = `${APP_URL}/unsubscribe`
 
   for (const user of recipients) {
-    if (!user.email) {
+    if (!user.email || alreadySent.has(user.id)) {
       skipped++
       continue
     }
+    // Per-recipient one-click link (the old ${APP_URL}/unsubscribe was a 404).
+    const unsubscribeUrl = unsubscribeUrlFor(APP_URL, user.id)
 
     const variables: Record<string, string> = {
       name: user.name ?? firstName(user.name, user.email),
@@ -173,7 +211,7 @@ export async function sendCampaign(
       status: 'SENT',
       sentAt: new Date(),
       recipientCount: recipients.length,
-      deliveredCount: sent,
+      deliveredCount: sent + alreadySent.size,
     },
   })
 

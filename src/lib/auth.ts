@@ -64,6 +64,9 @@ export async function authorizeCredentials(
 export const SESSION_COOKIE_NAME = sessionCookieName
 export const SESSION_COOKIE_SECURE = isSecure
 
+/** How often a signed-in session re-reads the user's role from the DB. */
+const ROLE_RECHECK_MS = 5 * 60 * 1000
+
 export const authOptions: NextAuthOptions = {
   useSecureCookies: isSecure,
   session: { strategy: 'jwt' },
@@ -104,6 +107,26 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
+        token.roleCheckedAt = Date.now()
+      } else if (
+        token.id &&
+        Date.now() - Number(token.roleCheckedAt ?? 0) > ROLE_RECHECK_MS
+      ) {
+        // The role used to be frozen into the JWT at sign-in for the life of
+        // the session (30 days): an admin demoted to CUSTOMER — or a deleted
+        // account — kept full /admin + /api/admin access until the cookie
+        // expired. Re-read it from the DB every few minutes.
+        try {
+          const fresh = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true },
+          })
+          token.role = fresh?.role ?? null
+          token.roleCheckedAt = Date.now()
+        } catch (err) {
+          // DB blip: keep the previous role and retry on the next request.
+          console.error('JWT role re-check failed:', err)
+        }
       }
 
       // Enrich with org context. Done on initial sign-in AND whenever the

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { refreshBlogPages } from '@/lib/blog-cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,13 @@ const updateSchema = z.object({
   content: z.string().min(1).optional(),
   category: z.string().min(1).max(60).optional(),
   readTime: z.string().max(40).optional().nullable(),
-  coverImage: z.string().url().optional().nullable().or(z.literal('')),
+  // https URL or a /path on this site (uploads land in /uploads/...; .url()
+  // rejected those).
+  coverImage: z
+    .string()
+    .refine((u) => u === '' || /^https?:\/\//i.test(u) || /^\/(?!\/)/.test(u), 'Cover image must be https://… or /uploads/…')
+    .optional()
+    .nullable(),
   relatedLinks: z.array(relatedLinkSchema).optional(),
   authorName: z.string().max(120).optional().nullable(),
   published: z.boolean().optional(),
@@ -49,7 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   try {
     const data = updateSchema.parse(await req.json())
-    const prev = await prisma.post.findUnique({ where: { id }, select: { published: true } })
+    const prev = await prisma.post.findUnique({ where: { id }, select: { published: true, slug: true } })
     if (!prev) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Stamp publishedAt on the first false→true transition; clear on unpublish.
@@ -75,6 +82,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       entityId: id,
       metadata: data,
     })
+    // Old AND new slug: a renamed or unpublished post must drop off at once.
+    refreshBlogPages([prev.slug, post.slug])
     return NextResponse.json(post)
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
@@ -94,7 +103,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const existing = await prisma.post.findUnique({ where: { id }, select: { id: true } })
+  const existing = await prisma.post.findUnique({ where: { id }, select: { id: true, slug: true } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await prisma.post.delete({ where: { id } })
   await logAudit({
@@ -104,5 +113,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     entityType: 'Post',
     entityId: id,
   })
+  refreshBlogPages([existing.slug])
   return NextResponse.json({ ok: true })
 }

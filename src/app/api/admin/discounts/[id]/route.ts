@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { couponExpiryFromInput, zodMessage } from '@/lib/coupon-admin'
 
 const ruleSchema = z
   .object({
@@ -80,7 +81,29 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = { ...base }
     if (expiresAt !== undefined)
-      updateData.expiresAt = expiresAt ? new Date(expiresAt) : null
+      updateData.expiresAt = couponExpiryFromInput(expiresAt)
+
+    // Percentage cap — checked against the stored type when only one of
+    // type/value is being changed.
+    if (base.value !== undefined || base.type !== undefined) {
+      const current = await prisma.discountCode.findUnique({ where: { id }, select: { type: true, value: true } })
+      if (!current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      const type = base.type ?? current.type
+      const value = base.value ?? current.value
+      if (type === 'PERCENTAGE' && value > 100) {
+        return NextResponse.json({ error: 'A percentage discount can be at most 100' }, { status: 400 })
+      }
+    }
+
+    // Renaming onto another coupon's code used to hit the unique index and
+    // come back as a generic 500.
+    if (base.code !== undefined) {
+      const clash = await prisma.discountCode.findFirst({
+        where: { code: base.code, NOT: { id } },
+        select: { id: true },
+      })
+      if (clash) return NextResponse.json({ error: 'Code already exists' }, { status: 409 })
+    }
 
     // Upsert rule
     if (rule !== undefined) {
@@ -138,7 +161,7 @@ export async function PATCH(
     return NextResponse.json(updated)
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error) }, { status: 400 })
     console.error('Discount update error:', error)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }

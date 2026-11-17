@@ -15,6 +15,7 @@ export function CustomerSearchBar({ defaultValue = '' }: { defaultValue?: string
     const q = value.trim()
     // Preserve the active segment tab; reset q.
     const usp = new URLSearchParams(params?.toString() ?? '')
+    usp.delete('page') // a new search starts at page 1
     if (q) usp.set('q', q)
     else usp.delete('q')
     startTransition(() =>
@@ -26,6 +27,7 @@ export function CustomerSearchBar({ defaultValue = '' }: { defaultValue?: string
     setValue('')
     const usp = new URLSearchParams(params?.toString() ?? '')
     usp.delete('q')
+    usp.delete('page')
     startTransition(() =>
       router.push(`/admin/customers${usp.toString() ? `?${usp}` : ''}`),
     )

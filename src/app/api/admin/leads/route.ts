@@ -88,6 +88,10 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+    const due = nextActionDue ? new Date(nextActionDue) : null
+    if (due && Number.isNaN(due.getTime())) {
+      return NextResponse.json({ error: 'Invalid next-action date' }, { status: 400 })
+    }
 
     const lead = await prisma.salesLead.create({
       data: {
@@ -108,18 +112,18 @@ export async function POST(req: NextRequest) {
           typeof estimatedValue === 'number'
             ? estimatedValue
             : estimatedValue
-              ? parseInt(estimatedValue, 10) || null
+              ? intOrNull(estimatedValue)
               : null,
         probability:
           typeof probability === 'number'
             ? probability
             : probability
-              ? parseInt(probability, 10) || null
+              ? intOrNull(probability)
               : null,
         assignedTo: assignedTo || null,
         notes: notes || null,
         nextAction: nextAction || null,
-        nextActionDue: nextActionDue ? new Date(nextActionDue) : null,
+        nextActionDue: due,
       },
     })
 
@@ -137,4 +141,9 @@ export async function POST(req: NextRequest) {
     console.error('Create lead error:', error)
     return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
   }
+}
+
+function intOrNull(v: unknown): number | null {
+  const n = parseInt(String(v), 10)
+  return Number.isNaN(n) ? null : n
 }

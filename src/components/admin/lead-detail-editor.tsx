@@ -1,5 +1,6 @@
 'use client'
 
+import { isoToLocalInput, localInputToIso } from '@/lib/datetime-local'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ export function LeadDetailEditor({
   const [nextAction, setNextAction] = useState(lead.nextAction ?? '')
   const [nextActionDue, setNextActionDue] = useState(
     lead.nextActionDue
-      ? new Date(lead.nextActionDue).toISOString().slice(0, 16)
+      ? isoToLocalInput(lead.nextActionDue)
       : '',
   )
   const [closedReason, setClosedReason] = useState(lead.closedReason ?? '')
@@ -89,7 +90,7 @@ export function LeadDetailEditor({
           assignedTo: assignedTo || null,
           notes: notes || null,
           nextAction: nextAction || null,
-          nextActionDue: nextActionDue || null,
+          nextActionDue: localInputToIso(nextActionDue),
           closedReason: closedReason || null,
         }),
       })

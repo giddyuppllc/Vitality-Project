@@ -1,5 +1,6 @@
 'use client'
 
+import { localInputToIso } from '@/lib/datetime-local'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,7 @@ export function NewLeadForm({ admins }: { admins: AdminInfo[] }) {
           probability: probability ? parseInt(probability, 10) : null,
           assignedTo: assignedTo || null,
           nextAction: nextAction || null,
-          nextActionDue: nextActionDue || null,
+          nextActionDue: localInputToIso(nextActionDue),
           notes: notes || null,
         }),
       })

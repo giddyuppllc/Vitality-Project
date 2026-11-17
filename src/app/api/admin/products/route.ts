@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
     // `force: true` in the body overrides it, for the genuine case of two
     // similarly-named products.
     const similar = await findSimilarProduct(data.name, data.sku ?? null)
-    if (similar && !force) {
+    // A SKU clash can never be forced: the column is unique, so the insert
+    // would fail anyway.
+    if (similar && (!force || similar.reason === 'same-sku')) {
       return NextResponse.json(
         {
           error: 'duplicate',
@@ -57,8 +59,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // A forced near-duplicate can share its name's slug with the existing
+    // product; the slug is unique, so suffix it instead of failing with a 500.
+    const base = slugify(data.name) || 'product'
+    let slug = base
+    for (let n = 2; await prisma.product.findUnique({ where: { slug }, select: { id: true } }); n++) {
+      slug = `${base}-${n}`
+    }
+
     const product = await prisma.product.create({
-      data: { ...data, slug: slugify(data.name), images: { create: images } },
+      data: { ...data, slug, images: { create: images } },
       include: { images: true, category: true },
     })
     await logAudit({
@@ -71,7 +81,11 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json(product, { status: 201 })
   } catch (error) {
-    if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error instanceof z.ZodError) {
+      const msg = error.issues.map((i) => `${i.path.join('.') || 'value'}: ${i.message}`).join('; ')
+      return NextResponse.json({ error: msg, issues: error.issues }, { status: 400 })
+    }
+    console.error('[admin/products POST] failed:', error)
     return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
   }
 }

@@ -65,21 +65,26 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [showAchAccount, setShowAchAccount] = useState(false)
   const [showWireAccount, setShowWireAccount] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/settings')
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Could not load saved settings (${r.status}) — showing defaults`)
+        return r.json()
+      })
       .then((data: Record<string, string>) => {
         setSettings((s) => ({ ...s, ...data }))
       })
-      .catch(() => {})
+      .catch((err) => setSaveError(err instanceof Error ? err.message : 'Could not load saved settings'))
       .finally(() => setLoading(false))
   }, [])
 
   async function saveSection(sectionKey: string, keys: (keyof Settings)[]) {
     setSaving(true)
+    setSaveError(null)
     try {
       const partial = Object.fromEntries(keys.map((k) => [k, settings[k]]))
       const res = await fetch('/api/admin/settings', {
@@ -90,7 +95,12 @@ export default function AdminSettingsPage() {
       if (res.ok) {
         setSavedKey(sectionKey)
         setTimeout(() => setSavedKey((k) => (k === sectionKey ? null : k)), 2200)
+      } else {
+        const d = await res.json().catch(() => null)
+        setSaveError(typeof d?.error === 'string' ? d.error : `Save failed (${res.status})`)
       }
+    } catch {
+      setSaveError('Save failed — check your connection and try again')
     } finally {
       setSaving(false)
     }
@@ -122,6 +132,12 @@ export default function AdminSettingsPage() {
           Site configuration, payment details, and operational preferences.
         </p>
       </div>
+
+      {saveError && (
+        <p role="alert" className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {saveError}
+        </p>
+      )}
 
       <div className="space-y-6">
         {/* General */}

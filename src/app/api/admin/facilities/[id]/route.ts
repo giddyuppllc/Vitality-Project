@@ -46,7 +46,12 @@ export async function PATCH(
         action: 'facility.update',
         entityType: 'Facility',
         entityId: updated.id,
-        metadata: JSON.stringify(data),
+        // Never write the facility's API key into the audit trail (it is
+        // readable on /admin/audit) — record only that it changed.
+        metadata: JSON.stringify({
+          ...data,
+          ...(data.apiKey !== undefined ? { apiKey: data.apiKey ? '[changed]' : '[cleared]' } : {}),
+        }),
       },
     })
 
@@ -79,6 +84,18 @@ export async function DELETE(
       return NextResponse.json(
         { error: `Cannot delete — ${active} active fulfillment(s) still assigned. Mark them complete first.` },
         { status: 400 }
+      )
+    }
+
+    // Finished fulfillments still reference the facility (shipping history),
+    // so the row can't be deleted — say so instead of a generic 500.
+    const history = await prisma.fulfillment.count({ where: { facilityId: id } })
+    if (history > 0) {
+      return NextResponse.json(
+        {
+          error: `This facility has ${history} past fulfillment(s) on record, so it can't be deleted. Turn off "Active" instead to stop routing orders to it.`,
+        },
+        { status: 409 }
       )
     }
 

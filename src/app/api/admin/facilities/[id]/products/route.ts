@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 const assignSchema = z.object({
   productId: z.string().min(1),
@@ -49,6 +50,15 @@ export async function POST(
       },
     })
 
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'facility.product.assign',
+      entityType: 'Facility',
+      entityId: facilityId,
+      metadata: data,
+    })
+
     return NextResponse.json(pf)
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -78,6 +88,14 @@ export async function DELETE(
 
     await prisma.productFacility.delete({
       where: { productId_facilityId: { productId, facilityId } },
+    })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'facility.product.unassign',
+      entityType: 'Facility',
+      entityId: facilityId,
+      metadata: { productId },
     })
     return NextResponse.json({ ok: true })
   } catch (error) {

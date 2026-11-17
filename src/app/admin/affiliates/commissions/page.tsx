@@ -3,6 +3,7 @@ import { formatPrice, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Download } from 'lucide-react'
 import type { CommissionStatus } from '@prisma/client'
+import { CommissionActions } from './commission-actions'
 
 interface PageProps {
   searchParams: Promise<{
@@ -170,12 +171,13 @@ export default async function AdminCommissionsPage({ searchParams }: PageProps) 
               <th className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">Order Total</th>
               <th className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">Commission</th>
               <th className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">Status</th>
+              <th className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wider"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {commissions.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-white/40">
+                <td colSpan={7} className="px-5 py-10 text-center text-sm text-white/40">
                   No commissions match the filters.
                 </td>
               </tr>
@@ -221,6 +223,9 @@ export default async function AdminCommissionsPage({ searchParams }: PageProps) 
                     >
                       {c.status}
                     </Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <CommissionActions id={c.id} status={c.status} orderPaid={order?.paymentStatus === 'PAID'} />
                   </td>
                 </tr>
               )

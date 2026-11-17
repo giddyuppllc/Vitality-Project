@@ -11,6 +11,7 @@ import { createAdminNotification } from '@/lib/notifications'
 import { decrementStock } from '@/lib/inventory'
 import { outstandingOrderCredit } from '@/lib/order-credit'
 import { sendClubhouseWelcome } from '@/lib/vip/mailer'
+import { logAudit } from '@/lib/audit'
 
 const MEMBERSHIP_NOTE_PREFIX = 'MEMBERSHIP:'
 const LOW_STOCK_THRESHOLD = 5
@@ -222,6 +223,22 @@ export async function POST(
     )
   }
   const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+
+  // Manual payment confirmation moves money-state — it must be on the trail.
+  await logAudit({
+    userId: session.user.id,
+    userEmail: session.user.email,
+    action: 'order.mark_paid',
+    entityType: 'Order',
+    entityId: order.id,
+    metadata: {
+      orderNumber: order.orderNumber,
+      total: order.total,
+      fromStatus: order.status,
+      toStatus: updated.status,
+      paymentMethod: order.paymentMethod,
+    },
+  })
 
   // Membership invoice? Activate the membership instead of routing to a
   // physical facility (memberships have no fulfillment). Membership invoices

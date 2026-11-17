@@ -10,7 +10,7 @@ const createSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).optional(),
-  dueAt: z.string().datetime().optional().or(z.string().optional()),
+  dueAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Invalid due date').optional(),
   assignedTo: z.string().optional(),
   entityType: z.string().optional(),
   entityId: z.string().optional(),
@@ -32,10 +32,11 @@ export async function GET(req: NextRequest) {
   const entityId = searchParams.get('entityId')
 
   const where: Prisma.AdminTaskWhereInput = {}
-  if (status) {
+  // Unknown values are ignored rather than handed to Prisma (which 500'd).
+  if (status && (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as string[]).includes(status)) {
     where.status = status as Prisma.AdminTaskWhereInput['status']
   }
-  if (priority) {
+  if (priority && (['LOW', 'NORMAL', 'HIGH', 'URGENT'] as string[]).includes(priority)) {
     where.priority = priority as Prisma.AdminTaskWhereInput['priority']
   }
   if (assignee === 'me') {

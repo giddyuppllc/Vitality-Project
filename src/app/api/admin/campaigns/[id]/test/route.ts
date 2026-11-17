@@ -7,6 +7,7 @@ import { sendEmail } from '@/lib/email'
 import { marketingWrapper } from '@/lib/email-templates'
 import { renderTemplate } from '@/lib/campaigns'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const schema = z.object({
   email: z.string().email(),
@@ -57,7 +58,9 @@ export async function POST(
     const html = marketingWrapper({
       subject,
       body,
-      unsubscribeUrl: `${APP_URL}/unsubscribe`,
+      // Test sends go to an arbitrary address, not a customer — point at the
+      // preferences page (the old /unsubscribe was a 404).
+      unsubscribeUrl: `${APP_URL}/account/settings`,
     })
 
     const result = await sendEmail({ to: email, subject, html })
@@ -78,7 +81,7 @@ export async function POST(
     })
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(err), issues: err.issues }, { status: 400 })
     }
     console.error('[campaigns/test] error', err)
     return NextResponse.json({ error: 'Test send failed' }, { status: 500 })

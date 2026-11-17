@@ -10,6 +10,12 @@ import { z } from 'zod'
 
 const COA_DIR = path.resolve(process.cwd(), 'public', 'coa')
 
+// Uploaded certificates are served from the store's own origin (/coa/...), so
+// only document/image types are accepted — an uploaded .html or .svg would be
+// stored XSS on vitalityproject.global.
+const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp'])
+const MAX_COA_BYTES = 25 * 1024 * 1024
+
 async function ensureDir() {
   await fs.mkdir(COA_DIR, { recursive: true }).catch(() => {})
 }
@@ -68,7 +74,16 @@ export async function POST(req: NextRequest) {
     purity: z.string().optional(),
     testingLab: z.string().optional(),
     notes: z.string().optional(),
-    documentUrl: z.string().optional(), // external URL alternative to file upload
+    // external URL alternative to file upload — http(s) or a site path (it is rendered
+    // as a link on the public COA pages; javascript:/data: would run there)
+    documentUrl: z
+      .string()
+      .trim()
+      .refine(
+        (u) => u === '' || /^https?:\/\//i.test(u) || /^\/(?!\/)/.test(u),
+        'Document URL must start with https:// (or be a /path on this site)',
+      )
+      .optional(),
   })
 
   const fields: Record<string, string> = {}
@@ -80,7 +95,11 @@ export async function POST(req: NextRequest) {
   try {
     parsed = schema.parse(fields)
   } catch (err) {
-    return NextResponse.json({ error: 'Invalid form data', detail: String(err) }, { status: 400 })
+    const msg =
+      err instanceof z.ZodError
+        ? err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
+        : 'Invalid form data'
+    return NextResponse.json({ error: msg }, { status: 400 })
   }
 
   let documentUrl = parsed.documentUrl ?? ''
@@ -90,7 +109,16 @@ export async function POST(req: NextRequest) {
   if (file && file instanceof File && file.size > 0) {
     const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
     const id = crypto.randomBytes(8).toString('hex')
-    const ext = path.extname(safeBase) || '.pdf'
+    const ext = (path.extname(safeBase) || '.pdf').toLowerCase()
+    if (!ALLOWED_EXT.has(ext)) {
+      return NextResponse.json(
+        { error: 'Upload a PDF or an image (JPG, PNG, WebP).' },
+        { status: 400 },
+      )
+    }
+    if (file.size > MAX_COA_BYTES) {
+      return NextResponse.json({ error: 'File too large (max 25MB)' }, { status: 413 })
+    }
     const stem = path.basename(safeBase, ext)
     const finalName = `${id}-${stem}${ext}`
     const targetPath = path.join(COA_DIR, finalName)

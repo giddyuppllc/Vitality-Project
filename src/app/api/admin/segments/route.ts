@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { parseSegmentFilters, quickCount, stringifySegmentFilters } from '@/lib/segments'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 const filtersSchema = z
   .object({
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(created, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(err), issues: err.issues }, { status: 400 })
     }
     console.error('[segments] create error', err)
     return NextResponse.json({ error: 'Failed to create segment' }, { status: 500 })

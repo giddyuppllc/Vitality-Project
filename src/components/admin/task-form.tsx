@@ -1,5 +1,6 @@
 'use client'
 
+import { localInputToIso } from '@/lib/datetime-local'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -50,7 +51,7 @@ export function TaskForm({
           title: title.trim(),
           description: description.trim() || undefined,
           priority,
-          dueAt: dueAt || undefined,
+          dueAt: localInputToIso(dueAt) ?? undefined,
           assignedTo: assignedTo || undefined,
           entityType: entityType || undefined,
           entityId: entityId.trim() || undefined,

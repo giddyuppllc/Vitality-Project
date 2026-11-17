@@ -67,7 +67,12 @@ export async function PATCH(
     if ('notes' in body) data.notes = body.notes || null
     if ('nextAction' in body) data.nextAction = body.nextAction || null
     if ('nextActionDue' in body) {
-      data.nextActionDue = body.nextActionDue ? new Date(body.nextActionDue) : null
+      const due = body.nextActionDue ? new Date(body.nextActionDue) : null
+      // An unparseable date used to reach Prisma as Invalid Date (500).
+      if (due && Number.isNaN(due.getTime())) {
+        return NextResponse.json({ error: 'Invalid next-action date' }, { status: 400 })
+      }
+      data.nextActionDue = due
     }
     if ('estimatedValue' in body) {
       data.estimatedValue =
@@ -75,7 +80,7 @@ export async function PATCH(
           ? null
           : typeof body.estimatedValue === 'number'
             ? body.estimatedValue
-            : parseInt(body.estimatedValue, 10) || null
+            : intOrNull(body.estimatedValue)
     }
     if ('probability' in body) {
       data.probability =
@@ -83,7 +88,7 @@ export async function PATCH(
           ? null
           : typeof body.probability === 'number'
             ? body.probability
-            : parseInt(body.probability, 10) || null
+            : intOrNull(body.probability) // "0" is a real probability, not "unset"
     }
     if ('assignedTo' in body) data.assignedTo = body.assignedTo || null
     if ('closedReason' in body) data.closedReason = body.closedReason || null
@@ -166,4 +171,9 @@ export async function DELETE(
     console.error('Delete lead error:', error)
     return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 })
   }
+}
+
+function intOrNull(v: unknown): number | null {
+  const n = parseInt(String(v), 10)
+  return Number.isNaN(n) ? null : n
 }

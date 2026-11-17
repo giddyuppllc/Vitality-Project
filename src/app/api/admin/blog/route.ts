@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
+import { refreshBlogPages } from '@/lib/blog-cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,13 @@ const createSchema = z.object({
   content: z.string().min(1),
   category: z.string().min(1).max(60).default('Research'),
   readTime: z.string().max(40).optional().nullable(),
-  coverImage: z.string().url().optional().nullable().or(z.literal('')),
+  // https URL or a /path on this site (uploads land in /uploads/...; .url()
+  // rejected those).
+  coverImage: z
+    .string()
+    .refine((u) => u === '' || /^https?:\/\//i.test(u) || /^\/(?!\/)/.test(u), 'Cover image must be https://… or /uploads/…')
+    .optional()
+    .nullable(),
   relatedLinks: z.array(relatedLinkSchema).default([]),
   authorName: z.string().max(120).optional().nullable(),
   published: z.boolean().default(false),
@@ -70,6 +77,7 @@ export async function POST(req: NextRequest) {
       entityId: post.id,
       metadata: { slug: post.slug, published: post.published },
     })
+    refreshBlogPages([post.slug])
     return NextResponse.json(post, { status: 201 })
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {

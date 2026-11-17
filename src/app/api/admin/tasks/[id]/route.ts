@@ -10,7 +10,7 @@ const patchSchema = z.object({
   description: z.string().max(5000).nullable().optional(),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).optional(),
-  dueAt: z.string().datetime().nullable().optional().or(z.string().nullable().optional()),
+  dueAt: z.string().refine((v) => v === '' || !Number.isNaN(Date.parse(v)), 'Invalid due date').nullable().optional(),
   assignedTo: z.string().nullable().optional(),
 })
 

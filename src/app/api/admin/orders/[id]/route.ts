@@ -51,6 +51,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
+    // Membership invoices carry "MEMBERSHIP:<id>:<tier>" in notes — it is what
+    // mark-paid reads to activate the membership. Overwriting it from the
+    // Internal Notes box silently broke activation, so it can't be edited.
+    if (
+      data.notes !== undefined &&
+      prev.notes?.startsWith('MEMBERSHIP:') &&
+      data.notes !== prev.notes
+    ) {
+      return NextResponse.json(
+        { error: 'This is a membership invoice — its notes hold the activation marker and can’t be edited.' },
+        { status: 400 },
+      )
+    }
+
     // Payment confirmation now goes through the canonical /mark-paid pipeline
     // (the order-detail button uses it). This branch only fires on a genuine
     // UNPAID→PAID transition so re-saving an already-paid order can't double-
@@ -238,6 +252,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(updated)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      const msg = error.issues.map((i) => `${i.path.join('.') || 'value'}: ${i.message}`).join('; ')
+      return NextResponse.json({ error: msg }, { status: 400 })
+    }
     console.error('Order update error:', error)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }

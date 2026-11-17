@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -35,6 +36,14 @@ export async function POST(req: NextRequest) {
         maxWeight: data.maxWeight ?? null,
         minOrderValue: data.minOrderValue ?? null,
       },
+    })
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email,
+      action: 'shipping.rate.create',
+      entityType: 'ShippingRate',
+      entityId: rate.id,
+      metadata: data,
     })
     return NextResponse.json(rate, { status: 201 })
   } catch (err) {

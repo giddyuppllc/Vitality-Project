@@ -13,7 +13,7 @@ const DAY = 24 * 60 * 60 * 1000
 type Segment = 'all' | 'new' | 'vip' | 'at-risk' | 'affiliates'
 
 interface Props {
-  searchParams: Promise<{ segment?: string; q?: string }>
+  searchParams: Promise<{ segment?: string; q?: string; page?: string }>
 }
 
 function parseSegment(raw?: string): Segment {
@@ -28,10 +28,13 @@ function parseSegment(raw?: string): Segment {
   }
 }
 
+const PAGE_SIZE = 100
+
 export default async function AdminCustomersPage({ searchParams }: Props) {
   const sp = await searchParams
   const segment = parseSegment(sp?.segment)
   const q = (sp?.q ?? '').trim()
+  const page = Math.max(1, Number.parseInt(sp?.page ?? '1', 10) || 1)
 
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY)
@@ -45,6 +48,18 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
     where = { ...where, createdAt: { gte: thirtyDaysAgo } }
   } else if (segment === 'affiliates') {
     where = { role: 'AFFILIATE' }
+  } else if (segment === 'vip') {
+    // VIP = lifetime PAID spend >= $2,000, across ALL customers. It used to be
+    // computed in memory over the newest 500 users only, so older big
+    // spenders never appeared while the tab count (SQL) included them.
+    const vipIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT u.id FROM users u
+         JOIN orders o ON o."userId" = u.id AND o."paymentStatus" = 'PAID'
+        WHERE u.role IN ('CUSTOMER', 'AFFILIATE')
+        GROUP BY u.id
+       HAVING SUM(o.total) >= 200000`,
+    )
+    where = { ...where, id: { in: vipIds.map((r) => r.id) } }
   } else if (segment === 'at-risk') {
     where = {
       ...where,
@@ -68,6 +83,8 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
     }
   }
 
+  const matching = await prisma.user.count({ where })
+  const totalPages = Math.max(1, Math.ceil(matching / PAGE_SIZE))
   const baseCustomers = await prisma.user.findMany({
     where,
     include: {
@@ -78,7 +95,8 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
       },
     },
     orderBy: { createdAt: 'desc' },
-    take: 500,
+    take: PAGE_SIZE,
+    skip: (page - 1) * PAGE_SIZE,
   })
 
   // Load assigned tags for the rendered customer list
@@ -99,11 +117,13 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
     tagsByUser.set(row.userId, list)
   }
 
-  let customers = baseCustomers
-  if (segment === 'vip') {
-    customers = baseCustomers.filter(
-      (c) => c.orders.reduce((sum, o) => sum + o.total, 0) >= 200000
-    )
+  const customers = baseCustomers
+  const pageHref = (n: number) => {
+    const usp = new URLSearchParams()
+    if (segment !== 'all') usp.set('segment', segment)
+    if (q) usp.set('q', q)
+    if (n > 1) usp.set('page', String(n))
+    return `/admin/customers${usp.toString() ? `?${usp}` : ''}`
   }
 
   // Counts
@@ -148,7 +168,10 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">Customers</h1>
-          <p className="text-white/40 mt-1">{customers.length} shown · {total} total</p>
+          <p className="text-white/40 mt-1">
+            {matching} matching · {total} total
+            {totalPages > 1 && ` · page ${Math.min(page, totalPages)} of ${totalPages}`}
+          </p>
         </div>
         <a
           href="/api/admin/customers/export"
@@ -285,6 +308,21 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm">
+          {page > 1 ? (
+            <Link href={pageHref(page - 1)} className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5">
+              ← Newer
+            </Link>
+          ) : <span />}
+          {page < totalPages ? (
+            <Link href={pageHref(page + 1)} className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5">
+              Older →
+            </Link>
+          ) : <span />}
+        </div>
+      )}
     </div>
   )
 }

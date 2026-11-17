@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { zodMessage } from '@/lib/zod-message'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,7 +77,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing id or all flag' }, { status: 400 })
   } catch (error) {
     if (error instanceof z.ZodError)
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return NextResponse.json({ error: zodMessage(error), issues: error.issues }, { status: 400 })
     console.error('Notifications patch error:', error)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }

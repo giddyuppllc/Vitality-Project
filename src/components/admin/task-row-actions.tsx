@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { adminFetch } from '@/lib/admin-fetch'
 import { Check, X, Play, Trash2 } from 'lucide-react'
 
 interface Props {
@@ -16,11 +17,12 @@ export function TaskRowActions({ taskId, status }: Props) {
   const update = async (next: Props['status']) => {
     setBusy(true)
     try {
-      await fetch(`/api/admin/tasks/${taskId}`, {
+      const r = await adminFetch(`/api/admin/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       })
+      if (!r.ok) alert(r.error)
       router.refresh()
     } finally {
       setBusy(false)
@@ -31,7 +33,8 @@ export function TaskRowActions({ taskId, status }: Props) {
     if (!confirm('Delete this task?')) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/tasks/${taskId}`, { method: 'DELETE' })
+      const r = await adminFetch(`/api/admin/tasks/${taskId}`, { method: 'DELETE' })
+      if (!r.ok) alert(r.error)
       router.refresh()
     } finally {
       setBusy(false)

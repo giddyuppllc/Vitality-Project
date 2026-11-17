@@ -97,9 +97,16 @@ export function OrderActions({ order }: Props) {
   // orders confirmed here never shipped.
   const confirmPayment = async () => {
     setLoading(true)
+    setActionErr(null)
     try {
-      await fetch(`/api/admin/orders/${order.id}/mark-paid`, { method: 'POST' })
+      const res = await fetch(`/api/admin/orders/${order.id}/mark-paid`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? `Could not confirm payment (${res.status})`)
+      }
       router.refresh()
+    } catch (err) {
+      setActionErr(err instanceof Error ? err.message : 'Could not confirm payment')
     } finally {
       setLoading(false)
     }
@@ -121,6 +128,7 @@ export function OrderActions({ order }: Props) {
           >
             <DollarSign className="w-4 h-4" /> Confirm Payment Received
           </Button>
+          {actionErr && <p className="text-xs text-red-400 mt-2">{actionErr}</p>}
         </div>
       )}
 
@@ -168,7 +176,16 @@ export function OrderActions({ order }: Props) {
         </Button>
       </div>
 
-      {/* Internal notes */}
+      {/* Internal notes — not editable on membership invoices, whose notes
+          field holds the MEMBERSHIP:<id>:<tier> activation marker. */}
+      {order.notes?.startsWith('MEMBERSHIP:') ? (
+        <div className="space-y-1">
+          <p className="text-sm text-white/50">Internal Notes</p>
+          <p className="text-xs text-white/40">
+            Membership invoice — notes are reserved for the membership link and can&rsquo;t be edited here.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-3">
         <p className="text-sm text-white/50">Internal Notes</p>
         <textarea
@@ -182,6 +199,7 @@ export function OrderActions({ order }: Props) {
           Save Notes
         </Button>
       </div>
+      )}
 
       {/* Refund */}
       {order.paymentStatus === 'PAID' && (

@@ -177,53 +177,19 @@ export function SegmentBuilder({
     setPreviewing(true)
     setPreviewCount(null)
     try {
-      // Save temporarily as a dry count: we use POST then DELETE? Easier:
-      // For preview, create/update via PATCH if edit, else just a POST preview.
-      // Simpler: since the back-end's segment count needs a persisted row, we
-      // instead pass the filters directly through a one-off query by creating
-      // a temporary in-memory evaluation. Use the segment's own customers
-      // endpoint on an existing id; for new segments save first.
-      if (mode === 'edit' && id) {
-        // Patch with current filters, then ask for customer count
-        const res = await fetch(`/api/admin/segments/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filters: filtersPayload }),
-        })
-        if (!res.ok) {
-          setError('Preview failed')
-          return
-        }
-        const cust = await fetch(`/api/admin/segments/${id}/customers?limit=1&offset=0`)
-        if (!cust.ok) {
-          setError('Preview failed')
-          return
-        }
-        const data = await cust.json()
-        setPreviewCount(data.total ?? 0)
-      } else {
-        // Create a temp segment, query count, then delete it.
-        const create = await fetch('/api/admin/segments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name || `Preview ${Date.now()}`,
-            description: form.description || null,
-            filters: filtersPayload,
-          }),
-        })
-        if (!create.ok) {
-          setError('Preview failed')
-          return
-        }
-        const seg = await create.json()
-        const cust = await fetch(`/api/admin/segments/${seg.id}/customers?limit=1&offset=0`)
-        const data = cust.ok ? await cust.json() : { total: 0 }
-        setPreviewCount(data.total ?? 0)
-        // Cleanup preview segment and forward to edit page so user keeps it
-        // if they want to save. Actually: delete it so the list isn't polluted.
-        await fetch(`/api/admin/segments/${seg.id}`, { method: 'DELETE' })
+      // Count without saving (the old preview PATCHed the saved segment, or
+      // created + deleted a throwaway one).
+      const res = await fetch('/api/admin/segments/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters: filtersPayload }),
+      })
+      if (!res.ok) {
+        setError('Preview failed')
+        return
       }
+      const data = await res.json()
+      setPreviewCount(data.total ?? 0)
     } finally {
       setPreviewing(false)
     }
