@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireVipApi, vipJson } from '@/lib/vip/access'
 import { MAX_COMMENT_CHARS, memberRateLimit, spamCheck } from '@/lib/vip/guard'
 import { notifyForContent } from '@/lib/vip/notify'
+import { isBlockedBetween } from '@/lib/vip/blocks'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     select: { id: true, authorId: true, hiddenAt: true },
   })
   if (!post || post.hiddenAt) return vipJson({ error: 'Not found' }, { status: 404 })
+  if (await isBlockedBetween(viewer.userId, post.authorId)) return vipJson({ error: 'Not found' }, { status: 404 })
 
   let parentId: string | null = null
   let parentAuthorId: string | undefined

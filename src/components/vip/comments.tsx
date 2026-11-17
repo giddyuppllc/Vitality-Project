@@ -9,6 +9,7 @@ import { renderPostBody } from '@/lib/vip/text'
 import { Avatar, TierBadge, timeAgo } from './ui'
 import { LikeButton } from './post-card'
 import { ReportDialog } from './report-dialog'
+import { MentionTextarea } from './mention-textarea'
 
 export function CommentForm({
   postId,
@@ -52,9 +53,9 @@ export function CommentForm({
     <form onSubmit={submit} className="flex flex-col gap-2">
       <label>
         <span className="sr-only">{placeholder}</span>
-        <textarea
+        <MentionTextarea
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onValueChange={setBody}
           rows={2}
           maxLength={2000}
           autoFocus={autoFocus}

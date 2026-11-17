@@ -2,8 +2,35 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ImagePlus, Loader2, X } from 'lucide-react'
+import { ImagePlus, Loader2, Video, X } from 'lucide-react'
 import { Avatar } from './ui'
+import { MentionTextarea } from './mention-textarea'
+import { uploadVipImage } from './upload'
+
+export const MAX_POST_IMAGES = 6
+
+/** Photo thumbnails with remove buttons (composer + post editor). */
+export function ImageTray({ images, onRemove }: { images: string[]; onRemove: (url: string) => void }) {
+  if (!images.length) return null
+  return (
+    <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6" aria-label="Attached photos">
+      {images.map((url, i) => (
+        <li key={url} className="relative aspect-square">
+          {/* eslint-disable-next-line @next/next/no-img-element -- members-only media route */}
+          <img src={url} alt={`Attached photo ${i + 1}`} className="h-full w-full rounded-xl border border-white/10 object-cover" />
+          <button
+            type="button"
+            onClick={() => onRemove(url)}
+            aria-label={`Remove photo ${i + 1}`}
+            className="vip-focus absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-black/75"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function Composer({
   viewerName,
@@ -22,33 +49,47 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null)
   const [body, setBody] = useState('')
   const [spaceId, setSpaceId] = useState(defaultSpaceId ?? '')
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [images, setImages] = useState<string[]>([])
+  const [showVideo, setShowVideo] = useState(false)
+  const [videoUrl, setVideoUrl] = useState('')
   const [announce, setAnnounce] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [uploading, setUploading] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [earned, setEarned] = useState<string | null>(null)
   const postable = spaces.filter((s) => isAdmin || !s.adminOnly)
 
-  async function upload(file: File) {
-    setUploading(true)
+  async function addFiles(files: File[]) {
     setError(null)
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/vip/uploads', { method: 'POST', body: fd })
-    const data = await res.json().catch(() => ({}))
-    setUploading(false)
-    if (!res.ok) setError(data.error || 'Upload failed.')
-    else setImageUrl(data.url)
+    const room = MAX_POST_IMAGES - images.length
+    if (files.length > room) setError(`Add up to ${MAX_POST_IMAGES} photos.`)
+    const take = files.slice(0, Math.max(0, room))
+    setUploading((n) => n + take.length)
+    await Promise.all(
+      take.map(async (f) => {
+        const r = await uploadVipImage(f)
+        setUploading((n) => n - 1)
+        if (r.ok) setImages((cur) => (cur.length < MAX_POST_IMAGES && !cur.includes(r.url) ? [...cur, r.url] : cur))
+        else setError(r.error)
+      }),
+    )
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
+    setEarned(null)
     const res = await fetch('/api/vip/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body, spaceId: spaceId || null, imageUrl, isAnnouncement: announce }),
+      body: JSON.stringify({
+        body,
+        spaceId: spaceId || null,
+        images,
+        videoUrl: showVideo && videoUrl.trim() ? videoUrl.trim() : null,
+        isAnnouncement: announce,
+      }),
     })
     const data = await res.json().catch(() => ({}))
     setBusy(false)
@@ -56,8 +97,12 @@ export function Composer({
       setError(data.error || 'Could not post.')
       return
     }
+    const pts = (data.points?.firstPost ?? 0) + (data.points?.postDay ?? 0)
+    if (pts > 0) setEarned(`Posted · +${pts} points`)
     setBody('')
-    setImageUrl(null)
+    setImages([])
+    setVideoUrl('')
+    setShowVideo(false)
     setAnnounce(false)
     router.refresh()
   }
@@ -68,9 +113,9 @@ export function Composer({
         <Avatar name={viewerName} src={viewerAvatar} size={40} />
         <label className="min-w-0 flex-1">
           <span className="sr-only">Write a post</span>
-          <textarea
+          <MentionTextarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onValueChange={setBody}
             rows={body.length > 80 ? 5 : 2}
             maxLength={5000}
             placeholder="Share a win, a check-in or a question…"
@@ -79,43 +124,55 @@ export function Composer({
         </label>
       </div>
 
-      {imageUrl && (
-        <div className="relative ml-[52px] mt-3 inline-block">
-          {/* eslint-disable-next-line @next/next/no-img-element -- members-only media route */}
-          <img src={imageUrl} alt="Attached image preview" className="max-h-48 rounded-xl border border-white/10" />
-          <button
-            type="button"
-            onClick={() => setImageUrl(null)}
-            aria-label="Remove image"
-            className="vip-focus absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/70"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      )}
+      <div className="sm:pl-[52px]">
+        <ImageTray images={images} onRemove={(u) => setImages((cur) => cur.filter((x) => x !== u))} />
+        {showVideo && (
+          <label className="mt-3 block text-sm text-white/70">
+            YouTube or Vimeo link
+            <input
+              type="url"
+              inputMode="url"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+              className="vip-focus mt-1.5 h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/40"
+            />
+          </label>
+        )}
+        {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
+        {earned && <p role="status" className="mt-2 text-sm text-emerald-300">{earned}</p>}
+      </div>
 
-      {error && <p role="alert" className="ml-[52px] mt-2 text-sm text-red-300">{error}</p>}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 pl-[52px]">
+      <div className="mt-3 flex flex-wrap items-center gap-2 sm:pl-[52px]">
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) upload(f)
+            const files = Array.from(e.target.files ?? [])
+            if (files.length) addFiles(files)
             e.target.value = ''
           }}
         />
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          disabled={uploading || !!imageUrl}
-          className="vip-focus inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-white/60 hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+          disabled={uploading > 0 || images.length >= MAX_POST_IMAGES}
+          className="vip-focus inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
         >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ImagePlus className="h-4 w-4" aria-hidden="true" />}
-          Photo
+          {uploading > 0 ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ImagePlus className="h-4 w-4" aria-hidden="true" />}
+          Photos{images.length ? ` ${images.length}/${MAX_POST_IMAGES}` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowVideo((v) => !v)}
+          aria-pressed={showVideo}
+          className="vip-focus inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white"
+        >
+          <Video className="h-4 w-4" aria-hidden="true" />
+          Video
         </button>
         {postable.length > 0 && (
           <label className="text-sm text-white/60">
@@ -123,7 +180,7 @@ export function Composer({
             <select
               value={spaceId}
               onChange={(e) => setSpaceId(e.target.value)}
-              className="vip-focus h-8 rounded-lg border border-white/10 bg-[#161a33] px-2 text-sm text-white/80"
+              className="vip-focus h-8 max-w-[11rem] rounded-lg border border-white/10 bg-[#161a33] px-2 text-sm text-white/80"
             >
               <option value="">General</option>
               {postable.map((s) => (
@@ -142,7 +199,7 @@ export function Composer({
         )}
         <button
           type="submit"
-          disabled={busy || uploading || !body.trim()}
+          disabled={busy || uploading > 0 || !body.trim()}
           className="vip-focus ml-auto inline-flex h-9 items-center gap-2 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-40"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}

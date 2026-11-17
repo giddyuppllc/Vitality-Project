@@ -8,8 +8,11 @@ import { Composer } from '@/components/vip/composer'
 import { EmptyState, PageHeader } from '@/components/vip/ui'
 import { cn } from '@/lib/utils'
 import { VIP_COPY } from '@/lib/vip/copy'
+import { SOCIAL_COPY } from '@/lib/vip/social-copy'
 import { onboardingSteps } from '@/lib/vip/onboarding'
+import { suggestedMembers } from '@/lib/vip/social'
 import { OnboardingCard } from '@/components/vip/onboarding-card'
+import { FeedTabs, SuggestedMembers } from '@/components/vip/social'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Community' }
@@ -17,17 +20,19 @@ export const metadata = { title: 'Community' }
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ space?: string; q?: string }>
+  searchParams: Promise<{ space?: string; q?: string; tab?: string }>
 }) {
   const viewer = await requireVipPage('community')
-  const { space, q } = await searchParams
-  const [spaces, feed, steps] = await Promise.all([
+  const { space, q, tab } = await searchParams
+  const following = tab === 'following' && !q
+  const [spaces, feed, steps, suggestions] = await Promise.all([
     listSpaces(),
-    listFeed({ viewer, space, q }),
+    listFeed({ viewer, space: following ? null : space, q, following }),
     viewer.onboarded ? Promise.resolve(null) : onboardingSteps(viewer.userId),
+    following ? suggestedMembers(viewer, 5) : Promise.resolve([]),
   ])
-  const current = spaces.find((s) => s.slug === space) ?? null
-  const showOnboarding = !!steps && !q && !space && steps.some((s) => !s.done)
+  const current = following ? null : (spaces.find((s) => s.slug === space) ?? null)
+  const showOnboarding = !!steps && !q && !space && !following && steps.some((s) => !s.done)
   const empty = q ? VIP_COPY.empty.search : current ? VIP_COPY.empty.space : VIP_COPY.empty.feed
 
   return (
@@ -36,6 +41,8 @@ export default async function FeedPage({
         title={q ? 'Search' : current ? `# ${current.name}` : VIP_COPY.feed.title}
         intro={q || current ? undefined : VIP_COPY.feed.subtitle}
       />
+
+      {!q && <FeedTabs current={following ? 'following' : 'everyone'} />}
 
       {showOnboarding && <OnboardingCard steps={steps!} />}
 
@@ -53,7 +60,7 @@ export default async function FeedPage({
         </label>
       </form>
 
-      {spaces.length > 0 && !q && (
+      {spaces.length > 0 && !q && !following && (
         <nav className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" aria-label="Spaces">
           {[{ slug: '', name: 'All' }, ...spaces].map((s) => {
             const on = (s.slug || null) === (space || null)
@@ -82,15 +89,17 @@ export default async function FeedPage({
           <Link href="/feed" className="text-brand-300 hover:text-brand-200">clear</Link>
         </p>
       ) : (
-        <div className="mb-4">
-          <Composer
-            viewerName={viewer.displayName}
-            viewerAvatar={viewer.avatarUrl}
-            spaces={spaces.map((s) => ({ id: s.id, name: s.name, adminOnly: s.adminOnly }))}
-            defaultSpaceId={current && (!current.adminOnly || viewer.isAdmin) ? current.id : null}
-            isAdmin={viewer.isAdmin}
-          />
-        </div>
+        !following && (
+          <div className="mb-4">
+            <Composer
+              viewerName={viewer.displayName}
+              viewerAvatar={viewer.avatarUrl}
+              spaces={spaces.map((s) => ({ id: s.id, name: s.name, adminOnly: s.adminOnly }))}
+              defaultSpaceId={current && (!current.adminOnly || viewer.isAdmin) ? current.id : null}
+              isAdmin={viewer.isAdmin}
+            />
+          </div>
+        )
       )}
 
       {feed.pinned.length > 0 && (
@@ -101,16 +110,28 @@ export default async function FeedPage({
         </section>
       )}
 
-      {feed.posts.length === 0 && feed.pinned.length === 0 ? (
+      {following && feed.posts.length === 0 ? (
+        <div className="space-y-4">
+          <EmptyState title={SOCIAL_COPY.following.emptyTitle}>{SOCIAL_COPY.following.emptyBody}</EmptyState>
+          <SuggestedMembers members={suggestions} />
+        </div>
+      ) : feed.posts.length === 0 && feed.pinned.length === 0 ? (
         <EmptyState title={empty.title}>{empty.body}</EmptyState>
       ) : (
-        <FeedList
-          key={`${space ?? ''}|${q ?? ''}|${feed.posts[0]?.id ?? ''}|${feed.posts.length}`}
-          initial={feed.posts}
-          initialCursor={feed.nextCursor}
-          query={{ space, q }}
-          viewerId={viewer.userId}
-        />
+        <>
+          {following && suggestions.length > 0 && feed.posts.length < 5 && (
+            <div className="mb-3">
+              <SuggestedMembers members={suggestions} />
+            </div>
+          )}
+          <FeedList
+            key={`${space ?? ''}|${q ?? ''}|${following ? 'f' : ''}|${feed.posts[0]?.id ?? ''}|${feed.posts.length}`}
+            initial={feed.posts}
+            initialCursor={feed.nextCursor}
+            query={{ space: following ? undefined : space, q, tab: following ? 'following' : undefined }}
+            viewerId={viewer.userId}
+          />
+        </>
       )}
     </div>
   )

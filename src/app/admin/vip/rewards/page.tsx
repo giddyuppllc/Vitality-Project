@@ -5,6 +5,7 @@ import { TIER_BENEFITS } from '@/lib/membership'
 import { getTierRewardSettings, periodFor, runMemberRewards } from '@/lib/vip/rewards'
 import { ClubhouseSettingsForm, RewardsForm } from '@/components/admin/vip/forms'
 import { getVipSettings } from '@/lib/vip/settings'
+import { SocialPointsForm } from '@/components/admin/vip/social-points-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ export default async function AdminVipRewardsPage() {
         <div className="space-y-6">
           <RewardsForm initial={settings} />
           <ClubhouseSettingsForm initial={clubSettings} />
+          <SocialPointsForm initial={{ firstPost: clubSettings['vip.points.firstPost'], postDay: clubSettings['vip.points.postDay'] }} />
         </div>
         <div className="glass space-y-2 rounded-2xl p-5 text-sm">
           <h2 className="font-semibold">This month ({periodFor(new Date())})</h2>

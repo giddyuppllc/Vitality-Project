@@ -53,12 +53,22 @@ model User {
   vipLessonProgress VipLessonProgress[]
   vipEventRsvps     VipEventRsvp[]
 
-  verifyToken      String?   @unique
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
-  twoFASecret      String?
-  twoFAEnabled     Boolean   @default(false)
-  birthday         DateTime?
+  verifyToken       String?                      @unique
+  resetToken        String?                      @unique
+  resetTokenExpiry  DateTime?
+  twoFASecret       String?
+  twoFAEnabled      Boolean                      @default(false)
+  birthday          DateTime?
+  // VIP social network (follow graph, DMs, bookmarks, badges) — relations only.
+  vipFollowing      VipFollow[]                  @relation("VipFollowFollower")
+  vipFollowers      VipFollow[]                  @relation("VipFollowFollowing")
+  vipBlocksMade     VipBlock[]                   @relation("VipBlockBlocker")
+  vipBlocksReceived VipBlock[]                   @relation("VipBlockBlocked")
+  vipBadges         VipUserBadge[]
+  vipInterests      VipInterest[]
+  vipBookmarks      VipBookmark[]
+  vipConversations  VipConversationParticipant[]
+  vipMessages       VipMessage[]
 
   @@map("users")
 }
@@ -1497,6 +1507,13 @@ model VipProfile {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Social profile (all optional; null = default behaviour).
+  coverUrl             String?
+  location             String?
+  // MEMBERS (default when null) | FOLLOWERS
+  profileVisibility    String?
+  // EVERYONE (default when null) | FOLLOWING | NOBODY
+  dmPolicy             String?
 
   @@map("vip_profiles")
 }
@@ -1519,24 +1536,30 @@ model VipSpace {
 }
 
 model VipPost {
-  id             String        @id @default(cuid())
+  id             String           @id @default(cuid())
   authorId       String
   spaceId        String?
-  body           String        @db.Text
+  body           String           @db.Text
   imageUrl       String?
-  pinned         Boolean       @default(false)
-  isAnnouncement Boolean       @default(false)
+  pinned         Boolean          @default(false)
+  isAnnouncement Boolean          @default(false)
   hiddenAt       DateTime?
   hiddenById     String?
   hiddenReason   String?
   editedAt       DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  author         User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  space          VipSpace?     @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  author         User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  space          VipSpace?        @relation(fields: [spaceId], references: [id], onDelete: SetNull)
   comments       VipComment[]
   reactions      VipReaction[]
   reports        VipReport[]
+  // YouTube / Vimeo link shown as a privacy-friendly embed (lib/vip/text videoEmbed).
+  videoUrl       String?
+  images         VipPostImage[]
+  hashtags       VipPostHashtag[]
+  bookmarks      VipBookmark[]
+  sharedIn       VipMessage[]
 
   @@index([createdAt])
   @@index([spaceId, createdAt])
@@ -1589,38 +1612,47 @@ model VipReaction {
 }
 
 model VipReport {
-  id           String      @id @default(cuid())
-  reporterId   String
-  postId       String?
-  commentId    String?
-  reason       String      @db.Text
+  id             String           @id @default(cuid())
+  reporterId     String
+  postId         String?
+  commentId      String?
+  reason         String           @db.Text
   // OPEN | RESOLVED | DISMISSED
-  status       String      @default("OPEN")
-  resolvedById String?
-  resolvedAt   DateTime?
-  resolution   String?
-  createdAt    DateTime    @default(now())
-  reporter     User        @relation("VipReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  post         VipPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment      VipComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  status         String           @default("OPEN")
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolution     String?
+  createdAt      DateTime         @default(now())
+  reporter       User             @relation("VipReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  post           VipPost?         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment        VipComment?      @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  // A reported direct message (and its conversation, which admins may then open).
+  messageId      String?
+  conversationId String?
+  message        VipMessage?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation   VipConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([reporterId, postId])
   @@unique([reporterId, commentId])
   @@index([status, createdAt])
+  @@index([messageId]) // one report per member per message is enforced in the API (a unique here would block db push)
+  @@index([conversationId])
   @@map("vip_reports")
 }
 
 // In-app only (no email/SMS). type: REPLY | COMMENT | MENTION
 model VipNotification {
-  id        String    @id @default(cuid())
-  userId    String
-  type      String
-  actorId   String?
-  postId    String?
-  commentId String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation("VipNotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  userId         String
+  type           String
+  actorId        String?
+  postId         String?
+  commentId      String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+  user           User      @relation("VipNotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  // MESSAGE notifications: the conversation (one unread notification per conversation).
+  conversationId String?
 
   @@index([userId, readAt, createdAt])
   @@map("vip_notifications")
@@ -1962,8 +1994,10 @@ model VipUserBadge {
   badgeKey  String
   label     String
   awardedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeKey])
+  @@index([userId, awardedAt])
   @@map("vip_user_badges")
 }
 
@@ -2280,4 +2314,139 @@ model VipOnboarding {
   updatedAt   DateTime  @updatedAt
 
   @@map("vip_onboarding")
+}
+
+// ─── Social network ─────────────────────────────────────────────────────────
+
+model VipFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("VipFollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("VipFollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@map("vip_follows")
+}
+
+// Blocks hide both ways: either side loses the other's posts, DMs and profile.
+model VipBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("VipBlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("VipBlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("vip_blocks")
+}
+
+// Profile interests / tags (lower-case, max 10 per member).
+model VipInterest {
+  id     String @id @default(cuid())
+  userId String
+  tag    String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tag])
+  @@index([tag])
+  @@map("vip_interests")
+}
+
+// Up to 6 images per post (VipPost.imageUrl keeps the first, for older readers).
+model VipPostImage {
+  id        String  @id @default(cuid())
+  postId    String
+  url       String
+  sortOrder Int     @default(0)
+  post      VipPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sortOrder])
+  @@map("vip_post_images")
+}
+
+// #hashtags in a post body; createdAt = the post's createdAt (for "trending").
+model VipPostHashtag {
+  id        String   @id @default(cuid())
+  postId    String
+  tag       String
+  createdAt DateTime @default(now())
+  post      VipPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tag])
+  @@index([tag, createdAt])
+  @@index([createdAt])
+  @@map("vip_post_hashtags")
+}
+
+model VipBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      VipPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+  @@map("vip_bookmarks")
+}
+
+// Direct messages: a 1:1 conversation (directKey = "<idA>:<idB>", sorted, so
+// there is only ever one per pair) or a small group (up to 20 people).
+model VipConversation {
+  id            String                       @id @default(cuid())
+  isGroup       Boolean                      @default(false)
+  title         String?
+  directKey     String?                      @unique
+  createdById   String
+  lastMessageAt DateTime                     @default(now())
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  participants  VipConversationParticipant[]
+  messages      VipMessage[]
+  reports       VipReport[]
+
+  @@index([lastMessageAt])
+  @@map("vip_conversations")
+}
+
+model VipConversationParticipant {
+  id             String          @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime        @default(now())
+  // Left a group: history stays for the others; this member no longer sees it.
+  leftAt         DateTime?
+  // Read receipt: everything sent up to this moment has been seen.
+  lastReadAt     DateTime?
+  conversation   VipConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("vip_conversation_participants")
+}
+
+model VipMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String          @db.Text
+  imageUrl       String?
+  // A clubhouse post shared into the conversation.
+  sharedPostId   String?
+  createdAt      DateTime        @default(now())
+  conversation   VipConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sharedPost     VipPost?        @relation(fields: [sharedPostId], references: [id], onDelete: SetNull)
+  reports        VipReport[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+  @@map("vip_messages")
 }

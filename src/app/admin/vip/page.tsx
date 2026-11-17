@@ -23,6 +23,7 @@ export default async function AdminVipModerationPage() {
         reporter: { select: { email: true, name: true } },
         post: { select: { id: true, body: true, hiddenAt: true, authorId: true, author: { select: { email: true } } } },
         comment: { select: { id: true, body: true, hiddenAt: true, authorId: true, author: { select: { email: true } } } },
+        message: { select: { id: true, body: true, imageUrl: true, senderId: true, sender: { select: { email: true } } } },
       },
     }),
     prisma.vipPost.findMany({
@@ -53,6 +54,42 @@ export default async function AdminVipModerationPage() {
         ) : (
           <ul className="space-y-3">
             {reports.map((r) => {
+              if (r.message) {
+                const m = r.message
+                return (
+                  <li key={r.id} className="glass rounded-2xl p-5">
+                    <p className="text-xs text-white/40">
+                      {formatDate(r.createdAt)} · reported by {r.reporter.email} · direct message
+                    </p>
+                    <p className="mt-2 text-sm">
+                      <span className="text-white/50">Reason:</span> {r.reason}
+                    </p>
+                    <blockquote className="mt-2 whitespace-pre-line rounded-xl bg-white/5 p-3 text-sm text-white/80">
+                      {m.body ? snippet(m.body) : m.imageUrl ? '(photo)' : '(shared post)'}
+                      <footer className="mt-1 text-xs text-white/40">by {m.sender.email}</footer>
+                    </blockquote>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.conversationId && (
+                        <a
+                          href={`/admin/vip/conversations/${r.conversationId}`}
+                          className="rounded-xl bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
+                        >
+                          Open reported conversation
+                        </a>
+                      )}
+                      <AdminActionButton
+                        endpoint={M}
+                        label="Suspend sender from community"
+                        confirmText="Suspend this member from the community? They lose posting and messages but keep classroom, events and rewards."
+                        body={{ action: 'suspend_member', userId: m.senderId }}
+                        prompt={{ field: 'reason', question: 'Internal reason (optional)' }}
+                      />
+                      <AdminActionButton endpoint={M} tone="primary" label="Resolve" body={{ action: 'resolve_report', reportId: r.id }} />
+                      <AdminActionButton endpoint={M} label="Dismiss" body={{ action: 'dismiss_report', reportId: r.id }} />
+                    </div>
+                  </li>
+                )
+              }
               const item = r.post ?? r.comment
               const isPost = !!r.post
               return (

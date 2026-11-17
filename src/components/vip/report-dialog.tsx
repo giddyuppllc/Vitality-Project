@@ -6,7 +6,7 @@ export function ReportDialog({
   target,
   onClose,
 }: {
-  target: { postId: string } | { commentId: string }
+  target: { postId: string } | { commentId: string } | { messageId: string }
   onClose: () => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)

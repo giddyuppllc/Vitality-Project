@@ -37,14 +37,43 @@ export function countLinks(body: string): number {
   return (body.match(URL_RE) || []).length
 }
 
-function formatPlain(raw: string): string {
-  return escapeHtml(raw)
-    .replace(
-      MENTION_RE,
-      (_m, pre: string, name: string) =>
-        `${pre}<a href="/members/@${name.toLowerCase()}" class="vip-mention">@${name}</a>`,
+/**
+ * #hashtag: a letter first, then letters/digits/underscore (2–40 chars). The
+ * character before must not be a word character or '&' — escaped entities
+ * such as &#39; never read as a tag.
+ */
+const HASHTAG_RE = /(^|[^\w&#/])#([a-z][a-z0-9_]{1,39})\b/gi
+
+/** Unique, lower-cased #hashtags in a body (URLs excluded; max 10). */
+export function extractHashtags(body: string): string[] {
+  const out = new Set<string>()
+  const plain = body.replace(URL_RE, ' ')
+  for (const m of plain.matchAll(HASHTAG_RE)) {
+    out.add(m[2].toLowerCase())
+    if (out.size >= 10) break
+  }
+  return [...out]
+}
+
+/** A tag typed by a member (with or without '#') → normalised tag, or null. */
+export function normaliseTag(raw: string): string | null {
+  const t = raw.trim().replace(/^#+/, '').toLowerCase()
+  return /^[a-z][a-z0-9_]{1,39}$/.test(t) ? t : null
+}
+
+function formatPlain(raw: string, hashtags: boolean): string {
+  let s = escapeHtml(raw).replace(
+    MENTION_RE,
+    (_m, pre: string, name: string) =>
+      `${pre}<a href="/members/@${name.toLowerCase()}" class="vip-mention">@${name}</a>`,
+  )
+  if (hashtags) {
+    s = s.replace(
+      HASHTAG_RE,
+      (_m, pre: string, tag: string) => `${pre}<a href="/tags/${tag.toLowerCase()}" class="vip-hashtag">#${tag}</a>`,
     )
-    .replace(/\r?\n/g, '<br />')
+  }
+  return s.replace(/\r?\n/g, '<br />')
 }
 
 /**
@@ -52,18 +81,19 @@ function formatPlain(raw: string): string {
  * other span is escaped and gets @mention links + line breaks. (Doing mentions
  * after linkifying would inject markup inside an href like https://x/@name.)
  */
-export function renderPostBody(body: string): string {
+export function renderPostBody(body: string, opts: { hashtags?: boolean } = {}): string {
   const text = body.trim()
+  const tags = opts.hashtags ?? false
   let out = ''
   let last = 0
   for (const m of text.matchAll(URL_RE)) {
     const idx = m.index ?? 0
-    out += formatPlain(text.slice(last, idx))
+    out += formatPlain(text.slice(last, idx), tags)
     const url = escapeHtml(m[0])
     out += `<a href="${url}" ${linkAttrs()}>${url}</a>`
     last = idx + m[0].length
   }
-  out += formatPlain(text.slice(last))
+  out += formatPlain(text.slice(last), tags)
   return out
 }
 
@@ -165,4 +195,14 @@ export function videoEmbed(url: string | null | undefined): VideoEmbed | null {
     if (id) return { kind: 'iframe', provider: 'vimeo', src: `https://player.vimeo.com/video/${id}?dnt=1` }
   }
   return { kind: 'link', href: u.toString() }
+}
+
+/**
+ * A member's post video link: YouTube or Vimeo only (embedded privately, like
+ * lessons). null = no link, false = not an accepted video link.
+ */
+export function checkVideoUrl(url: string | null | undefined): string | null | false {
+  if (!url) return null
+  const v = videoEmbed(url)
+  return v && v.kind === 'iframe' ? url : false
 }

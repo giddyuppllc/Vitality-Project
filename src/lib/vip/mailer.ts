@@ -153,14 +153,23 @@ export async function runDigest(now: Date, dryRun: boolean): Promise<DigestRun> 
       const a = actors.find((x) => x.id === id)
       return a?.vipProfile?.displayName || a?.name || a?.username || 'A member'
     }
-    const items: DigestItem[] = shown
-      .filter((n) => n.postId && posts.some((p) => p.id === n.postId))
-      .map((n) => ({
-        type: n.type as DigestItem['type'],
-        actor: actorName(n.actorId),
-        snippet: snippet(comments.find((c) => c.id === n.commentId)?.body ?? posts.find((p) => p.id === n.postId)?.body),
-        postId: n.postId!,
-      }))
+    const items: DigestItem[] = []
+    for (const n of shown) {
+      if (n.type === 'FOLLOW' && n.actorId) {
+        // Follows: no quoted text; links to the follower's profile.
+        items.push({ type: 'FOLLOW', actor: actorName(n.actorId), snippet: '', path: `/members/${encodeURIComponent(n.actorId)}` })
+      } else if (n.type === 'MESSAGE' && n.conversationId) {
+        // Messages: never quoted in email — the member opens them in the clubhouse.
+        items.push({ type: 'MESSAGE', actor: actorName(n.actorId), snippet: '', path: `/messages/${encodeURIComponent(n.conversationId)}` })
+      } else if (n.postId && posts.some((p) => p.id === n.postId)) {
+        items.push({
+          type: n.type as DigestItem['type'],
+          actor: actorName(n.actorId),
+          snippet: snippet(comments.find((c) => c.id === n.commentId)?.body ?? posts.find((p) => p.id === n.postId)?.body),
+          postId: n.postId,
+        })
+      }
+    }
     if (!items.length) continue
     const ok = await sendVipEmail(user.email, clubhouseDigestEmail({ userId, name: user.name, items, total: notes.length })).catch(() => false)
     if (ok) out.sent++

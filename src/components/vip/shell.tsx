@@ -8,6 +8,7 @@ import { Bell, ExternalLink, LayoutGrid, LogOut, Search, Shield, X } from 'lucid
 import { cn } from '@/lib/utils'
 import { isActive, visibleNav, type VipNavBadge, type VipNavItem } from '@/lib/vip/nav'
 import { Avatar, TierBadge, Wordmark } from './ui'
+import { MessagesNavLink } from './messages-nav-link'
 
 export interface ShellViewer {
   displayName: string
@@ -125,6 +126,7 @@ export function VipShell({
             </form>
           )}
           <div className="ml-auto flex items-center gap-1.5">
+            {!viewer.suspended && <MessagesNavLink />}
             {!viewer.suspended && (
               <Link
                 href="/notifications"

@@ -32,6 +32,8 @@ const schema = z
     'vip.points.lessonComplete': z.number().int().min(0).max(100_000),
     'vip.points.courseComplete': z.number().int().min(0).max(100_000),
     'vip.points.quizPassed': z.number().int().min(0).max(100_000),
+    'vip.points.firstPost': z.number().int().min(0).max(100_000),
+    'vip.points.postDay': z.number().int().min(0).max(100_000),
   })
   .partial()
 

@@ -111,6 +111,16 @@ body.vip-theme::after {
   font-weight: 600;
 }
 
+.vip-body .vip-hashtag {
+  color: #82c3ff;
+  font-weight: 600;
+}
+.vip-body .vip-mention:hover,
+.vip-body .vip-hashtag:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .vip-prose h2 { font-size: 1.35rem; font-weight: 700; margin: 1.6rem 0 0.6rem; }
 .vip-prose h3 { font-size: 1.15rem; font-weight: 700; margin: 1.3rem 0 0.5rem; }
 .vip-prose h4 { font-size: 1rem; font-weight: 700; margin: 1rem 0 0.4rem; }

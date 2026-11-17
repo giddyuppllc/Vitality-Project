@@ -26,6 +26,16 @@ import * as rewardsRedeem from '@/app/api/vip/rewards/redeem/route'
 import * as rewardsRedemption from '@/app/api/vip/rewards/redemptions/[id]/route'
 import * as rewardsPartnerCode from '@/app/api/vip/rewards/partner-code/route'
 import * as rewardsPrefs from '@/app/api/vip/rewards/prefs/route'
+import * as bookmarks from '@/app/api/vip/bookmarks/route'
+import * as discover from '@/app/api/vip/discover/route'
+import * as follow from '@/app/api/vip/members/[id]/follow/route'
+import * as block from '@/app/api/vip/members/[id]/block/route'
+import * as follows from '@/app/api/vip/members/[id]/follows/route'
+import * as suggest from '@/app/api/vip/members/suggest/route'
+import * as messages from '@/app/api/vip/messages/route'
+import * as messagesUnread from '@/app/api/vip/messages/unread/route'
+import * as conversation from '@/app/api/vip/messages/[id]/route'
+import * as adminMedia from '@/app/api/admin/vip/media/[...path]/route'
 import * as adminSettings from '@/app/api/admin/vip/settings/route'
 import * as adminSpaces from '@/app/api/admin/vip/spaces/route'
 import * as adminSpace from '@/app/api/admin/vip/spaces/[id]/route'
@@ -73,6 +83,22 @@ const CASES: Case[] = [
   { name: 'PATCH /profile', gate: 'community', run: () => h(profile.PATCH)(req('/api/vip/profile', { method: 'PATCH', body: { bio: 'x' } }), ctx({})) },
   { name: 'GET /members', gate: 'community', run: () => h(members.GET)(req('/api/vip/members'), ctx({})) },
   { name: 'POST /uploads', gate: 'community', run: () => h(uploads.POST)(req('/api/vip/uploads', { body: {} }), ctx({})) },
+  { name: 'GET /bookmarks', gate: 'community', run: () => h(bookmarks.GET)(req('/api/vip/bookmarks'), ctx({})) },
+  { name: 'POST /bookmarks', gate: 'community', run: () => h(bookmarks.POST)(req('/api/vip/bookmarks', { body: { postId } }), ctx({})) },
+  { name: 'GET /discover', gate: 'community', run: () => h(discover.GET)(req('/api/vip/discover?q=zz'), ctx({})) },
+  { name: 'POST /members/:id/follow', gate: 'community', run: () => h(follow.POST)(req('/api/vip/members/missing/follow', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'DELETE /members/:id/follow', gate: 'community', run: () => h(follow.DELETE)(req('/api/vip/members/missing/follow', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'POST /members/:id/block', gate: 'community', run: () => h(block.POST)(req('/api/vip/members/missing/block', { method: 'POST' }), ctx({ id: 'missing' })) },
+  { name: 'DELETE /members/:id/block', gate: 'community', run: () => h(block.DELETE)(req('/api/vip/members/missing/block', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'GET /members/:id/follows', gate: 'community', run: () => h(follows.GET)(req('/api/vip/members/missing/follows'), ctx({ id: 'missing' })) },
+  { name: 'GET /members/suggest', gate: 'community', run: () => h(suggest.GET)(req('/api/vip/members/suggest?q=zz'), ctx({})) },
+  { name: 'GET /messages', gate: 'community', run: () => h(messages.GET)(req('/api/vip/messages'), ctx({})) },
+  { name: 'POST /messages', gate: 'community', run: () => h(messages.POST)(req('/api/vip/messages', { body: { recipientId: 'missing' } }), ctx({})) },
+  { name: 'GET /messages/unread', gate: 'community', run: () => h(messagesUnread.GET)(req('/api/vip/messages/unread'), ctx({})) },
+  { name: 'GET /messages/:id', gate: 'community', run: () => h(conversation.GET)(req('/api/vip/messages/missing'), ctx({ id: 'missing' })) },
+  { name: 'POST /messages/:id', gate: 'community', run: () => h(conversation.POST)(req('/api/vip/messages/missing', { body: { body: 'hi' } }), ctx({ id: 'missing' })) },
+  { name: 'PATCH /messages/:id', gate: 'community', run: () => h(conversation.PATCH)(req('/api/vip/messages/missing', { method: 'PATCH', body: { read: true } }), ctx({ id: 'missing' })) },
+  { name: 'DELETE /messages/:id', gate: 'community', run: () => h(conversation.DELETE)(req('/api/vip/messages/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
   { name: 'GET /profile', gate: 'member', run: () => h(profile.GET)(req('/api/vip/profile'), ctx({})) },
   { name: 'GET /media/*', gate: 'member', run: () => h(media.GET)(req('/api/vip/media/2026-01/x.jpg'), ctx({ path: ['2026-01', 'x.jpg'] })) },
   { name: 'POST /lessons/:id/progress', gate: 'member', run: () => h(progress.POST)(req('/api/vip/lessons/missing/progress', { method: 'POST' }), ctx({ id: 'missing' })) },
@@ -123,6 +149,7 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'POST statements', run: () => h(adminStatements.POST)(req('/api/admin/vip/partners/statements', { body: { op: 'issue', id: 'x' } }), ctx({})) },
   { name: 'POST files', run: () => h(adminFiles.POST)(req('/api/admin/vip/files', { body: {} }), ctx({})) },
   { name: 'POST library', run: () => h(adminLibrary.POST)(req('/api/admin/vip/library', { body: { op: 'delete', id: 'x' } }), ctx({})) },
+  { name: 'GET media (reported DM photo)', run: () => h(adminMedia.GET)(req('/api/admin/vip/media/2026-01/x.jpg?c=x'), ctx({ path: ['2026-01', 'x.jpg'] })) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -167,6 +194,9 @@ describe('members-only gating — every clubhouse API', () => {
         'rewards/redeem/route.ts', 'rewards/redemptions/[id]/route.ts', 'rewards/partner-code/route.ts', 'rewards/prefs/route.ts',
         'lessons/[id]/note/route.ts', 'quizzes/[id]/attempts/route.ts', 'trainings/[id]/redeem/route.ts',
         'trainings/[id]/invoice/route.ts', 'files/[id]/route.ts', 'events/[id]/ics/route.ts',
+        'bookmarks/route.ts', 'discover/route.ts', 'members/[id]/follow/route.ts', 'members/[id]/block/route.ts',
+        'members/[id]/follows/route.ts', 'members/suggest/route.ts', 'messages/route.ts', 'messages/unread/route.ts',
+        'messages/[id]/route.ts',
       ].sort(),
     )
   })

@@ -23,6 +23,10 @@ export const VIP_SETTING_DEFAULTS = {
   'vip.points.lessonComplete': 50,
   'vip.points.courseComplete': 500,
   'vip.points.quizPassed': 25,
+  /** Points for a member's first clubhouse post (once per member). 0 = off. */
+  'vip.points.firstPost': 100,
+  /** Points for posting on a day (once per member per clubhouse-time-zone day). 0 = off. */
+  'vip.points.postDay': 10,
 } as const
 
 export type VipSettingKey = keyof typeof VIP_SETTING_DEFAULTS

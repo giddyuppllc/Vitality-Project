@@ -14,6 +14,7 @@ import PointsPage from '@/app/admin/vip/rewards/points/page'
 import PartnersPage from '@/app/admin/vip/partners/page'
 import PartnerDetail from '@/app/admin/vip/partners/[id]/page'
 import StatementsPage from '@/app/admin/vip/partners/statements/page'
+import ReportedConversation from '@/app/admin/vip/conversations/[id]/page'
 
 /**
  * The admin layout's role check is NOT an access boundary: Next renders only
@@ -38,6 +39,7 @@ const pages: Array<[string, () => Promise<unknown>]> = [
   ['/admin/vip/partners', () => PartnersPage()],
   ['/admin/vip/partners/[id]', () => PartnerDetail({ params: Promise.resolve({ id: 'nope' }) })],
   ['/admin/vip/partners/statements', () => StatementsPage({ searchParams: Promise.resolve({}) })],
+  ['/admin/vip/conversations/[id]', () => ReportedConversation({ params: Promise.resolve({ id: 'nope' }) })],
 ]
 
 async function outcome(render: () => Promise<unknown>): Promise<string> {
