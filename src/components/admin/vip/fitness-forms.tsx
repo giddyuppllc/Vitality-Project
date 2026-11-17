@@ -1,5 +1,6 @@
 'use client'
 
+import { MEASURE_OPTIONS } from '@/lib/vip/fitness/labels'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -169,11 +170,6 @@ export interface AdminExercise {
   published: boolean
 }
 
-export const MEASURE_OPTIONS = [
-  { value: 'WEIGHT_REPS', label: 'Weight × reps' },
-  { value: 'REPS', label: 'Bodyweight reps' },
-  { value: 'TIME', label: 'Timed' },
-] as const
 
 export function ExerciseForm({ exercise }: { exercise?: AdminExercise }) {
   const { busy, msg, send } = useSubmit()

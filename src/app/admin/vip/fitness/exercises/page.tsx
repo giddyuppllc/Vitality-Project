@@ -2,7 +2,8 @@ import type { Prisma } from '@prisma/client'
 import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { AdminActionButton, adminInput } from '@/components/admin/vip/admin-vip-ui'
-import { ExerciseForm, FitnessSubNav, MEASURE_OPTIONS } from '@/components/admin/vip/fitness-forms'
+import { ExerciseForm, FitnessSubNav } from '@/components/admin/vip/fitness-forms'
+import { MEASURE_OPTIONS } from '@/lib/vip/fitness/labels'
 
 export const dynamic = 'force-dynamic'
 

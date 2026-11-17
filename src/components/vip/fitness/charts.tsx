@@ -12,7 +12,7 @@ export interface Datum {
   display: string
 }
 
-const W = 600
+const W = 400
 const PAD = { top: 22, right: 8, bottom: 32, left: 8 }
 
 function niceMax(v: number) {
@@ -47,7 +47,7 @@ export function BarChart({ data, caption, height = 150 }: { data: Datum[]; capti
   const bw = Math.max(4, Math.min(28, slot - 4))
   const every = data.length > 8 ? 3 : data.length > 5 ? 2 : 1
   return (
-    <figure className="m-0">
+    <figure className="m-0 max-w-[560px]">
       <svg viewBox={`0 0 ${W} ${height}`} className="h-auto w-full" role="img" aria-label={caption}>
         <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + innerH} y2={PAD.top + innerH} stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
         <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top} y2={PAD.top} stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="3 4" />
@@ -69,7 +69,7 @@ export function BarChart({ data, caption, height = 150 }: { data: Datum[]; capti
                 />
               )}
               {i % every === (data.length - 1) % every && (
-                <text x={x + bw / 2} y={height - 9} textAnchor="middle" fontSize="16" fill="rgba(255,255,255,0.6)">
+                <text x={x + bw / 2} y={height - 9} textAnchor="middle" fontSize="13" fill="rgba(255,255,255,0.6)">
                   {d.label}
                 </text>
               )}
@@ -91,14 +91,14 @@ export function LineChart({ data, caption, height = 160 }: { data: Datum[]; capt
   const span = hi - lo || Math.max(1, hi * 0.1)
   const min = lo - span * 0.15
   const max = hi + span * 0.15
-  const innerW = W - PAD.left - PAD.right - 40
+  const innerW = W - PAD.left - PAD.right - 36
   const innerH = height - PAD.top - PAD.bottom
-  const x = (i: number) => PAD.left + 20 + (data.length === 1 ? innerW / 2 : (innerW * i) / (data.length - 1))
+  const x = (i: number) => PAD.left + 18 + (data.length === 1 ? innerW / 2 : (innerW * i) / (data.length - 1))
   const y = (v: number) => PAD.top + innerH - ((v - min) / (max - min)) * innerH
   const path = data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(' ')
   const last = data.length - 1
   return (
-    <figure className="m-0">
+    <figure className="m-0 max-w-[560px]">
       <svg viewBox={`0 0 ${W} ${height}`} className="h-auto w-full" role="img" aria-label={caption}>
         <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + innerH} y2={PAD.top + innerH} stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
         <path d={path} fill="none" stroke="#4aa3f7" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
@@ -116,18 +116,18 @@ export function LineChart({ data, caption, height = 160 }: { data: Datum[]; capt
             x={x(i)}
             y={y(data[i].value) - 12}
             textAnchor={i === 0 && last > 0 ? 'start' : 'end'}
-            fontSize="17"
+            fontSize="14"
             fontWeight="600"
             fill="rgba(255,255,255,0.85)"
           >
             {data[i].display}
           </text>
         ))}
-        <text x={x(0)} y={height - 9} textAnchor="start" fontSize="16" fill="rgba(255,255,255,0.6)">
+        <text x={x(0)} y={height - 9} textAnchor="start" fontSize="13" fill="rgba(255,255,255,0.6)">
           {data[0].label}
         </text>
         {last > 0 && (
-          <text x={x(last)} y={height - 9} textAnchor="end" fontSize="16" fill="rgba(255,255,255,0.6)">
+          <text x={x(last)} y={height - 9} textAnchor="end" fontSize="13" fill="rgba(255,255,255,0.6)">
             {data[last].label}
           </text>
         )}

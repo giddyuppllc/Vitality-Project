@@ -114,10 +114,10 @@ export default async function HealthPage() {
 
       <SectionTitle>Body measurements</SectionTitle>
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-        <section className="vip-surface p-5" aria-label="Add measurements">
+        <section className="vip-surface min-w-0 p-5" aria-label="Add measurements">
           <MetricsForm units={u} today={today} />
         </section>
-        <section className="vip-surface p-5" aria-label="Measurement history">
+        <section className="vip-surface min-w-0 p-5" aria-label="Measurement history">
           {weights.length >= 2 && (
             <div className="mb-4">
               <h3 className="mb-1 text-sm font-semibold">Weight ({weightUnit(u)})</h3>
