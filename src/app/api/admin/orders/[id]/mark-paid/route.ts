@@ -175,21 +175,26 @@ export async function POST(
 
   // A cancelled/expired Zelle order has already given its store credit back.
   // Marking it paid would ship it with that credit spent twice — refuse and
-  // point the admin at re-placing the order instead.
-  if (order.status === 'CANCELLED') {
-    const credit = await outstandingOrderCredit(order.id)
-    if (credit.restored > 0) {
-      return NextResponse.json(
-        {
-          error: `This order was cancelled and its $${(credit.restored / 100).toFixed(2)} store credit was returned to the customer. Place a new order for them instead of marking this one paid.`,
-        },
-        { status: 409 },
-      )
-    }
+  // point the admin at re-placing the order instead. Checked on the credit
+  // ledger, not the status: an admin can re-open a cancelled order ("Mark
+  // Processing") and the credit is still back in the customer's balance.
+  const credit = await outstandingOrderCredit(order.id)
+  if (credit.restored > 0) {
+    return NextResponse.json(
+      {
+        error: `This order was cancelled and its $${(credit.restored / 100).toFixed(2)} store credit was returned to the customer. Place a new order for them instead of marking this one paid.`,
+      },
+      { status: 409 },
+    )
   }
 
-  const updated = await prisma.order.update({
-    where: { id: order.id },
+  // CLAIM the UNPAID→PAID transition with one conditional update, so a
+  // double-click or two admins at once run the pipeline below exactly once.
+  // (Was read-then-update: concurrent calls each decremented stock, awarded
+  // loyalty points and pushed a membership's renewal date another 30 days.)
+  // A refunded order can't be flipped back to PAID here either.
+  const claimed = await prisma.order.updateMany({
+    where: { id: order.id, paymentStatus: { in: ['UNPAID', 'FAILED'] } },
     data: {
       paymentStatus: 'PAID',
       status: order.status === 'PENDING' ? 'PROCESSING' : order.status,
@@ -199,6 +204,17 @@ export async function POST(
         `zelle_manual_${Date.now().toString(36)}`,
     },
   })
+  if (claimed.count !== 1) {
+    const now = await prisma.order.findUnique({ where: { id: order.id }, select: { paymentStatus: true } })
+    if (now?.paymentStatus === 'PAID') {
+      return NextResponse.json({ ok: true, alreadyPaid: true, orderId: order.id })
+    }
+    return NextResponse.json(
+      { error: `This order's payment is ${now?.paymentStatus ?? 'unknown'}; it can't be marked paid.` },
+      { status: 409 },
+    )
+  }
+  const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
 
   // Membership invoice? Activate the membership instead of routing to a
   // physical facility (memberships have no fulfillment). Membership invoices
