@@ -3,15 +3,16 @@ import { Search } from 'lucide-react'
 import { VIP_COPY } from '@/lib/vip/copy'
 import { requireVipPage } from '@/lib/vip/page-gate'
 import { listMembers } from '@/lib/vip/members'
+import { blockedIdSet } from '@/lib/vip/blocks'
 import { Avatar, EmptyState, PageHeader, TierBadge } from '@/components/vip/ui'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Members' }
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  await requireVipPage('community')
+  const viewer = await requireVipPage('community')
   const { q } = await searchParams
-  const members = await listMembers(q)
+  const members = await listMembers(q, { excludeIds: await blockedIdSet(viewer.userId) })
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -26,7 +27,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
             name="q"
             type="search"
             defaultValue={q}
-            placeholder="Search by name"
+            placeholder="Search by name, username or interest"
             className="vip-focus h-11 w-full rounded-xl border border-white/10 bg-white/[0.05] pl-9 pr-3 text-sm text-white placeholder:text-white/40"
           />
         </label>

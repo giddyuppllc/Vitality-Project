@@ -9,7 +9,7 @@ import { authorSelect, toAuthor, type AuthorView } from './feed'
  * gate with requireVipPage/requireVipApi — there are no public profiles.
  */
 
-const memberWhere: Prisma.UserWhereInput = {
+export const memberWhere: Prisma.UserWhereInput = {
   OR: [{ role: 'ADMIN' }, { membership: { status: 'ACTIVE', tier: { not: 'NONE' } } }],
   NOT: { vipProfile: { suspendedAt: { not: null } } },
 }
@@ -19,16 +19,16 @@ export interface MemberCard extends AuthorView {
   joinedAt: string | null
 }
 
-const cardSelect = {
+export const cardSelect = {
   ...authorSelect,
   createdAt: true,
   vipProfile: { select: { displayName: true, avatarUrl: true, bio: true } },
   membership: { select: { tier: true, status: true, startedAt: true, paymentConfirmedAt: true } },
 } satisfies Prisma.UserSelect
 
-type CardRow = Prisma.UserGetPayload<{ select: typeof cardSelect }>
+export type CardRow = Prisma.UserGetPayload<{ select: typeof cardSelect }>
 
-function toCard(u: CardRow): MemberCard {
+export function toCard(u: CardRow): MemberCard {
   const joined = u.membership?.paymentConfirmedAt ?? u.membership?.startedAt ?? null
   return {
     ...toAuthor(u),
@@ -37,27 +37,34 @@ function toCard(u: CardRow): MemberCard {
   }
 }
 
-export async function listMembers(q: string | null | undefined): Promise<MemberCard[]> {
-  const term = q?.trim().slice(0, 60)
-  const where: Prisma.UserWhereInput = term
-    ? {
-        AND: [
-          memberWhere,
-          {
-            OR: [
-              { name: { contains: term, mode: 'insensitive' } },
-              { username: { contains: term, mode: 'insensitive' } },
-              { vipProfile: { displayName: { contains: term, mode: 'insensitive' } } },
-            ],
-          },
-        ],
-      }
-    : memberWhere
+/**
+ * Directory / member search: name, display name, username, or an interest
+ * tag ("sleep" or "#sleep"). `excludeIds` drops members blocked either way.
+ */
+export async function listMembers(
+  q: string | null | undefined,
+  opts: { excludeIds?: Iterable<string>; take?: number } = {},
+): Promise<MemberCard[]> {
+  const term = q?.trim().replace(/^@/, '').slice(0, 60)
+  const tag = term?.replace(/^#+/, '').toLowerCase()
+  const exclude = [...(opts.excludeIds ?? [])]
+  const and: Prisma.UserWhereInput[] = [memberWhere]
+  if (exclude.length) and.push({ id: { notIn: exclude } })
+  if (term) {
+    and.push({
+      OR: [
+        { name: { contains: term, mode: 'insensitive' } },
+        { username: { contains: term, mode: 'insensitive' } },
+        { vipProfile: { displayName: { contains: term, mode: 'insensitive' } } },
+        ...(tag ? [{ vipInterests: { some: { tag: { contains: tag } } } }] : []),
+      ],
+    })
+  }
   const rows = await prisma.user.findMany({
-    where,
+    where: { AND: and },
     select: cardSelect,
     orderBy: { createdAt: 'asc' },
-    take: 200,
+    take: Math.min(opts.take ?? 200, 200),
   })
   return rows.map(toCard)
 }
