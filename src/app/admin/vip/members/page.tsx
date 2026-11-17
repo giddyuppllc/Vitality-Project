@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { TIER_BENEFITS } from '@/lib/membership'
@@ -13,6 +14,7 @@ const M = '/api/admin/vip/moderation'
  * community (feed, comments, directory); classroom/events/rewards remain.
  */
 export default async function AdminVipMembersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  await requireAdminPage()
   const { q } = await searchParams
   const term = q?.trim()
   const users = await prisma.user.findMany({
