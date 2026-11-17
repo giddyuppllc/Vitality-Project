@@ -150,6 +150,18 @@ describe('variants are priced from the variant the customer chose', () => {
     expect(c.status).toBe(400)
     expect(await prisma.order.count({ where: { userId: m.id } })).toBe(0)
   })
+
+  it('a product sold in sizes is refused without a size, not sold at the product price', async () => {
+    const m = await makeUser({ tag: 'mp-nosize' })
+    const a = await product(4500, { variants: { create: [{ name: 'ZZ 10mg', price: 7400, sku: `ZZ-S-${Date.now()}` }] } })
+    setSession(m)
+    const z = await zellePOST(zelleReq(m, [{ productId: a.id, quantity: 1 }]))
+    expect(z.status).toBe(400)
+    setSession(m)
+    const c = await cardPOST(cardReq(m, [{ productId: a.id, quantity: 1 }]))
+    expect(c.status).toBe(400)
+    expect(await prisma.order.count({ where: { userId: m.id } })).toBe(0)
+  })
 })
 
 describe('member pricing never discounts more than the merchandise', () => {

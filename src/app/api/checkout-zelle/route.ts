@@ -180,6 +180,12 @@ export async function POST(req: NextRequest) {
       if (item.variantId && !variant) {
         throw new UnorderableLineError(`The selected option for ${product.name} is no longer available`)
       }
+      // A product sold in sizes must be ordered in a size; without one the
+      // line was charged the product's own price, which can differ from every
+      // size (Selank: $45 product price vs $74 for the only size sold).
+      if (!item.variantId && product.variants.length > 0) {
+        throw new UnorderableLineError(`Please choose a size for ${product.name}`)
+      }
       const price = variant?.price ?? product.price
       // `??` falls back on null/undefined but NOT on 0, so a variant saved
       // without a price resolves to 0 and this line would be sold for nothing.

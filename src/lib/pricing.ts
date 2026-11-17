@@ -55,7 +55,7 @@ export interface PricedLine {
   /** true if the line can actually be ordered (ACTIVE + (no variant OR variant exists)). */
   available: boolean
   /** Why available is false, if applicable. */
-  reason?: 'archived' | 'product-not-found' | 'variant-not-found' | 'price-unset'
+  reason?: 'archived' | 'product-not-found' | 'variant-not-found' | 'variant-required' | 'price-unset'
 }
 
 export interface PricedCart {
@@ -141,6 +141,24 @@ export async function computeCartTotal(
     let variant: { id: string; name: string; price: number } | null = null
     if (ref.variantId) {
       variant = p.variants.find((v) => v.id === ref.variantId) ?? null
+    }
+    // A product sold in sizes must be bought in a size. Without one the line
+    // fell back to the product's own price, which can differ from every size
+    // (Selank: $45 product price vs $74 for the only size sold).
+    if (!ref.variantId && p.variants.length > 0) {
+      return {
+        productId: p.id,
+        variantId: null,
+        name: p.name,
+        slug: p.slug,
+        image: p.images[0]?.url ?? null,
+        unitPrice: 0,
+        quantity: ref.quantity,
+        lineTotal: 0,
+        productStatus: p.status,
+        available: false,
+        reason: 'variant-required',
+      }
     }
     if (ref.variantId && !variant) {
       return {
