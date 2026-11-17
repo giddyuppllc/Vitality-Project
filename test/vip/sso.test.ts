@@ -108,4 +108,20 @@ describe('SSO consume (/api/sso)', () => {
     expect(safeCallbackPath('/\\evil.example')).toBe('/feed')
     expect(safeCallbackPath(null)).toBe('/feed')
   })
+
+  it('callbackUrl: browsers strip tab/CR/LF from a Location, so "/\\t/evil" must not become //evil', async () => {
+    // A browser resolving the Location removes ASCII tab and newline first;
+    // whatever we emit must still resolve to the clubhouse origin.
+    const base = 'https://vitalityproject.vip'
+    const resolve = (p: string) => new URL(p.replace(/[\t\n\r]/g, ''), base)
+    for (const evil of ['/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '/%09/evil.example']) {
+      expect(resolve(safeCallbackPath(evil)).origin, JSON.stringify(evil)).toBe(base)
+    }
+    // the end-to-end route too
+    const user = await makeUser({ tag: 'sso-tab', tier: 'CLUB' })
+    const res = await consume(mintSsoToken({ sub: user.id, email: user.email }), '/\t/evil.example/path')
+    expect(resolve(res.headers.get('location')!).origin).toBe(base)
+    // legitimate paths with a query survive
+    expect(safeCallbackPath('/classroom/foundations?x=1#m')).toBe('/classroom/foundations?x=1#m')
+  })
 })

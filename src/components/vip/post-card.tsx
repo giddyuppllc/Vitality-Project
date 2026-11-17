@@ -55,7 +55,6 @@ export function LikeButton({
       type="button"
       onClick={toggle}
       aria-pressed={liked}
-      aria-label={liked ? 'Unlike' : 'Like'}
       className={cn(
         'vip-focus inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors',
         size === 'sm' ? 'px-1.5 py-1 text-xs' : 'px-2.5 py-1.5 text-sm',
@@ -63,6 +62,7 @@ export function LikeButton({
       )}
     >
       <Heart className={cn(size === 'sm' ? 'h-3.5 w-3.5' : 'h-[18px] w-[18px]', liked && 'fill-current')} aria-hidden="true" />
+      <span className="sr-only">Like, </span>
       <span>{count}</span>
     </button>
   )

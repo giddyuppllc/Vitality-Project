@@ -13,7 +13,7 @@ The members' community for The Vitality Project. It has a private social feed, a
 ```
                  ┌──────────── src/proxy.ts (Next 16 proxy, by Host) ────────────┐
  Host = VIP_HOST │  /feed → rewrite /vip/feed + request header x-vp-site: vip     │
-                 │  store APIs → 404, store PWA files → 404, X-Robots-Tag noindex │
+                 │  store APIs + every public/ file → 404, X-Robots-Tag noindex   │
  anything else   │  pass-through, untouched (a client-sent x-vp-site is stripped; │
                  │  only /vip*, /api/vip*, /api/sso answer 404)                   │
                  └───────────────────────────────────────────────────────────────┘
@@ -200,6 +200,16 @@ Measured 09-29: master and this branch built with the same env against the same 
 - Admin: clubhouse settings form, "Repeats monthly" on events; mark-paid refuses a cancelled order whose credit was returned; stale-zelle cron now cancels unpaid orders after 14 days.
 
 Pre-existing on master (not from this branch): `/membership` throws React hydration error #418 in the browser on master too.
+
+## Review fixes (11-17, branch `review/clubhouse`)
+
+- **Admin pages and partial rendering.** A layout is not an access check: a request with `RSC: 1` and a `Next-Router-State-Tree` that claims the admin layout is already rendered gets the page segment without the layout running. Every `/admin/vip` page now calls `requireAdminPage()` (`lib/vip/page-gate.ts`). `src/proxy.ts` also checks the role for every `/admin` page on .global. Before this, 29 of the 47 static store admin pages could be read anonymously, `/admin/customers` among them.
+- **SSO `callbackUrl`.** Control characters are refused. Browsers strip tab and newline characters from a Location, so `/\t/evil` used to resolve to `//evil`.
+- **Uploads.** `experimental.proxyClientMaxBodySize: '25mb'`. With a proxy in place, Next cut request bodies off at 10MB. That broke 10–12MB clubhouse photos and 10–25MB admin uploads on .global.
+- **Host isolation.** On .vip, the files in `public/` (product photos, COAs, logos, hero video) and `/api/auth/register` and `/api/auth/post-login` now return 404.
+- **Direct sign-in.** The login-CSRF check now compares the MIME essence. A request sent as `text/plain; application/json` used to pass.
+- **Events.** Moving an event's start time re-arms the 24h and 1h reminders.
+- **UI.** Signed-in non-members now have a Sign out button. Axe (WCAG 2.1 AA) reports no violations at 390px or 1440px: small-print contrast and accessible names were fixed.
 
 ## Quality (09-29)
 

@@ -156,6 +156,32 @@ describe('event reminders (24h + 1h, RSVPs only)', () => {
     expect(sentTo(late.email).map((m) => m.subject)).toEqual([`Starting in an hour: ${e.title}`])
   })
 
+  it('an event the admin moves to a new time gets fresh reminders for the new time', async () => {
+    const admin = await makeUser({ tag: 'em-ev-move-admin', role: 'ADMIN' })
+    const u = await makeUser({ tag: 'em-ev-move', tier: 'PLUS' })
+    const e = await event(20 * 60)
+    await prisma.vipEventRsvp.create({ data: { eventId: e.id, userId: u.id } })
+    await runEventReminders(new Date(), false)
+    expect(sentTo(u.email)).toHaveLength(1) // "Tomorrow" for the old time
+
+    // Admin pushes the session back a week (same edit form as /admin/vip/events).
+    const { POST: eventsPOST } = await import('@/app/api/admin/vip/events/route')
+    setSession({ ...admin, role: 'ADMIN' })
+    const newStart = new Date(e.startsAt.getTime() + 7 * 86400e3)
+    const res = await eventsPOST(
+      req('/api/admin/vip/events', {
+        body: { op: 'upsert', id: e.id, title: e.title, description: e.description, startsAt: newStart.toISOString(), minTier: 'CLUB', published: true, joinUrl: '' },
+      }),
+    )
+    setSession(null)
+    expect(res.status).toBe(200)
+
+    // A day before the NEW time the member is reminded again; an edit that
+    // doesn't move the time does not re-arm anything.
+    await runEventReminders(new Date(newStart.getTime() - 20 * 3600e3), false)
+    expect(sentTo(u.email).map((m) => m.subject)).toEqual([`Tomorrow: ${e.title}`, `Tomorrow: ${e.title}`])
+  })
+
   it('overlapping cron runs send each reminder once (the claim is the guard)', async () => {
     const u = await makeUser({ tag: 'em-ev-race', tier: 'PLUS' })
     const e = await event(10 * 60)

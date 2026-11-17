@@ -78,11 +78,13 @@ export type RouteDecision =
 
 /**
  * Paths the .vip host serves WITHOUT rewriting into /vip:
- *  - Next internals and static assets (/_next/…, files with an extension)
- *  - next-auth's own endpoints (/api/auth/…) — session reads by SessionProvider
+ *  - Next internals (/_next/…) and the clubhouse's own files (/vip/…)
+ *  - next-auth's own endpoints (/api/auth/…) — but not the store's account
+ *    APIs that happen to live under it (register, post-login)
  *  - the clubhouse's own APIs (/api/vip/…) and the SSO consume endpoint
  */
 const VIP_PASSTHROUGH_API = [/^\/api\/auth(\/|$)/, /^\/api\/vip(\/|$)/, /^\/api\/sso$/]
+const VIP_BLOCKED_API = [/^\/api\/auth\/(register|post-login)(\/|$)/]
 
 /** .global's PWA files must never be served on .vip (would install the store's worker). */
 const VIP_BLOCKED_FILES = new Set(['/service-worker.js', '/manifest.json', '/sitemap.xml'])
@@ -104,11 +106,15 @@ export function routeFor(site: Site, pathname: string): RouteDecision {
   if (pathname === '/robots.txt') return { kind: 'rewrite', path: `${VIP_PREFIX}/robots.txt` }
   if (VIP_BLOCKED_FILES.has(pathname)) return { kind: 'not-found' }
   if (pathname.startsWith('/api/')) {
+    if (VIP_BLOCKED_API.some((re) => re.test(pathname))) return { kind: 'not-found' }
     return VIP_PASSTHROUGH_API.some((re) => re.test(pathname)) ? { kind: 'next' } : { kind: 'not-found' }
   }
   // Already-internal paths (e.g. a client navigation that carries the prefix)
   // are served as-is rather than double-prefixed.
   if (pathname === VIP_PREFIX || pathname.startsWith(`${VIP_PREFIX}/`)) return { kind: 'next' }
-  if (hasFileExtension(pathname)) return { kind: 'next' } // public/ brand assets
+  // public/ is the store's (product photos, COA files, logos, hero video);
+  // the clubhouse ships its own files under /vip/ and member images through
+  // /api/vip/media, so no other file is served on this host.
+  if (hasFileExtension(pathname)) return { kind: 'not-found' }
   return { kind: 'rewrite', path: pathname === '/' ? VIP_PREFIX : `${VIP_PREFIX}${pathname}` }
 }

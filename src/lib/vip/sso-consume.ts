@@ -48,6 +48,18 @@ export async function consumeSsoToken(token: string | null | undefined): Promise
 /** Only same-site relative paths; the mint side's /dashboard maps to the feed. */
 export function safeCallbackPath(raw: string | null | undefined): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/feed'
+  // Browsers drop tab/CR/LF from a Location before resolving it, so "/\t/evil"
+  // would become "//evil" (another origin). No control characters or spaces,
+  // and the result must resolve to our own origin.
+  if (/[\u0000- \u007f]/.test(raw) || raw.length > 512) return '/feed'
+  const probe = 'https://clubhouse.invalid'
+  let u: URL
+  try {
+    u = new URL(raw, probe)
+  } catch {
+    return '/feed'
+  }
+  if (u.origin !== probe) return '/feed'
   if (raw === '/dashboard') return '/feed'
-  return raw.slice(0, 512)
+  return raw
 }

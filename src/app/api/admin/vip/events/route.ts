@@ -54,9 +54,21 @@ export async function POST(req: NextRequest) {
         published: d.published,
         ...(d.repeatMonthly !== undefined ? { repeatMonthly: d.repeatMonthly } : {}),
       }
-      const row = d.id
-        ? await prisma.vipEvent.update({ where: { id: d.id }, data })
-        : await prisma.vipEvent.create({ data: { ...data, createdById: gate.userId } })
+      let row
+      if (d.id) {
+        const before = await prisma.vipEvent.findUnique({ where: { id: d.id }, select: { startsAt: true } })
+        row = await prisma.vipEvent.update({ where: { id: d.id }, data })
+        // Moved to a new time: the reminders already sent were for the old
+        // time, so re-arm them for the new one.
+        if (before && before.startsAt.getTime() !== startsAt.getTime()) {
+          await prisma.vipEventRsvp.updateMany({
+            where: { eventId: d.id },
+            data: { reminded24hAt: null, reminded1hAt: null },
+          })
+        }
+      } else {
+        row = await prisma.vipEvent.create({ data: { ...data, createdById: gate.userId } })
+      }
       id = row.id
     } else if (d.op === 'delete') {
       await prisma.vipEvent.delete({ where: { id: d.id } })
