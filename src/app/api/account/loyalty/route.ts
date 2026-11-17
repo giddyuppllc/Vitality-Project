@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { pointsToDiscountCents, tierForLifetimeSpend } from '@/lib/loyalty'
+import { getEarningRule } from '@/lib/vip/earning'
 
 // Customer-facing loyalty summary. Used by the checkout page to render the
 // "Use loyalty points" redemption UI without re-fetching the heavier
@@ -34,5 +35,7 @@ export async function GET() {
     tier,
     maxDiscountCents,
     centsPerPoint: 1,
+    // Max % of an order's goods payable with points (0 = no cap); checkout enforces it.
+    redeemCapPct: await getEarningRule('vip.points.redeemCapPct'),
   })
 }

@@ -26,6 +26,7 @@ import {
 import {
   awardPointsForOrder,
   InsufficientPointsError,
+  maxRedeemablePoints,
   pointsToDiscountCents,
 } from '@/lib/loyalty'
 import { routeOrderToFacilities } from '@/lib/fulfillment'
@@ -269,7 +270,7 @@ export async function POST(req: NextRequest) {
       })
       const available = acct?.points ?? 0
       const remainingAfterDiscount = Math.max(0, subtotal - discount)
-      plannedPointsRedeem = Math.min(data.useLoyaltyPoints, available, remainingAfterDiscount)
+      plannedPointsRedeem = Math.min(data.useLoyaltyPoints, available, await maxRedeemablePoints(remainingAfterDiscount))
       plannedPointsDiscount = pointsToDiscountCents(plannedPointsRedeem)
     }
 

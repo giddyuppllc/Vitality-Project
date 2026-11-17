@@ -92,6 +92,7 @@ export default function CheckoutPage() {
   // Loyalty points redemption state — fetched once on auth, applied at submit.
   const [loyaltyBalance, setLoyaltyBalance] = useState<number>(0)
   const [pointsToRedeem, setPointsToRedeem] = useState<number>(0)
+  const [redeemCapPct, setRedeemCapPct] = useState<number>(0)
   useEffect(() => {
     if (!session?.user?.id) return
     let cancelled = false
@@ -100,6 +101,7 @@ export default function CheckoutPage() {
       .then((data) => {
         if (cancelled || !data) return
         setLoyaltyBalance(data.points ?? 0)
+        setRedeemCapPct(data.redeemCapPct ?? 0)
       })
       .catch(() => {})
     return () => {
@@ -352,7 +354,9 @@ export default function CheckoutPage() {
                   0,
                   (discount?.finalTotalCents ?? subtotal) - 0, // points can't reduce shipping/tax below 0; server clamps
                 )
-                const maxPoints = Math.min(loyaltyBalance, remainingForRedemption)
+                // Admin redemption cap (% of the goods; 0 = none) — the server applies the same rule.
+                const capped = redeemCapPct > 0 ? Math.floor((remainingForRedemption * redeemCapPct) / 100) : remainingForRedemption
+                const maxPoints = Math.min(loyaltyBalance, capped)
                 const clamped = Math.max(0, Math.min(pointsToRedeem, maxPoints))
                 return (
                   <>
@@ -407,6 +411,7 @@ export default function CheckoutPage() {
                         ) : (
                           '100 pts = $1 off'
                         )}
+                        {redeemCapPct > 0 && ` · up to ${redeemCapPct}% of your items`}
                       </p>
                     </div>
                   </>

@@ -89,6 +89,8 @@ function MembershipPageInner() {
   // Arrived from the members' clubhouse (vitalityproject.vip): same Zelle
   // flow, with a hand-off back to the clubhouse once it is done.
   const fromVip = params.get('from') === 'vip'
+  // Clubhouse referral code (a member number); kept through the register round-trip.
+  const refCode = (params.get('ref') ?? '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 20)
   const vipUrl = (process.env.NEXT_PUBLIC_VIP_URL || 'https://vitalityproject.vip').replace(/\/+$/, '')
   const [selectedPlan, setSelectedPlan] = useState(
     initialTier in PLAN_TO_TIER ? initialTier : 'plus',
@@ -103,7 +105,7 @@ function MembershipPageInner() {
 
     // Not signed in — bounce to register, return here after with the tier preserved.
     if (!session?.user) {
-      const next = encodeURIComponent(`/membership?tier=${selectedPlan}&autostart=1${fromVip ? '&from=vip' : ''}`)
+      const next = encodeURIComponent(`/membership?tier=${selectedPlan}&autostart=1${fromVip ? '&from=vip' : ''}${refCode ? `&ref=${refCode}` : ''}`)
       router.push(`/auth/register?next=${next}`)
       return
     }
@@ -113,7 +115,7 @@ function MembershipPageInner() {
       const res = await fetch('/api/membership/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: PLAN_TO_TIER[selectedPlan] }),
+        body: JSON.stringify({ tier: PLAN_TO_TIER[selectedPlan], ...(refCode ? { ref: refCode } : {}) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not start membership')

@@ -16,6 +16,7 @@ export function VipAdminTabs() {
     { href: '/admin/vip/classroom', label: 'Classroom' },
     { href: '/admin/vip/events', label: 'Events' },
     { href: '/admin/vip/rewards', label: 'Rewards' },
+    { href: '/admin/vip/partners', label: 'Partners' },
   ]
   return (
     <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-white/5 pb-px" aria-label="Clubhouse admin">

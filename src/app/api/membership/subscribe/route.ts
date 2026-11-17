@@ -9,6 +9,7 @@ import { getZelleIdentity } from '@/lib/zelle'
 import { generateOrderNumber } from '@/lib/utils'
 import { setProductStatus } from '@/lib/products'
 import { z } from 'zod'
+import { recordReferral } from '@/lib/vip/referrals'
 import type { MembershipTier } from '@prisma/client'
 
 // Customer signs up for a membership tier. We create the Membership row in
@@ -17,6 +18,8 @@ import type { MembershipTier } from '@prisma/client'
 // flips Order to PAID via mark-paid, which activates the Membership.
 const subscribeSchema = z.object({
   tier: z.enum(['CLUB', 'PLUS', 'PREMIUM']),
+  // Clubhouse referral: the referring member's number (lib/vip/referrals.ts).
+  ref: z.string().max(40).optional(),
 })
 
 const TIER_LABELS: Record<MembershipTier, string> = {
@@ -96,7 +99,10 @@ export async function POST(req: NextRequest) {
       )
     }
     const body = await req.json().catch(() => ({}))
-    const { tier } = subscribeSchema.parse(body)
+    const { tier, ref } = subscribeSchema.parse(body)
+    // Member-gets-member: remember who referred this person (best-effort,
+    // never blocks signup; the award is paid when the first invoice is paid).
+    if (ref) await recordReferral(session.user.id, ref)
 
     // Already ACTIVE on this tier? Idempotent return.
     const existing = await prisma.membership.findUnique({

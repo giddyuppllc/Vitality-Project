@@ -22,6 +22,10 @@ import * as rsvp from '@/app/api/vip/events/[id]/rsvp/route'
 import * as rewards from '@/app/api/vip/rewards/route'
 import * as emailPrefs from '@/app/api/vip/email-prefs/route'
 import * as onboarding from '@/app/api/vip/onboarding/route'
+import * as rewardsRedeem from '@/app/api/vip/rewards/redeem/route'
+import * as rewardsRedemption from '@/app/api/vip/rewards/redemptions/[id]/route'
+import * as rewardsPartnerCode from '@/app/api/vip/rewards/partner-code/route'
+import * as rewardsPrefs from '@/app/api/vip/rewards/prefs/route'
 import * as adminSettings from '@/app/api/admin/vip/settings/route'
 import * as adminSpaces from '@/app/api/admin/vip/spaces/route'
 import * as adminSpace from '@/app/api/admin/vip/spaces/[id]/route'
@@ -29,6 +33,13 @@ import * as adminModeration from '@/app/api/admin/vip/moderation/route'
 import * as adminClassroom from '@/app/api/admin/vip/classroom/route'
 import * as adminEvents from '@/app/api/admin/vip/events/route'
 import * as adminRewards from '@/app/api/admin/vip/rewards/route'
+import * as adminCatalog from '@/app/api/admin/vip/rewards/catalog/route'
+import * as adminRedemptions from '@/app/api/admin/vip/rewards/redemptions/route'
+import * as adminEarning from '@/app/api/admin/vip/rewards/earning/route'
+import * as adminPoints from '@/app/api/admin/vip/rewards/points/route'
+import * as adminUpload from '@/app/api/admin/vip/rewards/upload/route'
+import * as adminPartners from '@/app/api/admin/vip/partners/route'
+import * as adminStatements from '@/app/api/admin/vip/partners/statements/route'
 
 type Handler = (r: NextRequest, ctx: { params: Promise<Record<string, unknown>> }) => Promise<Response>
 type Case = { name: string; gate: 'community' | 'member'; run: () => Promise<Response> }
@@ -63,6 +74,11 @@ const CASES: Case[] = [
   { name: 'GET /email-prefs', gate: 'member', run: () => h(emailPrefs.GET)(req('/api/vip/email-prefs'), ctx({})) },
   { name: 'PATCH /email-prefs', gate: 'member', run: () => h(emailPrefs.PATCH)(req('/api/vip/email-prefs', { method: 'PATCH', body: { emailDigest: true } }), ctx({})) },
   { name: 'POST /onboarding', gate: 'member', run: () => h(onboarding.POST)(req('/api/vip/onboarding', { method: 'POST' }), ctx({})) },
+  { name: 'POST /rewards/redeem', gate: 'member', run: () => h(rewardsRedeem.POST)(req('/api/vip/rewards/redeem', { body: { itemId: 'missing', clickKey: 'gate-test-key' } }), ctx({})) },
+  { name: 'DELETE /rewards/redemptions/:id', gate: 'member', run: () => h(rewardsRedemption.DELETE)(req('/api/vip/rewards/redemptions/missing', { method: 'DELETE' }), ctx({ id: 'missing' })) },
+  { name: 'POST /rewards/partner-code', gate: 'member', run: () => h(rewardsPartnerCode.POST)(req('/api/vip/rewards/partner-code', { body: { partnerId: 'missing', points: 100 } }), ctx({})) },
+  { name: 'GET /rewards/prefs', gate: 'member', run: () => h(rewardsPrefs.GET)(req('/api/vip/rewards/prefs'), ctx({})) },
+  { name: 'PATCH /rewards/prefs', gate: 'member', run: () => h(rewardsPrefs.PATCH)(req('/api/vip/rewards/prefs', { method: 'PATCH', body: { hideFromLeaderboards: false } }), ctx({})) },
 ]
 
 const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
@@ -76,6 +92,19 @@ const ADMIN_CASES: { name: string; run: () => Promise<Response> }[] = [
   { name: 'PUT rewards', run: () => h(adminRewards.PUT)(req('/api/admin/vip/rewards', { method: 'PUT', body: { CLUB: 1, PLUS: 1, PREMIUM: 1 } }), ctx({})) },
   { name: 'GET settings', run: () => h(adminSettings.GET)(req('/api/admin/vip/settings'), ctx({})) },
   { name: 'PUT settings', run: () => h(adminSettings.PUT)(req('/api/admin/vip/settings', { method: 'PUT', body: { 'vip.digestHourUtc': 13 } }), ctx({})) },
+  { name: 'GET catalog', run: () => h(adminCatalog.GET)(req('/api/admin/vip/rewards/catalog'), ctx({})) },
+  { name: 'POST catalog', run: () => h(adminCatalog.POST)(req('/api/admin/vip/rewards/catalog', { body: { op: 'delete', id: 'x' } }), ctx({})) },
+  { name: 'GET redemptions', run: () => h(adminRedemptions.GET)(req('/api/admin/vip/rewards/redemptions'), ctx({})) },
+  { name: 'POST redemptions', run: () => h(adminRedemptions.POST)(req('/api/admin/vip/rewards/redemptions', { body: { op: 'cancel', id: 'x' } }), ctx({})) },
+  { name: 'GET earning', run: () => h(adminEarning.GET)(req('/api/admin/vip/rewards/earning'), ctx({})) },
+  { name: 'PUT earning', run: () => h(adminEarning.PUT)(req('/api/admin/vip/rewards/earning', { method: 'PUT', body: {} }), ctx({})) },
+  { name: 'GET points', run: () => h(adminPoints.GET)(req('/api/admin/vip/rewards/points?q=x'), ctx({})) },
+  { name: 'POST points', run: () => h(adminPoints.POST)(req('/api/admin/vip/rewards/points', { body: { member: 'x@example.invalid', points: 5, reason: 'gate', clickKey: 'gate-test-key' } }), ctx({})) },
+  { name: 'POST upload', run: () => h(adminUpload.POST)(req('/api/admin/vip/rewards/upload', { body: {} }), ctx({})) },
+  { name: 'GET partners', run: () => h(adminPartners.GET)(req('/api/admin/vip/partners'), ctx({})) },
+  { name: 'POST partners', run: () => h(adminPartners.POST)(req('/api/admin/vip/partners', { body: { op: 'staff.remove', id: 'x' } }), ctx({})) },
+  { name: 'GET statements', run: () => h(adminStatements.GET)(req('/api/admin/vip/partners/statements'), ctx({})) },
+  { name: 'POST statements', run: () => h(adminStatements.POST)(req('/api/admin/vip/partners/statements', { body: { op: 'issue', id: 'x' } }), ctx({})) },
 ]
 
 let users: Record<string, { id: string; email: string; role: string }>
@@ -108,13 +137,16 @@ describe('members-only gating — every clubhouse API', () => {
     // auth/login + auth/logout are intentionally public (they create/clear the session).
     // email-prefs POST is the signed one-click opt-out (token-gated, tested in emails.test.ts);
     // its GET/PATCH are member-gated and listed in CASES.
-    const gated = files.filter((f) => !f.startsWith('auth/'))
+    // partner-portal is for partner-business STAFF, not members (gated by VipPartnerStaff,
+    // tested in partners.test.ts).
+    const gated = files.filter((f) => !f.startsWith('auth/') && !f.startsWith('partner-portal/'))
     expect(gated.sort()).toEqual(
       [
         'comments/[id]/route.ts', 'events/[id]/rsvp/route.ts', 'lessons/[id]/progress/route.ts', 'media/[...path]/route.ts',
         'members/route.ts', 'notifications/route.ts', 'posts/[id]/comments/route.ts', 'posts/[id]/route.ts', 'posts/route.ts',
         'profile/route.ts', 'reactions/route.ts', 'reports/route.ts', 'rewards/route.ts', 'uploads/route.ts',
         'email-prefs/route.ts', 'onboarding/route.ts',
+        'rewards/redeem/route.ts', 'rewards/redemptions/[id]/route.ts', 'rewards/partner-code/route.ts', 'rewards/prefs/route.ts',
       ].sort(),
     )
   })

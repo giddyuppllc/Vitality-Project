@@ -5,7 +5,9 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/prisma'
-import type { LoyaltyTier } from '@prisma/client'
+import { Prisma, type LoyaltyTier } from '@prisma/client'
+import { getUserMembership } from '@/lib/membership'
+import { getEarningRule, getEarningRules, purchasePoints } from '@/lib/vip/earning'
 
 export const POINTS_PER_DOLLAR = 1
 export const REDEMPTION_RATE_CENTS = 1 // 1 point = 1 cent of discount (100 pts = $1)
@@ -33,9 +35,22 @@ export function pointsToDiscountCents(points: number): number {
   return Math.max(0, Math.floor(points)) * REDEMPTION_RATE_CENTS
 }
 
+/** Exactly-once key of an order's purchase points (LoyaltyTransaction.idempotencyKey). */
+export const purchaseAwardKey = (orderId: string) => `purchase:${orderId}`
+
 /**
  * Records points earned for a paid order. Creates/updates the LoyaltyAccount,
  * writes a LoyaltyTransaction, bumps lifetimeSpend, and re-evaluates the tier.
+ *
+ * Rate: members with an ACTIVE membership earn the clubhouse's tier-scaled
+ * points-back (lib/vip/earning.ts — Club 1× / Plus 1.5× / Premium Stacks 2×
+ * of a 5% base, admin-editable, never below the store rule); everyone else
+ * keeps the store's 1 point per $1.
+ *
+ * Exactly once per order: the earn line carries the key `purchase:<orderId>`
+ * and is written in one transaction with the balance and lifetime-spend
+ * increments, so a repeat call for the same order changes nothing and returns
+ * the original award.
  */
 export async function awardPointsForOrder(args: {
   userId: string
@@ -43,41 +58,76 @@ export async function awardPointsForOrder(args: {
   orderTotal: number // cents paid (AFTER discount/credit), used for points + tier
 }): Promise<{ pointsEarned: number; tier: LoyaltyTier }> {
   const { userId, orderId, orderTotal } = args
-  const pointsEarned = pointsEarnedForOrder(orderTotal)
+  const key = purchaseAwardKey(orderId)
+
+  const already = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } })
+  if (already) return alreadyAwarded(userId, already.points)
+
+  const [{ tier: membershipTier }, rules] = await Promise.all([getUserMembership(userId), getEarningRules()])
+  const pointsEarned = purchasePoints(orderTotal, membershipTier, rules)
 
   const existing = await prisma.loyaltyAccount.findUnique({ where: { userId } })
+  const newTier = tierForLifetimeSpend((existing?.lifetimeSpend ?? 0) + orderTotal)
 
-  const newLifetimeSpend = (existing?.lifetimeSpend ?? 0) + orderTotal
-  const newTier = tierForLifetimeSpend(newLifetimeSpend)
-
-  const account = await prisma.loyaltyAccount.upsert({
-    where: { userId },
-    update: {
-      points: { increment: pointsEarned },
-      lifetimeSpend: { increment: orderTotal },
-      tier: newTier,
-    },
-    create: {
-      userId,
-      points: pointsEarned,
-      lifetimeSpend: orderTotal,
-      tier: newTier,
-    },
-  })
-
-  if (pointsEarned > 0) {
-    await prisma.loyaltyTransaction.create({
-      data: {
-        accountId: account.id,
-        type: 'EARN_PURCHASE',
-        points: pointsEarned,
-        description: `Earned ${pointsEarned} points on order`,
-        orderId,
-      },
+  if (pointsEarned <= 0) {
+    // Nothing to award (e.g. a $0.50 order): lifetime spend only, as before.
+    await prisma.loyaltyAccount.upsert({
+      where: { userId },
+      update: { lifetimeSpend: { increment: orderTotal }, tier: newTier },
+      create: { userId, lifetimeSpend: orderTotal, tier: newTier },
     })
+    return { pointsEarned: 0, tier: newTier }
   }
 
-  return { pointsEarned, tier: newTier }
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const account = await tx.loyaltyAccount.upsert({ where: { userId }, update: {}, create: { userId }, select: { id: true } })
+      // The keyed line first: a second award for this order fails here and
+      // rolls the whole transaction back before any balance moves.
+      await tx.loyaltyTransaction.create({
+        data: {
+          accountId: account.id,
+          type: 'EARN_PURCHASE',
+          points: pointsEarned,
+          description: `Earned ${pointsEarned} points on order`,
+          orderId,
+          idempotencyKey: key,
+          source: 'global',
+        },
+      })
+      const updated = await tx.loyaltyAccount.update({
+        where: { id: account.id },
+        data: { points: { increment: pointsEarned }, lifetimeSpend: { increment: orderTotal } },
+        select: { lifetimeSpend: true },
+      })
+      const tier = tierForLifetimeSpend(updated.lifetimeSpend)
+      await tx.loyaltyAccount.update({ where: { id: account.id }, data: { tier } })
+      return { pointsEarned, tier }
+    })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      const row = await prisma.loyaltyTransaction.findUnique({ where: { idempotencyKey: key } })
+      if (row) return alreadyAwarded(userId, row.points)
+    }
+    throw e
+  }
+}
+
+async function alreadyAwarded(userId: string, points: number): Promise<{ pointsEarned: number; tier: LoyaltyTier }> {
+  const acct = await prisma.loyaltyAccount.findUnique({ where: { userId }, select: { tier: true } })
+  return { pointsEarned: points, tier: acct?.tier ?? 'BRONZE' }
+}
+
+/**
+ * The most points a checkout may redeem against `goodsCents` (the order's
+ * goods after discounts): the admin's redemption cap (`vip.points.redeemCapPct`,
+ * 0 = no cap). Both checkouts clamp to this on top of balance and amount.
+ */
+export async function maxRedeemablePoints(goodsCents: number): Promise<number> {
+  const capPct = await getEarningRule('vip.points.redeemCapPct')
+  const base = Math.max(0, goodsCents)
+  if (!capPct) return base
+  return Math.floor((base * capPct) / 100)
 }
 
 /** Thrown when a points redemption is no longer covered by the balance. */

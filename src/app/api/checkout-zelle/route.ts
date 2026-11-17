@@ -21,7 +21,7 @@ import {
   plannedCreditUse,
   spendCreditForOrder,
 } from '@/lib/order-credit'
-import { InsufficientPointsError, redeemPointsInTx } from '@/lib/loyalty'
+import { InsufficientPointsError, maxRedeemablePoints, redeemPointsInTx } from '@/lib/loyalty'
 import { resolveOrderAffiliate } from '@/lib/affiliate-tracking'
 import {
   claimDiscountCodeUse,
@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
       const remainingAfterDiscount = Math.max(0, subtotal - discount)
       loyaltyPointsToUse = Math.max(
         0,
-        Math.min(data.loyaltyPointsToRedeem, available, remainingAfterDiscount),
+        Math.min(data.loyaltyPointsToRedeem, available, await maxRedeemablePoints(remainingAfterDiscount)),
       )
       loyaltyDiscount = loyaltyPointsToUse // 1pt = 1c
     }

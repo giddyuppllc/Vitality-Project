@@ -1,0 +1,70 @@
+import { requireAdminPage } from '@/lib/vip/page-gate'
+import { prisma } from '@/lib/prisma'
+import { formatDate } from '@/lib/utils'
+import { EARNING_MAX, formatBps, getEarningRules, purchaseRateBps } from '@/lib/vip/earning'
+import { runPointsExpiry } from '@/lib/vip/points-expiry'
+import { EarningRulesForm, type RuleField } from '@/components/admin/vip/rewards-forms'
+
+export const dynamic = 'force-dynamic'
+
+const FIELDS: Omit<RuleField, 'max'>[] = [
+  { key: 'vip.points.purchaseBaseBps', label: 'Purchase points-back — base rate', unit: 'bps', help: 'Basis points of what a member pays at vitalityproject.global (500 = 5%). Non-members always earn 1 point per $1.' },
+  { key: 'vip.points.multClub', label: 'The Club multiplier', unit: '%', help: '100 = 1×.' },
+  { key: 'vip.points.multPlus', label: 'Plus multiplier', unit: '%', help: '150 = 1.5×.' },
+  { key: 'vip.points.multPremium', label: 'Premium Stacks multiplier', unit: '%', help: '200 = 2×.' },
+  { key: 'vip.points.lesson', label: 'Classroom lesson completed', unit: 'pts', help: 'Paid by the classroom when a lesson is completed.' },
+  { key: 'vip.points.course', label: 'Full course finished', unit: 'pts', help: 'Paid by the classroom when every lesson of a course is done.' },
+  { key: 'vip.points.firstPost', label: 'First community post', unit: 'pts', help: 'Paid once per member by the community.' },
+  { key: 'vip.points.event', label: 'Live event attended', unit: 'pts', help: 'Paid by events when attendance is recorded.' },
+  { key: 'vip.points.streak', label: 'Monthly active streak', unit: 'pts', help: 'Paid once a month for staying active.' },
+  { key: 'vip.points.referral', label: 'Referral', unit: 'pts', help: 'To the referrer when the referred person’s first membership invoice is paid.' },
+  { key: 'vip.points.expiryMonths', label: 'Expire after inactivity', unit: 'months', help: 'Whole balance expires after this many months with no points activity. 0 = never.' },
+  { key: 'vip.points.redeemCapPct', label: 'Checkout redemption cap', unit: '%', help: 'Max share of an order’s goods payable with points at vitalityproject.global. 0 = no cap (the plan suggests 50).' },
+]
+
+export default async function AdminEarningRulesPage() {
+  await requireAdminPage()
+  const [rules, expiry, lastExpiry, lastStatements] = await Promise.all([
+    getEarningRules(),
+    runPointsExpiry({ dryRun: true }),
+    prisma.cronRun.findFirst({ where: { job: { startsWith: 'VIP points expiry' } }, orderBy: { startedAt: 'desc' } }),
+    prisma.cronRun.findFirst({ where: { job: { startsWith: 'VIP partner statements' } }, orderBy: { startedAt: 'desc' } }),
+  ])
+  const fields: RuleField[] = FIELDS.map((f) => ({ ...f, max: EARNING_MAX[f.key as keyof typeof EARNING_MAX] }))
+  return (
+    <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
+      <EarningRulesForm rules={rules} fields={fields} />
+      <div className="space-y-4">
+        <div className="glass space-y-2 rounded-2xl p-5 text-sm">
+          <h2 className="font-semibold">Points-back on purchases</h2>
+          <ul className="space-y-1 text-white/70">
+            <li>The Club: {formatBps(purchaseRateBps('CLUB', rules))}</li>
+            <li>Plus: {formatBps(purchaseRateBps('PLUS', rules))}</li>
+            <li>Premium Stacks: {formatBps(purchaseRateBps('PREMIUM', rules))}</li>
+            <li>Non-members: 1 point per $1</li>
+          </ul>
+          <p className="text-xs text-white/40">100 points = $1. Awarded once per order when it is paid.</p>
+        </div>
+        <div className="glass space-y-2 rounded-2xl p-5 text-sm">
+          <h2 className="font-semibold">Expiry preview (dry run)</h2>
+          {rules['vip.points.expiryMonths'] === 0 ? (
+            <p className="text-white/60">Expiry is off.</p>
+          ) : (
+            <p className="text-white/70">
+              A run now would expire <span className="font-semibold text-white">{expiry.wouldExpirePoints.toLocaleString('en-US')}</span> points across{' '}
+              <span className="font-semibold text-white">{expiry.examined}</span> inactive account(s).
+            </p>
+          )}
+          <p className="text-xs text-white/40">
+            Daily job: <code>/api/cron/vip-points-expiry</code> (<code>&amp;dryRun=1</code> lists, writes nothing). Last run:{' '}
+            {lastExpiry ? `${formatDate(lastExpiry.startedAt)} — ${lastExpiry.status} — ${lastExpiry.result ?? ''}` : 'never'}
+          </p>
+          <p className="text-xs text-white/40">
+            Partner statements: <code>/api/cron/vip-partner-statements</code> (daily; acts on the 1st). Last run:{' '}
+            {lastStatements ? `${formatDate(lastStatements.startedAt)} — ${lastStatements.status}` : 'never'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

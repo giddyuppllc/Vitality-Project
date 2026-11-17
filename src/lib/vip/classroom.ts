@@ -1,6 +1,7 @@
 import type { MembershipTier, VipCourse, VipLesson, VipModule } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { tierAllows } from './access'
+import { courseGrantSet, hasCourseGrant } from './course-grants'
 
 /**
  * Classroom + events tier gating. A lesson's requirement is its own minTier
@@ -18,10 +19,12 @@ export function effectiveLessonTier(lesson: LessonWithCourse): MembershipTier {
 export function lessonAccess(
   lesson: LessonWithCourse,
   accessTier: MembershipTier,
+  granted = false,
 ): { allowed: boolean; minTier: MembershipTier } | null {
   if (!lesson.published || !lesson.module.course.published) return null
   const minTier = effectiveLessonTier(lesson)
-  return { allowed: tierAllows(accessTier, minTier), minTier }
+  // A course grant (e.g. a TRAINING reward) opens every lesson of that course.
+  return { allowed: tierAllows(accessTier, minTier) || granted, minTier }
 }
 
 export async function listCourses(userId: string, accessTier: MembershipTier) {
@@ -45,6 +48,7 @@ export async function listCourses(userId: string, accessTier: MembershipTier) {
       })
     ).map((p) => p.lessonId),
   )
+  const granted = await courseGrantSet(userId)
   return courses.map((c) => {
     const ids = c.modules.flatMap((m) => m.lessons.map((l) => l.id))
     return {
@@ -54,7 +58,7 @@ export async function listCourses(userId: string, accessTier: MembershipTier) {
       summary: c.summary,
       coverImage: c.coverImage,
       minTier: c.minTier,
-      allowed: tierAllows(accessTier, c.minTier),
+      allowed: tierAllows(accessTier, c.minTier) || granted.has(c.id),
       lessonCount: ids.length,
       completedCount: ids.filter((id) => done.has(id)).length,
     }
@@ -86,9 +90,10 @@ export async function getCourse(slug: string, userId: string, accessTier: Member
       })
     ).map((p) => p.lessonId),
   )
+  const granted = await hasCourseGrant(userId, course.id)
   return {
     course,
-    allowed: tierAllows(accessTier, course.minTier),
+    allowed: tierAllows(accessTier, course.minTier) || granted,
     modules: course.modules.map((m) => ({
       id: m.id,
       title: m.title,
@@ -98,7 +103,7 @@ export async function getCourse(slug: string, userId: string, accessTier: Member
           id: l.id,
           title: l.title,
           minTier,
-          allowed: tierAllows(accessTier, minTier),
+          allowed: tierAllows(accessTier, minTier) || granted,
           completed: done.has(l.id),
         }
       }),
@@ -114,7 +119,7 @@ export async function getLesson(id: string, userId: string, accessTier: Membersh
     include: { module: { include: { course: true } } },
   })
   if (!lesson) return null
-  const access = lessonAccess(lesson, accessTier)
+  const access = lessonAccess(lesson, accessTier, await hasCourseGrant(userId, lesson.module.courseId))
   if (!access) return null
   const done = await prisma.vipLessonProgress.findUnique({
     where: { userId_lessonId: { userId, lessonId: id } },
