@@ -12,7 +12,7 @@ import { logAudit } from '@/lib/audit'
 import { createAdminNotification } from '@/lib/notifications'
 import { z } from 'zod'
 import { decrementStock } from '@/lib/inventory'
-import { restoreOrderCredit } from '@/lib/order-credit'
+import { outstandingOrderCredit, restoreOrderCredit } from '@/lib/order-credit'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -55,7 +55,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // (the order-detail button uses it). This branch only fires on a genuine
     // UNPAID→PAID transition so re-saving an already-paid order can't double-
     // decrement inventory or re-credit commission.
+    let runPaidPipeline = false
     if (data.paymentStatus === 'PAID' && prev.paymentStatus !== 'PAID') {
+      // Same guard as mark-paid: an order whose store credit was already
+      // returned (cancelled / expired) can't be marked paid — the customer
+      // would get the goods and keep the credit.
+      const credit = await outstandingOrderCredit(id)
+      if (credit.restored > 0) {
+        return NextResponse.json(
+          {
+            error: `This order was cancelled and its $${(credit.restored / 100).toFixed(2)} store credit was returned to the customer. Place a new order for them instead of marking this one paid.`,
+          },
+          { status: 409 },
+        )
+      }
+      // Claim the transition so two saves can't both run the pipeline.
+      const claimed = await prisma.order.updateMany({
+        where: { id, paymentStatus: { in: ['UNPAID', 'FAILED'] } },
+        data: { paymentStatus: 'PAID' },
+      })
+      runPaidPipeline = claimed.count === 1
+    }
+    if (runPaidPipeline) {
       const order = await prisma.order.findUnique({
         where: { id: id },
         include: { items: true },

@@ -149,14 +149,17 @@ export async function validateCoupon(
         }
     }
 
-    // Members only
+    // Members only — an ACTIVE paid membership (Club / Plus / Premium), the
+    // same rule the store uses for every other member benefit. (Was "has a
+    // loyalty account", which every past customer has.)
     if (rule.membersOnly) {
       if (!context.userId)
         return { valid: false, discount: 0, error: 'Members-only code' }
-      const membership = await prisma.loyaltyAccount.findUnique({
+      const membership = await prisma.membership.findUnique({
         where: { userId: context.userId },
+        select: { status: true, tier: true },
       })
-      if (!membership)
+      if (!membership || membership.status !== 'ACTIVE' || membership.tier === 'NONE')
         return { valid: false, discount: 0, error: 'Members-only code' }
     }
 

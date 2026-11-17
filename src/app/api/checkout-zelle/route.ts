@@ -14,13 +14,21 @@ import {
 import { calculateShipping } from '@/lib/shipping'
 import { calculateTaxAsync } from '@/lib/tax'
 import { checkRateLimit, tooManyRequests } from '@/lib/rate-limit'
-import { computeCartTotal } from '@/lib/pricing'
-import { TIER_BENEFITS } from '@/lib/membership'
+import { computeCartTotal, UnorderableLineError } from '@/lib/pricing'
+import { consumePeptideCredits, PeptideCreditsChangedError, TIER_BENEFITS } from '@/lib/membership'
 import {
   InsufficientCreditError,
   plannedCreditUse,
   spendCreditForOrder,
 } from '@/lib/order-credit'
+import { InsufficientPointsError, redeemPointsInTx } from '@/lib/loyalty'
+import { resolveOrderAffiliate } from '@/lib/affiliate-tracking'
+import {
+  claimDiscountCodeUse,
+  DiscountCodeError,
+  normalizeDiscountCode,
+  priceDiscountCode,
+} from '@/lib/checkout-discount'
 import { z } from 'zod'
 
 // Shared system user that owns guest shipping-address rows (Address.userId is a
@@ -160,11 +168,18 @@ export async function POST(req: NextRequest) {
     const orderItems = data.items.map((item) => {
       const product = products.find((p) => p.id === item.productId)
       if (!product) {
-        throw new Error(`Product ${item.productId} not found or inactive`)
+        throw new UnorderableLineError(`Product ${item.productId} not found or inactive`)
       }
       const variant = item.variantId
         ? product.variants.find((v) => v.id === item.variantId)
         : null
+      // A variantId that isn't one of this product's variants used to fall
+      // back to the product's base price and store the foreign variantId on
+      // the line (wrong price, and mark-paid then took stock from that other
+      // variant). Refuse it.
+      if (item.variantId && !variant) {
+        throw new UnorderableLineError(`The selected option for ${product.name} is no longer available`)
+      }
       const price = variant?.price ?? product.price
       // `??` falls back on null/undefined but NOT on 0, so a variant saved
       // without a price resolves to 0 and this line would be sold for nothing.
@@ -172,7 +187,7 @@ export async function POST(req: NextRequest) {
       // product price, which nobody set for this variant. Member freebies are
       // appended after this loop and are unaffected.
       if (!Number.isFinite(price) || price <= 0) {
-        throw new Error(
+        throw new UnorderableLineError(
           `No price set for ${product.name}${variant ? ` — ${variant.name}` : ''}`,
         )
       }
@@ -218,43 +233,27 @@ export async function POST(req: NextRequest) {
     const peptideCreditsApplied = priced?.member.peptideCreditsApplied ?? 0
 
     let discount = membershipDiscount
-    if (data.discountCode) {
-      const code = await prisma.discountCode.findUnique({
-        where: { code: data.discountCode.trim().toUpperCase(), active: true },
-      })
-      const notExpired = !!code && (!code.expiresAt || code.expiresAt > new Date())
-      if (code && notExpired) {
-        // Atomically CLAIM one use BEFORE applying the discount. The old path
-        // read `usedCount < maxUses` here and incremented separately after the
-        // order was created, so two concurrent checkouts could both pass the cap
-        // and both redeem past `maxUses`. A conditional updateMany
-        // (`usedCount < maxUses`) lets exactly maxUses checkouts win under any
-        // concurrency; a code with no cap increments unconditionally.
-        const claimed =
-          code.maxUses == null
-            ? (await prisma.discountCode.update({
-                where: { id: code.id },
-                data: { usedCount: { increment: 1 } },
-              }),
-              true)
-            : (
-                await prisma.discountCode.updateMany({
-                  where: { id: code.id, usedCount: { lt: code.maxUses } },
-                  data: { usedCount: { increment: 1 } },
-                })
-              ).count > 0
-        if (claimed) {
-          claimedDiscountCodeId = code.id
-          // Discount code stacks on top of the membership discount, applied to
-          // the post-membership amount so it never over-discounts.
-          const base = Math.max(0, subtotal - membershipDiscount)
-          const codeDiscount =
-            code.type === 'PERCENTAGE'
-              ? Math.round(base * (code.value / 100))
-              : Math.min(code.value, base)
-          discount += codeDiscount
-        }
+    // Every rule set on the code is enforced (lib/checkout-discount.ts); a code
+    // that exists but doesn't apply is refused with its reason (400) instead
+    // of being silently dropped or misapplied. Unknown codes (e.g. affiliate
+    // codes typed into the same box) are not an error.
+    const pricedCode = await priceDiscountCode(data.discountCode, {
+      userId,
+      subtotal,
+      // Stacks on the post-membership amount so it never over-discounts.
+      base: subtotal - membershipDiscount,
+      items: data.items,
+    })
+    let codeFreeShipping = false
+    if (pricedCode) {
+      // Atomically CLAIM one use BEFORE applying the discount (conditional on
+      // usedCount < maxUses), so concurrent checkouts can't redeem past the cap.
+      if (!(await claimDiscountCodeUse(pricedCode))) {
+        throw new DiscountCodeError('Code usage limit reached')
       }
+      claimedDiscountCodeId = pricedCode.id
+      discount += pricedCode.amount
+      codeFreeShipping = pricedCode.freeShipping
     }
 
     // Loyalty redemption — validate balance and convert to discount cents.
@@ -290,7 +289,7 @@ export async function POST(req: NextRequest) {
       membership.status === 'ACTIVE' &&
       (membership.tier === 'PLUS' || membership.tier === 'PREMIUM') &&
       TIER_BENEFITS[membership.tier].freeShipping
-    const shippingCost = memberFreeShipping
+    const shippingCost = memberFreeShipping || codeFreeShipping
       ? 0
       : (
           await calculateShipping(
@@ -377,12 +376,11 @@ export async function POST(req: NextRequest) {
     const affCode = req.cookies.get('aff_code')?.value
     let resolvedAffiliateId: string | null = null
     let resolvedAffiliateCode: string | null = null
+    // An affiliate never earns on their own order (lib/affiliate-tracking.ts).
+    const buyer = { userId, email: data.email }
     if (affCode && !locationId) {
-      const aff = await prisma.affiliate.findUnique({
-        where: { code: affCode.toUpperCase() },
-        select: { id: true, code: true, status: true },
-      })
-      if (aff && aff.status === 'ACTIVE') {
+      const aff = await resolveOrderAffiliate(affCode, buyer)
+      if (aff) {
         resolvedAffiliateId = aff.id
         resolvedAffiliateCode = aff.code
       }
@@ -393,16 +391,10 @@ export async function POST(req: NextRequest) {
     // share their code, not a link). Trim + uppercase so a stray space doesn't
     // silently drop the attribution. The code can double as a discount or not.
     if (!resolvedAffiliateId && !locationId && data.discountCode) {
-      const typed = data.discountCode.trim().toUpperCase()
-      if (typed) {
-        const aff = await prisma.affiliate.findUnique({
-          where: { code: typed },
-          select: { id: true, code: true, status: true },
-        })
-        if (aff && aff.status === 'ACTIVE') {
-          resolvedAffiliateId = aff.id
-          resolvedAffiliateCode = aff.code
-        }
+      const aff = await resolveOrderAffiliate(data.discountCode, buyer)
+      if (aff) {
+        resolvedAffiliateId = aff.id
+        resolvedAffiliateCode = aff.code
       }
     }
 
@@ -417,7 +409,8 @@ export async function POST(req: NextRequest) {
         shipping: shippingCost,
         tax: taxAmount,
         total,
-        discountCode: data.discountCode,
+        // Canonical upper-case form, so uses-per-customer counts every use.
+        discountCode: normalizeDiscountCode(data.discountCode),
         paymentMethod: 'zelle',
         paymentStatus: 'UNPAID',
         status: 'PENDING',
@@ -439,6 +432,27 @@ export async function POST(req: NextRequest) {
           orderId: created.id,
           orderNumber: created.orderNumber,
           amountCents: creditToUse,
+        })
+      }
+      // Points are burned in the same transaction, with a conditional
+      // decrement: if a simultaneous order already spent them, this order is
+      // refused (409) and rolled back instead of keeping a discount nobody
+      // paid for. (Was a read-then-write after the order was committed, so
+      // parallel orders each got the full points discount and the balance
+      // went negative.)
+      // This cycle's free-peptide credits, consumed atomically with the order.
+      if (membership && peptideCreditsApplied > 0) {
+        await consumePeptideCredits(tx, {
+          membershipId: membership.id,
+          applied: peptideCreditsApplied,
+          creditsThisPeriod: membership.freePeptideCreditsThisPeriod,
+        })
+      }
+      if (loyaltyPointsToUse > 0 && userId) {
+        await redeemPointsInTx(tx, {
+          userId,
+          points: loyaltyPointsToUse,
+          orderId: created.id,
         })
       }
       return created
@@ -464,36 +478,6 @@ export async function POST(req: NextRequest) {
     // release tracker means the catch below won't roll it back now the order
     // exists.
     claimedDiscountCodeId = null
-
-    // Consume this cycle's peptide credits now that the order row exists.
-    // (BAC + syringes are free on every order, so there's nothing to decrement.)
-    if (membership && peptideCreditsApplied > 0) {
-      await prisma.membership
-        .update({
-          where: { id: membership.id },
-          data: { freePeptidesUsedThisPeriod: { increment: peptideCreditsApplied } },
-        })
-        .catch((err) =>
-          console.error('[checkout-zelle] credit decrement failed:', err),
-        )
-    }
-
-    // Burn the loyalty points now that the order row exists — passes orderId
-    // for the ledger transaction. If this fails the order still stands but
-    // the points won't be debited; admin can reconcile manually. Wrapping
-    // in a transaction across order.create above would be ideal long-term.
-    if (loyaltyPointsToUse > 0) {
-      try {
-        const { redeemPointsForOrder } = await import('@/lib/loyalty')
-        await redeemPointsForOrder({
-          userId: userId!, // loyaltyPointsToUse>0 only when userId is set (guarded above)
-          pointsToRedeem: loyaltyPointsToUse,
-          orderId: order.id,
-        })
-      } catch (err) {
-        console.error('[checkout-zelle] loyalty redemption failed:', err)
-      }
-    }
 
     // Clear server-side cart_items for this user so the abandoned-cart cron
     // doesn't pester them while they're still mid-Zelle-transfer. Best-effort
@@ -628,7 +612,14 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (error instanceof InsufficientCreditError) {
+    if (error instanceof DiscountCodeError || error instanceof UnorderableLineError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (
+      error instanceof InsufficientCreditError ||
+      error instanceof InsufficientPointsError ||
+      error instanceof PeptideCreditsChangedError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     return NextResponse.json(

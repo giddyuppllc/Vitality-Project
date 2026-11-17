@@ -17,6 +17,41 @@ export async function getUserMembership(userId: string) {
   }
 }
 
+/** Thrown when this cycle's free-peptide credits were used by another order meanwhile. */
+export class PeptideCreditsChangedError extends Error {
+  constructor() {
+    super('Your member credits changed while you were checking out. Please review your order and place it again.')
+    this.name = 'PeptideCreditsChangedError'
+  }
+}
+
+type Tx = Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+
+/**
+ * Use `applied` free-peptide credits, inside the order's transaction. One
+ * conditional UPDATE (used + applied <= this cycle's allotment), so two
+ * simultaneous orders can't both redeem the same credit. It was an
+ * unconditional increment after the order was committed: one credit, three
+ * parallel orders, three free peptides.
+ */
+export async function consumePeptideCredits(
+  tx: Tx,
+  args: { membershipId: string; applied: number; creditsThisPeriod: number },
+): Promise<void> {
+  const { membershipId, applied, creditsThisPeriod } = args
+  if (!Number.isInteger(applied) || applied <= 0) return
+  const { count } = await tx.membership.updateMany({
+    where: {
+      id: membershipId,
+      status: 'ACTIVE',
+      freePeptideCreditsThisPeriod: creditsThisPeriod,
+      freePeptidesUsedThisPeriod: { lte: creditsThisPeriod - applied },
+    },
+    data: { freePeptidesUsedThisPeriod: { increment: applied } },
+  })
+  if (count !== 1) throw new PeptideCreditsChangedError()
+}
+
 /**
  * Calculates the member discount on a subtotal.
  */

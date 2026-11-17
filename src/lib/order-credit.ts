@@ -18,7 +18,9 @@ import { prisma } from '@/lib/prisma'
  * finds nothing left to return. A restore on an order that is still open or
  * paid returns nothing.
  *
- * The card checkout (api/checkout → applyStoreCredit) is unchanged.
+ * The card checkout (api/checkout) reserves credit with the same conditional
+ * UPDATE before charging and writes its CHECKOUT_APPLY line with the order;
+ * its credit is NOT returned by restoreOrderCredit (Zelle orders only).
  */
 
 /** The interactive-transaction client of our (extended) prisma instance. */

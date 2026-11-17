@@ -86,3 +86,26 @@ export async function recordClickAndRedirect(
   })
   return response
 }
+
+/**
+ * Resolve an affiliate code to the ACTIVE affiliate who should earn on this
+ * order — or null. An affiliate never earns commission on their own order
+ * (signed-in as themselves, or a guest order placed with their own email):
+ * otherwise an affiliate's own shopping paid them a cut of every purchase.
+ */
+export async function resolveOrderAffiliate(
+  code: string | null | undefined,
+  buyer: { userId: string | null; email: string | null },
+): Promise<{ id: string; code: string; commissionRate: number } | null> {
+  const normalized = code?.trim().toUpperCase()
+  if (!normalized) return null
+  const aff = await prisma.affiliate.findUnique({
+    where: { code: normalized },
+    select: { id: true, code: true, status: true, commissionRate: true, userId: true, user: { select: { email: true } } },
+  })
+  if (!aff || aff.status !== 'ACTIVE') return null
+  if (buyer.userId && aff.userId === buyer.userId) return null
+  const buyerEmail = buyer.email?.trim().toLowerCase()
+  if (buyerEmail && aff.user.email.trim().toLowerCase() === buyerEmail) return null
+  return { id: aff.id, code: aff.code, commissionRate: aff.commissionRate }
+}

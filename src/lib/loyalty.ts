@@ -80,6 +80,49 @@ export async function awardPointsForOrder(args: {
   return { pointsEarned, tier: newTier }
 }
 
+/** Thrown when a points redemption is no longer covered by the balance. */
+export class InsufficientPointsError extends Error {
+  constructor() {
+    super('Your loyalty points balance changed while you were checking out. Please review your order and place it again.')
+    this.name = 'InsufficientPointsError'
+  }
+}
+
+/** The interactive-transaction client of our prisma instance. */
+type Tx = Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+
+/**
+ * Redeem exactly `points` for `orderId` inside the transaction that creates
+ * the order. One conditional `UPDATE … WHERE points >= n` (never a
+ * read-then-write), so two simultaneous checkouts cannot both spend the same
+ * points and the balance never goes negative. Throws InsufficientPointsError,
+ * rolling the order back, when the balance no longer covers the redemption.
+ */
+export async function redeemPointsInTx(
+  tx: Tx,
+  args: { userId: string; points: number; orderId: string },
+): Promise<number> {
+  const { userId, points, orderId } = args
+  if (!Number.isInteger(points) || points <= 0) return 0
+  const { count } = await tx.loyaltyAccount.updateMany({
+    where: { userId, points: { gte: points } },
+    data: { points: { decrement: points } },
+  })
+  if (count !== 1) throw new InsufficientPointsError()
+  const account = await tx.loyaltyAccount.findUniqueOrThrow({ where: { userId }, select: { id: true } })
+  const discountCents = pointsToDiscountCents(points)
+  await tx.loyaltyTransaction.create({
+    data: {
+      accountId: account.id,
+      type: 'REDEEM_DISCOUNT',
+      points: -points,
+      description: `Redeemed ${points} points for $${(discountCents / 100).toFixed(2)} off`,
+      orderId,
+    },
+  })
+  return points
+}
+
 /**
  * Redeems points at checkout. Caller must ensure the user has enough points.
  * Returns the discount value in cents actually applied (clamped).
@@ -98,10 +141,13 @@ export async function redeemPointsForOrder(args: {
   const pointsUsed = Math.min(pointsToRedeem, account.points)
   const discountCents = pointsToDiscountCents(pointsUsed)
 
-  await prisma.loyaltyAccount.update({
-    where: { id: account.id },
+  // Conditional decrement: a concurrent redemption that already spent these
+  // points makes this one a no-op instead of driving the balance negative.
+  const { count } = await prisma.loyaltyAccount.updateMany({
+    where: { id: account.id, points: { gte: pointsUsed } },
     data: { points: { decrement: pointsUsed } },
   })
+  if (count !== 1) return { discountCents: 0, pointsUsed: 0 }
   await prisma.loyaltyTransaction.create({
     data: {
       accountId: account.id,
