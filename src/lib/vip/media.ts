@@ -37,22 +37,35 @@ export function isVipMediaUrl(url: string | null | undefined): boolean {
   return !!url && MEDIA_URL_RE.test(url)
 }
 
-export async function saveMemberImage(
+/**
+ * The shared normalisation step (size cap, decode by content, EXIF rotation,
+ * downscale, re-encode to JPEG — which drops every bit of metadata). Also used
+ * by the owner-only progress-photo store (lib/vip/fitness/photos.ts).
+ */
+export async function normaliseMemberImage(
   input: Buffer,
-): Promise<{ ok: true; url: string } | { ok: false; error: string; status: number }> {
+): Promise<{ ok: true; jpeg: Buffer } | { ok: false; error: string; status: number }> {
   if (input.length > MAX_UPLOAD_BYTES) {
     return { ok: false, error: 'Image is too large (max 12MB).', status: 413 }
   }
-  let processed: Buffer
   try {
-    processed = await sharp(input, { failOn: 'none' })
+    const jpeg = await sharp(input, { failOn: 'none' })
       .rotate()
       .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 80, mozjpeg: true })
       .toBuffer()
+    return { ok: true, jpeg }
   } catch {
     return { ok: false, error: 'That file is not a readable image.', status: 415 }
   }
+}
+
+export async function saveMemberImage(
+  input: Buffer,
+): Promise<{ ok: true; url: string } | { ok: false; error: string; status: number }> {
+  const norm = await normaliseMemberImage(input)
+  if (!norm.ok) return norm
+  const processed = norm.jpeg
   const now = new Date()
   const bucket = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
   const name = `${randomUUID()}.jpg`

@@ -2001,6 +2001,8 @@ model VipWorkoutLog {
   totalVolumeKg Float                 @default(0)
   totalSets     Int                   @default(0)
   pointsAwarded Int                   @default(0)
+  // Records set by this workout, frozen at finish ([{kind, value, previous, exerciseId, exerciseName, measure}]).
+  prSummary     Json?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
