@@ -194,7 +194,16 @@ describe('host routing — .vip serves the clubhouse', () => {
     const robots = vipMetadata.robots as { index: boolean; follow: boolean }
     expect(robots.index).toBe(false)
     expect(robots.follow).toBe(false)
-    expect(vipMetadata.manifest).toBeNull()
+    // The clubhouse's own manifest (vip/academy PWA), never the store's /manifest.json.
+    expect(vipMetadata.manifest).toBe('/manifest.webmanifest')
+  })
+
+  it("serves the clubhouse's own PWA files on .vip only", () => {
+    for (const p of ['/manifest.webmanifest', '/clubhouse-sw.js', '/app-icon-192.png', '/app-icon-512.png', '/app-icon-maskable-512.png', '/apple-touch-icon.png']) {
+      expect(rewriteTarget(call('vitalityproject.vip', p)), p).toBe(`/vip/pwa${p}`)
+      // on .global these names are not the clubhouse's (store files or 404) and /vip/pwa is unreachable
+      expect(rewriteTarget(call('vitalityproject.global', `/vip/pwa${p}`)), p).toBe('/__not-found')
+    }
   })
 })
 

@@ -72,6 +72,7 @@ const CASES: Case[] = [
   { name: 'GET /email-prefs', gate: 'member', run: () => h(emailPrefs.GET)(req('/api/vip/email-prefs'), ctx({})) },
   { name: 'PATCH /email-prefs', gate: 'member', run: () => h(emailPrefs.PATCH)(req('/api/vip/email-prefs', { method: 'PATCH', body: { emailDigest: true } }), ctx({})) },
   { name: 'POST /onboarding', gate: 'member', run: () => h(onboarding.POST)(req('/api/vip/onboarding', { method: 'POST' }), ctx({})) },
+  { name: 'PUT /onboarding', gate: 'member', run: () => h(onboarding.PUT)(req('/api/vip/onboarding', { method: 'PUT', body: { skip: true } }), ctx({})) },
   { name: 'PUT /lessons/:id/note', gate: 'member', run: () => h(lessonNote.PUT)(req('/api/vip/lessons/missing/note', { method: 'PUT', body: { body: 'x' } }), ctx({ id: 'missing' })) },
   { name: 'POST /quizzes/:id/attempts', gate: 'member', run: () => h(quizAttempts.POST)(req('/api/vip/quizzes/missing/attempts', { body: { answers: {} } }), ctx({ id: 'missing' })) },
   { name: 'POST /trainings/:id/redeem', gate: 'member', run: () => h(trainingRedeem.POST)(req('/api/vip/trainings/missing/redeem', { method: 'POST' }), ctx({ id: 'missing' })) },

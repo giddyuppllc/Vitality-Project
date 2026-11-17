@@ -39,4 +39,5 @@ scripts/out/
 
 # VIP clubhouse: local throwaway DB + private member uploads (never commit)
 .vip-dev-db/
+.dev-db-*/
 private-uploads/
