@@ -22,8 +22,11 @@ export async function POST(req: NextRequest) {
   if (!limited.allowed) return tooManyRequests(limited.retryAfter)
 
   // JSON only — a cross-site <form> cannot send this content type without a
-  // CORS preflight, which closes the login-CSRF hole.
-  if (!(req.headers.get('content-type') || '').includes('application/json')) {
+  // CORS preflight, which closes the login-CSRF hole. Compare the MIME
+  // essence: "text/plain; application/json" is still text/plain (safelisted,
+  // no preflight) even though the string contains "application/json".
+  const essence = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+  if (essence !== 'application/json') {
     return NextResponse.json({ error: 'Unsupported content type' }, { status: 415 })
   }
   const parsed = schema.safeParse(await req.json().catch(() => null))
