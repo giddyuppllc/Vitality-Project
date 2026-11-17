@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { type InputHTMLAttributes, forwardRef, useState } from 'react'
+import { type InputHTMLAttributes, forwardRef, useId, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -9,7 +9,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, type, ...props }, ref) => {
+  ({ className, label, error, hint, type, id, ...props }, ref) => {
+    // The <label> was never tied to its <input> (no htmlFor/id), so every
+    // labelled field on the site had no accessible name for screen readers and
+    // clicking the label did not focus the field. A caller-supplied id wins.
+    const autoId = useId()
+    const inputId = id ?? autoId
+    const messageId = `${inputId}-msg`
     // When the field is a password, render an inline show/hide toggle that
     // flips the underlying input type between "password" and "text" without
     // touching any value/validation/submit logic.
@@ -20,12 +26,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label className="text-sm font-medium text-white/70">{label}</label>
+          <label htmlFor={inputId} className="text-sm font-medium text-white/70">{label}</label>
         )}
         <div className="relative">
           <input
             ref={ref}
+            id={inputId}
             type={effectiveType}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error || hint ? messageId : undefined}
             className={cn(
               'w-full px-4 py-2.5 rounded-xl',
               'bg-dark-700 border border-white/10 text-white',
@@ -56,8 +65,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </button>
           )}
         </div>
-        {error && <p className="text-xs text-red-400">{error}</p>}
-        {!error && hint && <p className="text-xs text-white/40">{hint}</p>}
+        {error && <p id={messageId} className="text-xs text-red-400">{error}</p>}
+        {!error && hint && <p id={messageId} className="text-xs text-white/40">{hint}</p>}
       </div>
     )
   }
